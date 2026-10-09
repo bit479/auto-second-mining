@@ -1,0 +1,48 @@
+﻿Looking in indexes: https://mirrors.huaweicloud.com/repository/pypi/simple/
+Collecting ezdxf
+  Downloading ezdxf-1.4.4-cp313-cp313-win_amd64.whl (3.0 MB)
+     ---------------------------------------- 3.0/3.0 MB 593.6 kB/s  0:00:04
+Collecting numpy
+  Downloading numpy-2.5.3-cp313-cp313-win_amd64.whl (12.6 MB)
+     ---------------------------------------- 12.6/12.6 MB 428.3 kB/s  0:00:29
+Collecting pandas
+  Downloading pandas-3.0.6-cp313-cp313-win_amd64.whl (9.6 MB)
+     ---------------------------------------- 9.6/9.6 MB 1.6 MB/s  0:00:06
+Collecting shapely
+  Downloading shapely-2.2.0-cp313-cp313-win_amd64.whl (1.8 MB)
+     ---------------------------------------- 1.8/1.8 MB 2.0 MB/s  0:00:00
+Collecting matplotlib
+  Downloading matplotlib-3.11.2-cp313-cp313-win_amd64.whl (9.3 MB)
+     ---------------------------------------- 9.3/9.3 MB 1.6 MB/s  0:00:05
+Requirement already satisfied: openpyxl in C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages (3.1.5)
+Collecting pywin32
+  Downloading pywin32-312-cp313-cp313-win_amd64.whl (6.9 MB)
+     ---------------------------------------- 6.9/6.9 MB 726.4 kB/s  0:00:09
+Collecting pyparsing>=3.0.0 (from ezdxf)
+  Downloading pyparsing-3.3.3-py3-none-any.whl (126 kB)
+Collecting typing_extensions>=4.6.0 (from ezdxf)
+  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting fonttools (from ezdxf)
+  Downloading fonttools-4.66.1-cp313-cp313-win_amd64.whl (2.5 MB)
+     ---------------------------------------- 2.5/2.5 MB 513.6 kB/s  0:00:04
+Collecting python-dateutil>=2.8.2 (from pandas)
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Collecting tzdata (from pandas)
+  Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
+Collecting contourpy>=1.0.1 (from matplotlib)
+  Downloading contourpy-1.4.0-cp313-cp313-win_amd64.whl (234 kB)
+Collecting cycler>=0.10 (from matplotlib)
+  Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib)
+  Downloading kiwisolver-1.5.1-cp313-cp313-win_amd64.whl (70 kB)
+Collecting packaging>=20.0 (from matplotlib)
+  Downloading packaging-26.3-py3-none-any.whl (129 kB)
+Collecting pillow>=9 (from matplotlib)
+  Downloading pillow-12.3.0-cp313-cp313-win_amd64.whl (7.2 MB)
+     ---------------------------------------- 7.2/7.2 MB 141.7 kB/s  0:00:38
+Requirement already satisfied: et-xmlfile in C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages (from openpyxl) (2.0.0)
+Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas)
+  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Installing collected packages: tzdata, typing_extensions, six, pywin32, pyparsing, pillow, packaging, numpy, kiwisolver, fonttools, cycler, shapely, python-dateutil, ezdxf, contourpy, pandas, matplotlib
+
+Successfully installed contourpy-1.4.0 cycler-0.12.1 ezdxf-1.4.4 fonttools-4.66.1 kiwisolver-1.5.1 matplotlib-3.11.2 numpy-2.5.3 packaging-26.3 pandas-3.0.6 pillow-12.3.0 pyparsing-3.3.3 python-dateutil-2.9.0.post0 pywin32-312 shapely-2.2.0 six-1.17.0 typing_extensions-4.16.0 tzdata-2026.5

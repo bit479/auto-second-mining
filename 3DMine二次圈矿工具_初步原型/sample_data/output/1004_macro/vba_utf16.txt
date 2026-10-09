@@ -1,0 +1,4 @@
+=== 创建点.vbm ===
+utf16 fail: 'utf-16-le' codec can't decode bytes in position 8124-8125: illegal UTF-16 surrogate
+=== 创建面.vbm ===
+utf16 fail: 'utf-16-le' codec can't decode bytes in position 7308-7309: illegal UTF-16 surrogate

@@ -1,0 +1,5 @@
+{
+ "ezdxf": "1.4.4",
+ "add_image": "(image_def: 'ImageDef', insert: 'UVec', size_in_units: 'tuple[float, float]', rotation: 'float' = 0.0, dxfattribs=None) -> 'Image'",
+ "add_image_def": "(filename: 'str', size_in_pixel: 'tuple[int, int]', name=None)"
+}

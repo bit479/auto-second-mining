@@ -1,0 +1,2 @@
+测试python 所在组: <menu_group name="语言">
+组内菜单项: 中文 | English | French | Russian | Spanish | 编辑词条

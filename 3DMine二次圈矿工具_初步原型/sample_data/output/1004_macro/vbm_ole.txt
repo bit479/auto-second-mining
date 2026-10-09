@@ -1,0 +1,71 @@
+OLE streams:
+Contents
+apc  /The VBA Project  /Host Project Item Names  /Host Project Item List Data
+apc  /The VBA Project  /Host Project Item Names  /Project_Data_CurVer
+apc  /The VBA Project  /Host Project Item Names  /ThisDrawing  /Control List Data  /Control List Data
+apc  /The VBA Project  /Host Project Item Names  /ThisDrawing  /Control List Data  /Control_Data_CurVer
+apc  /The VBA Project  /Host Project Item Names  /ThisDrawing  /Project Item Data
+apc  /The VBA Project  /Host Project Item Names  /ThisDrawing  /ReqControl List Data  /ReqControl List Data
+apc  /The VBA Project  /Host Project Items
+apc  /The VBA Project  /VBA Project Data
+apc  /The VBA Project  /VBA Project Signature
+apc  /The VBA Project  /_VBA_Project  /PROJECT
+apc  /The VBA Project  /_VBA_Project  /PROJECTwm
+apc  /The VBA Project  /_VBA_Project  /VBA  /ThisDrawing
+apc  /The VBA Project  /_VBA_Project  /VBA  /_VBA_PROJECT
+apc  /The VBA Project  /_VBA_Project  /VBA  /__SRP_0
+apc  /The VBA Project  /_VBA_Project  /VBA  /__SRP_1
+apc  /The VBA Project  /_VBA_Project  /VBA  /__SRP_2
+apc  /The VBA Project  /_VBA_Project  /VBA  /__SRP_3
+apc  /The VBA Project  /_VBA_Project  /VBA  /dir
+
+=== stream apc/The VBA Project/Host Project Item Names/Host Project Item List Data size=20 ===
+Ķŀ
+
+=== stream apc/The VBA Project/Host Project Item Names/Project_Data_CurVer size=10 ===
+Ĭ
+
+=== stream apc/The VBA Project/Host Project Item Names/ThisDrawing/Control List Data/Control List Data size=40 ===
+ÒÜæð
+
+=== stream apc/The VBA Project/Host Project Item Names/ThisDrawing/Control List Data/Control_Data_CurVer size=10 ===
+È
+
+=== stream apc/The VBA Project/Host Project Item Names/ThisDrawing/Project Item Data size=10 ===
+Ŋ
+
+=== stream apc/The VBA Project/Host Project Item Names/ThisDrawing/ReqControl List Data/ReqControl List Data size=10 ===
+ɢ
+
+=== stream apc/The VBA Project/Host Project Items size=308 ===
+Ǵ笖ᢀኳȈThisDrawing笪ᤰኳȜ笵ⅰኳȞL{623A0104-7318-41AB-A286-DD5A98FF72F9}笷∠ኳȠL{FD301D92-BADA-4F87-B954-92B0BA8CE2EC}笹⋐ኳȢ笻⎀ኳȤ笽ኳȦ
+
+=== stream apc/The VBA Project/VBA Project Data size=194 ===
+ƐƚƤ&ƮL{FD301D92-BADA-4F87-B954-92B0BA8CE2EC}Ƹǂ8F:\新建文件夹\zzx\minevba\创建点.vbmǌ✴⦚
+
+=== stream apc/The VBA Project/VBA Project Signature size=10 ===
+Ǎ
+
+=== stream apc/The VBA Project/_VBA_Project/PROJECT size=384 ===
+䑉∽㡻䌶䐴㐸ⴵ㑆い㐭㥆ⴸ䘸䌷㤭㌸㘹㕅㌵ㅅ紴ഢ䐊捯浵湥㵴桔獩牄睡湩⽧䠦〰〰〰〰慎敭∽牐橯捥彴䐳楍敮ഢ䠊汥䍰湯整瑸䑉∽∰敖獲潩䍮浯慰楴汢㍥㴲㌢㌹㈲〲〰ഢ䌊䝍∽㝅㕅䌲䘰㑆㉆㡆㉆㡆㉆㡆㉆㡆ഢ䐊䉐∽䕃䍃㠲㔵㡅䉄䕃䍄䕃䍄䕃ഢ䜊㵃䈢䈵㔷㜳䑁㙄䐰㙅䐰㥅≆䡛獯⁴硅整摮牥䤠普嵯䠦〰〰〰笽㠳㈳㙄〴䌭㥆ⴰㄱ䙃㠭㑅ⴳ〰ぁ㥃ㄱ〰䄵㭽䉖㭅䠦〰〰〰〰坛牯獫慰散൝吊楨䑳慲楷杮ⴽ㔲㠭〶ⰲ㠠〹
+
+=== stream apc/The VBA Project/_VBA_Project/PROJECTwm size=38 ===
+桔獩牄睡湩gThisDrawing
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing size=1632 ===
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/_VBA_PROJECT size=2061 ===
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/__SRP_0 size=975 ===
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/__SRP_1 size=102 ===
+啲縀}缀
+		ऀ̉ԁp缀
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/__SRP_2 size=200 ===
+啲		0҉ұәѡH4ԁaԩėጀX缀
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/__SRP_3 size=103 ===
+
+=== stream apc/The VBA Project/_VBA_Project/VBA/dir size=320 ===
+㰁肱⨰Ȃঐ瀀͈ؔ舀ꡤЃᰀ倀潲敪瑣聟䐳楍敮ꡄɀ؊ਂȽ嘊ȇźࠔሆȉﴒ陀保Ȍ㱊ȉᘊĀ獲摴敬Ⱦ猙琀doleന栀─^⨃\筇〰㈰㐰㏘ⴰࠀЄCȊĎሁ〰㘴⍽2〮〣䌣尺圀义佄南\祳瑳浥㈳専攃⸲汴⍢伀䕌䄠瑵쁯慭楴湯Ā༢疂舓會࡞耋吊楨s牄睡湩䝧Ė楊猀Draw榀渀最ᨀᘍ㊊ᘘ#䠀ʂㅪ貂Ầ҂ਁ儬䂂ꖎ舢⬐ʂĐʂ

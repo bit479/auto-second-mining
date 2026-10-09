@@ -1,0 +1,10 @@
+﻿enum=5: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum=7: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum=9: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum=11: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum=12: saved=True size=227883
+enum=13: saved=False size=0
+enum=15: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum=61: saved=False size=0
+enum=103: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+DONE

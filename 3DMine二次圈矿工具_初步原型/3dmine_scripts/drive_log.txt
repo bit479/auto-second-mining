@@ -1,0 +1,3 @@
+fg_before=0xD205C
+fg_after_activate=0x81762
+clicked (1075,599) fg_now=0xD205C

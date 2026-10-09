@@ -1,0 +1,22 @@
+<menu_group name="采矿设计">
+			<menu_item name="矿房设计">
+				<Version ID="1.0"/>
+				<Visibility value="yes"/>
+				<Function name=""/>
+				<Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/>
+				<Help Tip="根据巷道中心和矿体设计矿房" HelpSource="AAA"/>
+				<Macro Path="..\..\common\tools\ugtool\stope design.py"/>
+			</menu_item>
+			<menu_separator------------/>
+			<menu_item name="矿房优化">
+				<Version ID="1.0"/>
+				<Visibility value="yes"/>
+				<Function name=""/>
+				<Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/>
+				<Help Tip="根据巷道中线和矿体优化矿房设计" HelpSource="AAA"/>
+				<Macro Path="..\..\common\tools\ugtool\stope optimization.py"/>
+			</menu_item>
+		</menu_group>
+
+矿房设计出现次数: 2
+矿房设计上下文: g" large_image_name="M16_UgSchedularReport_32.png"/> <Help Tip="采掘计划报告" HelpSource="AAA"/> </menu_item> </menu_group> <menu_separator------------/> <menu_group name="采矿设计"> <menu_item name="矿房设计"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="根据巷道中心和矿体设计矿房" HelpSource="AAA"/> <Macro Path="..\..\common\tools\ugtool\stope design.py"/> </menu_item> <me

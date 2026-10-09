@@ -1,0 +1,3 @@
+﻿COM ready 2s
+DWG: D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\3940平台 1004二次圈矿矿块图_3块版_2010.dwg head: AC1024 size: 57993
+DONE

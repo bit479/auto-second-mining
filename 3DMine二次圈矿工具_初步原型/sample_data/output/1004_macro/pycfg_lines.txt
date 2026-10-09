@@ -1,0 +1,4 @@
+﻿=== E:\gzRJ\3Dmine\2022\common\config\appsetting.txt ===
+  m_pyPath=..\bin\nt_x64\python39.dll
+=== E:\gzRJ\3Dmine\2022\common\config\app_module.txt ===
+  Module_40_Python.dll

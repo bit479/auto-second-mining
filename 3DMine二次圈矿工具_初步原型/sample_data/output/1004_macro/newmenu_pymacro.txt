@@ -1,0 +1,30 @@
+<menu_group name="PyMacro(^M)">
+    <menu_item name="RunMacroTest">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest" HelpSource="AAA" />
+      <Macro Path ="test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest2">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest2" HelpSource="AAA" />
+      <Macro Path ="..\test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest3">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest3" HelpSource="AAA" />
+      <Macro Path ="..\..\common\test_mine.py" />
+    </menu_item>
+  </menu_group>
+
+父组: <menu_group name="  <menu_group name="PyMacro(^M)">
+
+顶层菜单组:   <menu_group name= | 文件(^F) | 导入 | Micromine | Cass文件 | 导出 | 打印 | Dwg | Mapgis | 打开 | 保存 | 自定义 | 视图(^V) | 查询 | 浏览视口 | 视角操作 | 视角平面 | 坐标网格 | 鼠标左键旋转 | 点和属性库 | 实体渲染 | 编辑(^E) | 复制 | 粘贴 | 选择 | 隐藏对象 | 工具(^T) | 清理/查错 | 线赋高程 | 线的操作 | 点的操作 | 文字操作 | 多边形计算 | 坐标转换 | 创建(^C) | 剖面 | 编辑 | 剖面管理 | 动态剖面 | 剖面图

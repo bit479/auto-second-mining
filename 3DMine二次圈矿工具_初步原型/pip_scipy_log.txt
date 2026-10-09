@@ -1,0 +1,7 @@
+﻿Looking in indexes: https://mirrors.huaweicloud.com/repository/pypi/simple/
+Collecting scipy
+  Downloading scipy-1.18.1-cp313-cp313-win_amd64.whl (36.6 MB)
+     ---------------------------------------- 36.6/36.6 MB 111.7 kB/s  0:02:08
+Requirement already satisfied: numpy<2.8,>=2.0.0 in C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages (from scipy) (2.5.3)
+Installing collected packages: scipy
+Successfully installed scipy-1.18.1

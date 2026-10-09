@@ -1,0 +1,9 @@
+3DVent help.chm  16059814
+3DVent tutorial.doc  11910656
+3dmine evaluation.chm  824666
+3dmine_help.chm  125722730
+3dmine_release_note.files  <dir>
+3dmine_release_note.htm  1475067
+3dmine_statics.chm  1621984
+chm_extract  <dir>
+pit_optmize  <dir>

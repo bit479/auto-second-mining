@@ -1,0 +1,192 @@
+DbCommands_19.12_14.tx  (282304)
+DbCryptModule_19.12_14.tx  (41664)
+ExCommands_19.12_14.tx  (393408)
+GeoCommands_19.12_14.tx  (54976)
+MineApi.dll  (44032)
+ModelerCommands_19.12_14.tx  (180416)
+Module_0_Core.dll  (1524224)
+Module_10_RingDesign_ext.dll  (1106944)
+Module_11_Plugin.dll  (937984)
+Module_14_Opt.dll  (713216)
+Module_15_Fun.dll  (1202688)
+Module_16_Ug_Schedular.dll  (421376)
+Module_17_Cutting_Plane.dll  (682496)
+Module_18_OpenPit_Blast.dll  (995840)
+Module_1_CAD.dll  (1678848)
+Module_22_PitBlast_Database.dll  (547840)
+Module_23_Ug_Dev.dll  (574464)
+Module_24_Pit_Design.dll  (726016)
+Module_25_Mesh_Tool.dll  (14099968)
+Module_26_Linear_Opt.dll  (1040896)
+Module_2_CAD_Ext.dll  (1435648)
+Module_30_Sun.dll  (656896)
+Module_31_EditMenu.dll  (237568)
+Module_32_Lu.dll  (834048)
+Module_33_Hu.dll  (552448)
+Module_34_Xie.dll  (508928)
+Module_35_yue.dll  (459776)
+Module_37_Plot_Preview.dll  (52224)
+Module_38_Texture.dll  (497664)
+Module_3_DTM.dll  (1368064)
+Module_40_Python.dll  (87552)
+Module_41_Mesh_Ex.dll  (652800)
+Module_41_NetGen_Ex.dll  (744448)
+Module_42_PtCloud.dll  (1193984)
+Module_43_Lod.dll  (1152000)
+Module_4_Solid.dll  (847360)
+Module_5_DataBase_Core.dll  (1473024)
+Module_5_DataBase_Ext.dll  (2051584)
+Module_6_BlockModel.dll  (1301504)
+Module_7_UG.dll  (802816)
+Module_8_OpenPit.dll  (1732608)
+Module_9_Vent.dll  (875008)
+Module_GeoXML.dll  (412160)
+Module_Mapgis.dll  (2029568)
+Module_VR_Tool.dll  (541696)
+PDFiumModule_19.12_14.tx  (142528)
+PdfModuleVINet_19.12_14.tx  (35520)
+postscript1813_x64.hdi  (115200)
+
+=== all dlls ===
+ANN.dll
+AecDummyLoader_19.12_14.dll
+AecGeometry_19.12_14.dll
+BCGCBPRO2510140.dll
+BCGPStyle2007Aqua2510.dll
+BCGPStyle2007Luna2510.dll
+BCGPStyle2007Obsidian2510.dll
+BCGPStyle2007Silver2510.dll
+BCGPStyle2010Black2510.dll
+BCGPStyle2010Blue2510.dll
+BCGPStyle2010White2510.dll
+BCGPStyleCarbon2510.dll
+BCGPStyleScenic2510.dll
+COLLADABaseUtils.dll
+COLLADAFramework.dll
+COLLADASaxFrameworkLoader.dll
+COLLADAStreamWriter.dll
+DmFile.dll
+DwfCore.dll
+DwfToolkit.dll
+FacetModeler_19.12_14.dll
+FileDlgExt_19.12_14.dll
+Filter.dll
+GTS.dll
+GeneratedSaxParser.dll
+IfcPlusPlus.dll
+LicSafeLdk.dll
+MineApi.dll
+MineBcg.dll
+MineBlock.dll
+MineDB.dll
+MineDrillHole.Dll
+MineGe.dll
+MineHoops.dll
+MineLayout.dll
+MineRx-v14.dll
+MineSQL.dll
+MineUI.dll
+Module_0_Core.dll
+Module_10_RingDesign_ext.dll
+Module_11_Plugin.dll
+Module_14_Opt.dll
+Module_15_Fun.dll
+Module_16_Ug_Schedular.dll
+Module_17_Cutting_Plane.dll
+Module_18_OpenPit_Blast.dll
+Module_1_CAD.dll
+Module_22_PitBlast_Database.dll
+Module_23_Ug_Dev.dll
+Module_24_Pit_Design.dll
+Module_25_Mesh_Tool.dll
+Module_26_Linear_Opt.dll
+Module_2_CAD_Ext.dll
+Module_30_Sun.dll
+Module_31_EditMenu.dll
+Module_32_Lu.dll
+Module_33_Hu.dll
+Module_34_Xie.dll
+Module_35_yue.dll
+Module_37_Plot_Preview.dll
+Module_38_Texture.dll
+Module_3_DTM.dll
+Module_40_Python.dll
+Module_41_Mesh_Ex.dll
+Module_41_NetGen_Ex.dll
+Module_42_PtCloud.dll
+Module_43_Lod.dll
+Module_4_Solid.dll
+Module_5_DataBase_Core.dll
+Module_5_DataBase_Ext.dll
+Module_6_BlockModel.dll
+Module_7_UG.dll
+Module_8_OpenPit.dll
+Module_9_Vent.dll
+Module_GeoXML.dll
+Module_Mapgis.dll
+Module_VR_Tool.dll
+OdBrepModeler_19.12_14.dll
+OdaX_19.12_14.dll
+PSToolkit_19.12_14.dll
+Stat_0_Core.dll
+TD_AcisBuilder_19.12_14.dll
+TD_Alloc_19.12_14.dll
+TD_Br_19.12_14.dll
+TD_BrepBuilder_19.12_14.dll
+TD_BrepRenderer_19.12_14.dll
+TD_DbCore_19.12_14.dll
+TD_DbRoot_19.12_14.dll
+TD_Db_19.12_14.dll
+TD_Ge_19.12_14.dll
+TD_Gi_19.12_14.dll
+TD_Gs_19.12_14.dll
+TD_PDFToolkit_19.12_14.dll
+TD_Pdfium.dll
+TD_Root_19.12_14.dll
+TD_SpatialIndex_19.12_14.dll
+TD_Zlib.dll
+W3dTk.dll
+WhipTk.dll
+curl.dll
+freeglut.dll
+gdal300.dll
+glew32.dll
+hics1813_x64.dll
+hoops1813_x64_vc14.dll
+hoops_mfc.dll
+hoops_mvo.dll
+hoops_stream.dll
+libBuffer.dll
+libfbxsdk.dll
+libgmp-10.dll
+liblas.dll
+liblas_c.dll
+libmpfr-4.dll
+libxl.dll
+ngcore.dll
+nglib.dll
+oless.dll
+openctm.dll
+osg146-osg.dll
+osg146-osgAnimation.dll
+osg146-osgDB.dll
+osg146-osgFX.dll
+osg146-osgGA.dll
+osg146-osgSim.dll
+osg146-osgTerrain.dll
+osg146-osgText.dll
+osg146-osgUtil.dll
+osg146-osgViewer.dll
+osg146-osgVolume.dll
+ot21-OpenThreads.dll
+pcre.dll
+proj_6_1.dll
+pthreadVC2.dll
+python3.dll
+python39.dll
+sqlite3.dll
+surfe_lib.dll
+vcomp140.dll
+zfs.dll
+zlib.dll
+zmq.dll

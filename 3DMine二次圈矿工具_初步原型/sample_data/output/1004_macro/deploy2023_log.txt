@@ -1,0 +1,5 @@
+appsetting: m_pyPath set (was empty/other)
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310免安装程序\3DMine V202310免安装程序\common\test_mine.py
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310免安装程序\3DMine V202310免安装程序\common\cui\test_mine.py
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310免安装程序\3DMine V202310免安装程序\common\cui\3dmine_profile_chinese\00_标准界面\test_mine.py
+menu: PyMacro group added

@@ -1,0 +1,15 @@
+﻿python : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ python "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\bmp2png.py" "D:\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\bmp2png.py", line 5, in <module>
+    im = Image.open(src).convert('RGB')
+         ~~~~~~~~~~^^^^^
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\PIL\Image.py", line 3639, in open
+    fp = builtins.open(filename, "rb")
+FileNotFoundError: [Errno 2] No such file or directory: 'D:\\WK\\N CRT\\3DMine二次圈矿工具_初步原型\\3dmine_scripts\\menu_o_click
+.bmp'

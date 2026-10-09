@@ -1,0 +1,5 @@
+﻿启动 acad.exe ...
+COM 就绪（2s）
+version: 24.2s (LMS Tech)
+保存: D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\3940平台 1004二次圈矿矿块图_3块版_2010.dwg 版本头: AC1024 大小: 59696
+DONE

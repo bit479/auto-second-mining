@@ -1,0 +1,36 @@
+=== pit_optmize ===
+  1_grade_ore_selection.txt
+  1_grade_recovery.txt
+  1_grade_sg.txt
+  1_grade_type1.txt
+  1_grade_type2.txt
+  1_grade_type3.txt
+  2_cost_fill.txt
+  2_cost_ore.txt
+  2_cost_waste.txt
+  2_cost_z_ref.txt
+  3_slop.txt
+  4_constraint_string.txt
+  4_constraint_topo.txt
+  4_constraint_z.txt
+  5_output_nest.txt
+  5_output_size.txt
+  5_output_smooth.txt
+  5_output_tolerace.txt
+
+=== AppLoad/应用 in menu ===
+kw=AppLoad hits=1
+   ...应用程序">             <Version ID="1.0" />             <Visibility value="yes" />             <Function name="AppServerM0::AppLoad" />             <Icon small_image_name="main_appload.png" large_image_na
+kw=AppServerM0::App hits=4
+   ...     <menu_item name="添加对象到布局">         <Version ID="1.0" />         <Visibility value="yes" />         <Function name="AppServerM0::AppendObjectToLayout" />         <Icon small_image_name="" large_im
+   ...item name="加载应用程序">             <Version ID="1.0" />             <Visibility value="yes" />             <Function name="AppServerM0::AppLoad" />             <Icon small_image_name="main_appload.png" l
+   ...e="帮助(^H)">     <menu_item name="帮助">       <Version ID="1.0" />       <Visibility value="yes" />       <Function name="AppServerM0::AppHelp" />       <Icon small_image_name="M0_AppHelp.png" large_ima
+   ...------ />     <menu_item name="关于软件">       <Version ID="1.0" />       <Visibility value="yes" />       <Function name="AppServerM0::AppAbout" />       <Icon small_image_name="" large_image_name="" />
+kw=应用 hits=2
+   ...on small_image_name="M0_MatchProperty.png" large_image_name="M0_MatchProperty_32.png" />             <Help Tip="将选定对象的特性应用到其他对象" HelpSource="AAA" />         </menu_item>         <menu_item name="特性窗口"
+   ...e="AAA" />         </menu_item>		       </menu_group>         <menu_separator------------ />         <menu_item name="加载应用程序">             <Version ID="1.0" />             <Visibility value="yes" />  
+kw=插件 hits=0
+
+=== 7z ===
+C:\Program Files\7-Zip\7z.exe -> False
+C:\Program Files (x86)\7-Zip\7z.exe -> False

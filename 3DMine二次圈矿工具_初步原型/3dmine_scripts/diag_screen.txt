@@ -1,0 +1,4 @@
+primary screen: 1536x864
+virtual screen: x=0 y=0 w=1536 h=864
+SetCursorPos ok=1
+cursor now at (1230,25)

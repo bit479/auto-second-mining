@@ -1,0 +1,2 @@
+rect=(0,0)-(1536,862) iconic=False
+clicked (35,37)

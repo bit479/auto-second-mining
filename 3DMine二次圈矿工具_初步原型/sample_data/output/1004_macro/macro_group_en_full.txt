@@ -1,0 +1,42 @@
+name="Macro">
+      <menu_item name="Run macro">
+        <strVersion ID="1.0" />
+        <Visibility value="yes" />
+        <Function name="AppServerMain::VBARunMacro" />
+        <Icon small_image_name="main_move.png" large_image_name="main_move32.png" />
+        <Help Tip="Run macro" HelpSource="AAA" />
+      </menu_item>
+      <menu_separator------------ />
+      <menu_item name="Macro security settings">
+        <strVersion ID="1.0" />
+        <Visibility value="yes" />
+        <Function name="AppServerMain::VBASecurity" />
+        <Icon small_image_name="main_VBASecurity.png" large_image_name="main_VBASecurity32.png" />
+        <Help Tip="Macro security Settings" HelpSource="AAA" />
+      </menu_item>
+      <menu_separator------------ />
+      <menu_item name="Load project">
+        <strVersion ID="1.0" />
+        <Visibility value="yes" />
+        <Function name="AppServerMain::VBAProjectLoad" />
+        <Icon small_image_name="main_loading_the_project.png" large_image_name="main_loading_the_project32.png" />
+        <Help Tip="Load project" HelpSource="AAA" />
+      </menu_item>
+      <menu_item name="New project">
+        <strVersion ID="1.0" />
+        <Visibility value="yes" />
+        <Function name="AppServerMain::VBANewProject" />
+        <Icon small_image_name="main_new_obj.png" large_image_name="main_new_obj32.png" />
+        <Help Tip="New project" HelpSource="AAA" />
+      </menu_item>
+      <menu_separator------------ />
+      <menu_item name="VBA editor">
+        <strVersion ID="1.0" />
+        <Visibility value="yes" />
+        <Function name="AppServerMain::VBAIDE" />
+        <Icon small_image_name="main_vba_editor.png" large_image_name="main_vba_editor32.png" />
+        <Help Tip="VBA Editor" HelpSource="AAA" />
+      </menu_item>
+    </menu_group>
+  </menu_group>
+  

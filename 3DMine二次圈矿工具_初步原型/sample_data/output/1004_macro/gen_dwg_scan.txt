@@ -1,0 +1,21 @@
+=== GEN DWG: D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\3940平台 1004二次圈矿矿块图_3块版_2010.dwg ===
+=== Layers ===
+  0  color=7  on=True  locked=False
+  Defpoints  color=7  on=True  locked=False
+  0.500-1.000  color=4  on=True  locked=False
+  1.000-1.500  color=5  on=True  locked=False
+  1.500-3.000  color=1  on=True  locked=False
+  3.000-999.000  color=2  on=True  locked=False
+  爆区方格网  color=7  on=True  locked=False
+  钻孔  color=7  on=True  locked=False
+  线条  color=7  on=True  locked=False
+  点  color=7  on=True  locked=False
+  报告  color=7  on=True  locked=False
+=== ModelSpace entities ===
+=== counts ===
+  AcDbText: 1117
+  AcDbLine: 200
+  AcDbHatch: 34
+  AcDbCircle: 31
+  AcDbMText: 4
+  AcDbPolyline: 3

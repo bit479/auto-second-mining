@@ -1,0 +1,31 @@
+########## 创建点.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 创建面.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 创建多段线.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 创建单行文字.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 创建多行文字.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 数据库测试_遍历所有孔_打印孔号.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 填充.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+
+
+########## 图层操作.vbm ##########
+--- stream apc/The VBA Project/_VBA_Project/VBA/ThisDrawing (0 bytes) ---
+

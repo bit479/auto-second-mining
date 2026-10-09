@@ -1,0 +1,66 @@
+=== 文字样式 ===
+  Standard: font=arial.ttf bigfont= height=0.0 width=1.0
+  Annotative: font=arial.ttf bigfont= height=0.0 width=1.0
+  Standard_Shx: font=txt.shx bigfont=gbcbig.shx height=0.0 width=1.0
+  3dmine_textStyle_1: font=txt.shx bigfont=gbcbig.shx height=1.0 width=1.0
+  3dmine_textStyle_2: font=simsunb.ttf bigfont= height=1.0 width=1.0
+=== 图层 ===
+  0: color=7 linetype=Continuous lw=-3
+  1.500-3.000: color=7 linetype=Continuous lw=0
+  爆区方格网: color=7 linetype=Continuous lw=0
+  线条: color=7 linetype=Continuous lw=0
+  钻孔: color=7 linetype=Continuous lw=0
+  点: color=7 linetype=Continuous lw=0
+  Defpoints: color=7 linetype=Continuous lw=-3
+=== counts ===
+  LWPOLYLINE: 1086
+  TEXT: 981
+  HATCH: 31
+  LINE: 3
+  MTEXT: 3
+  OLE2FRAME: 1
+=== TEXT/MTEXT 抽样 ===
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470109.1488964444, 4349718.443122334))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470106.1488964445, 4349719.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470107.1488964444, 4349719.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470108.1488964445, 4349719.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470109.1488964444, 4349719.443122333))
+  ('1.52', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470110.1266742223, 4349719.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470106.1488964445, 4349720.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470107.1488964444, 4349720.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470108.1488964445, 4349720.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470109.1488964444, 4349720.443122333))
+  ('1.52', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470110.1266742223, 4349720.443122333))
+  ('1.51', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470108.1488964445, 4349721.443122334))
+  ('1.52', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470109.1266742222, 4349721.443122334))
+  ('1.53', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470110.1266742223, 4349721.443122334))
+  ('1.52', '0', 1, 0.1333333333333333, '3dmine_textStyle_1', (470107.1266742222, 4349716.443122334))
+  ('1号矿块', '0', 256, 5.0, 'Standard_Shx', (470054.5209521792, 4349738.978740212))
+  ('2号矿块', '0', 256, 5.0, 'Standard_Shx', (470134.5473704374, 4349705.370001966))
+  ('3号矿块', '0', 256, 5.0, 'Standard_Shx', (470125.8218808797, 4349664.037813449))
+=== HATCH 抽样 ===
+  ('钻孔', 5, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 4, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 4, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 4, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 4, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 4, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 8, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+  ('钻孔', 8, 'err', 'Invalid DXF attribute "extents" for entity HATCH')
+=== POLYLINE 抽样 ===
+  ('0', 1, 0, 13, [(np.float64(470087.319214), np.float64(4349648.986328), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470083.889023), np.float64(4349651.991211), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('0', 7, 0, 2, [(np.float64(470119.718918), np.float64(4349731.204102), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470119.7422639999), np.float64(4349731.133789), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('0', 4, 0, 29, [(np.float64(470090.823418), np.float64(4349662.008789), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470088.8034520001), np.float64(4349666.426758), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('1.500-3.000', 1, 0, 11, [(np.float64(470114.3731920001), np.float64(4349727.420898), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470111.087982), np.float64(4349722.7905), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470109.8044520001), np.float64(4349718.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470108.804452), np.float64(4349718.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470106.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470105.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470107.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470106.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470108.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470107.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470109.8044520001), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470108.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470110.804452), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470109.8044520001), np.float64(4349719.009789001), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470106.804452), np.float64(4349720.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470105.804452), np.float64(4349720.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+  ('爆区方格网', 1, 0, 5, [(np.float64(470107.804452), np.float64(4349720.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0)), (np.float64(470106.804452), np.float64(4349720.009789), np.float64(0.0), np.float64(0.0), np.float64(0.0))])
+=== LINE 抽样 ===
+  ('0', 256, (470108.804452, 4349725.009789), (470077.1773545088, 4349734.458736562))
+  ('0', 256, (470110.3093517262, 4349698.224454841), (470134.5473704374, 4349705.370001966))
+  ('0', 256, (470093.8900230001, 4349657.987328), (470125.8218808797, 4349664.037813449))

@@ -1,0 +1,53 @@
+=== PyMacro group ===
+name="PyMacro(^M)">
+    <menu_item name="RunMacroTest">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest" HelpSource="AAA" />
+      <Macro Path="E:\gzRJ\3Dmine\2022\common\test_mine.py" />
+    </menu_item>
+  </menu_group>
+
+  <menu_group name="文件(^F)">		
+    <menu_item name="新建
+
+=== 工具 group (idx 54055) ===
+name="工具(^T)">
+        <menu_separator------------ />
+        <menu_item name="编辑线条">
+            <Version ID="1.0" />
+            <Visibility value="yes" />
+            <Function name="AppServerM0::EditStringByGrid" />
+            <Icon small_image_name="m0_edit_lines.png" large_image_name="m0_edit_lines32.png" />
+            <Help Tip="编辑线条每个节点的坐标和属性" HelpSource="AAA" />
+        </menu_item>
+        <menu_item name="跟踪画线">
+            <Version ID="1.0" />
+            <Visibility value="yes" />
+            <Function name="AppServerM2::DigitalAlongPolyline" />
+            <Icon small_image_name="m2_tracking_painting_line.png" large_image_name="m2_tracking_painting_line32.png" />
+            <Help Tip="跟踪已知线条的轨迹来绘制另一条线" HelpSource="AAA" />
+        </menu_item>
+        <menu_item name="激活画线">
+            <Version ID="1.0" />
+            <Visibility value="yes" />
+            <Function name="AppServerM1::ContinueDrawPolyline" />
+            <Icon small_image_name="m1_activate_line.png" large_image_name="m1_activate_line32.png" />
+            <Help Tip="激活已知线段一端并在端点处继续画线" HelpSource="AAA" />
+        </menu_item>
+        <menu_item name="坡度画线">
+            <Version ID="1.0" />
+            <Visibility value="yes" />
+            <Function name="AppServerM1::DrawLineByGrad" />
+            <Icon small_image_name="m1_line_grade.png" large_image_name="m1_line_grad32.png" />
+            <Help Tip="通过预先设定的坡度来绘制线条" HelpSource="AAA" />
+        </menu_item>
+        <menu_separator------------ />
+        <menu_item name="属性数学计算">
+            <Version ID="1.0" />
+            <Visibility value="yes" />
+            <Function name="AppServerM1::AdvancedStringMath" />
+            <Icon small_image_name="m1_attribute_count.png" large_image_name="m1_attribute_count32.png" />
+            <Help 

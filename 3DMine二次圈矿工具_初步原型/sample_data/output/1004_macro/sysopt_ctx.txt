@@ -1,0 +1,25 @@
+iewAnimate" />
+      <Icon small_image_name="M0_ViewAnimate.png" large_image_name="new_file_large.png" />
+      <Help Tip="沿指定路线行走的动态图像显示" HelpSource="AAA" />
+    </menu_item>
+    <menu_item name="实体动画">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerM16::AnimateBySolidID" />
+      <Icon small_image_name="M16_AnimateBySolidID.png" large_image_name="M16_AnimateBySolidID_32.png" />
+      <Help Tip="动态显示不同体号实体" HelpSource="AAA" />
+    </menu_item>
+    <menu_separator------------ />
+    <menu_item name="地质统计">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerM0::FileOpenStaticsExe" />
+      <Icon small_image_name="Main_FileOpenStaticsExe.png" large_image_name="Main_FileOpenStaticsExe_32.png" />
+      <Help Tip="打开地质统计模块" HelpSource="AAA" />
+    </menu_item>
+    <menu_separator------------ />
+    <menu_item name="系统设置">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerM0::SystemOption" />
+      <Icon small_image_name="Main_SystemOption.png" large_image_name="" />

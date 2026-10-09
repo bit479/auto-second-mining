@@ -1,0 +1,8 @@
+FILE appsetting.txt
+FILE app_module.txt
+
+=== root configs ===
+
+HKCU Classes VisualMine check: 
+
+HKLM Classes VisualMine check: 

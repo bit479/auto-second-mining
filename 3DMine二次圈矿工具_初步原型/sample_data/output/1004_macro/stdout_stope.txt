@@ -1,0 +1,24 @@
+=== mine_stdout.py (341 chars) ===
+# -*- coding: cp936 -*-\n
+import ctypes
+import sys
+from mine import *
+
+
+class MyPrint:
+    def __init__(self):
+        self.n = 0
+
+    def write(self, s):       
+        if type(s).__name__ == 'bytes':
+            s = s.decode('gbk')
+            s = s.encode('utf-8')
+			
+        Put_Message(s)
+
+sys.stdout = MyPrint()
+sys.stderr = MyPrint()
+
+=== 矿房设计 group ===
+group: <menu_group name="采矿设计">
+items: 矿房设计 | 矿房优化

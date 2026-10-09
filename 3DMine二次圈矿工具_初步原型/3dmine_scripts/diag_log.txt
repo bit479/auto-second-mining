@@ -1,0 +1,7 @@
+GetWindowRect=1 rect=0,0,1536,862
+IsWindow=True IsWindowVisible=True
+hdc_win=1
+bmp=1
+PrintWindow=1
+GetDIBits=862
+saved bytes=5296182

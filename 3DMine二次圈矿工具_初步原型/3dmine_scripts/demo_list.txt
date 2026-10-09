@@ -1,0 +1,50 @@
+=== Python示例 ===
+
+Name              Length
+----              ------
+prog1(点给线赋属性) .py   1593
+prog2(点过滤线).py      2074
+prog4随机点云.py         477
+prog5球体.py           901
+prog6椭球.py           902
+prog多线程测试.py        1740
+创建mobis环.py         1532
+创建八面体.py            1456
+创建圆柱.py             1457
+创建圆环对象.py           1495
+创建坐标轴.py            1462
+创建球对象.py            1501
+创建箭头.py             1570
+创建长方体.py            1497
+文字根据相机批量改方向.py       693
+
+
+
+=== common\tools ===
+
+FullName                                                         
+--------                                                         
+E:\gzRJ\3Dmine\2022\common\tools\mesh\pcldensitysurface.py       
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclbpasurface.py     
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pcldensityclass.py   
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pcldeviationfilter.py
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclfromsurface.py    
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclnormalest.py      
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclpossionsurface.py 
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclratiofilter.py    
+E:\gzRJ\3Dmine\2022\common\tools\pointcloud\pclvoxelfilter.py    
+E:\gzRJ\3Dmine\2022\common\tools\ugtool\stope design.py          
+E:\gzRJ\3Dmine\2022\common\tools\ugtool\stope optimization.py    
+
+
+
+=== demo root ===
+
+Name    
+----    
+Python示例
+专题示例    
+煤炭矿山示例  
+金属矿山示例  
+
+

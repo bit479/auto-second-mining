@@ -1,0 +1,50 @@
+﻿AutoCAD version: 24.2s (LMS Tech)
+doc name: 5、 北部山头3940平台二次圈矿矿块图1004.dwg
+=== DWG: D:\WK\N CRT\北部山头3940平台2026\7、单日数据\北部山头3940平台-1004\5、 北部山头3940平台二次圈矿矿块图1004.dwg ===
+AutoCAD version: 24.2s (LMS Tech)
+=== Layers ===
+  0  color=7  on=True
+  1.500-3.000  color=7  on=True
+  爆区方格网  color=7  on=True
+  线条  color=7  on=True
+  钻孔  color=7  on=True
+  点  color=7  on=True
+=== ModelSpace entities ===
+  AcDbPolyline layer=0 pts=13 first=(470087.32,4349648.99)
+  AcDbPolyline layer=0 pts=2 first=(470119.72,4349731.20)
+  AcDbPolyline layer=0 pts=29 first=(470090.82,4349662.01)
+  AcDbText layer=0 txt='1.51' pos=(470109.15,4349718.44) h=0.13333333333333333
+  AcDbText layer=0 txt='1.51' pos=(470106.15,4349719.44) h=0.13333333333333333
+  AcDbText layer=0 txt='1.51' pos=(470107.15,4349719.44) h=0.13333333333333333
+  AcDbHatch layer=钻孔 pattern=SOLID
+  AcDbHatch layer=钻孔 pattern=SOLID
+  AcDbHatch layer=钻孔 pattern=SOLID
+  AcDbOle2Frame layer=0
+  AcDbLine layer=0 start=(470108.80,4349725.01) end=(470077.18,4349734.46)
+  AcDbLine layer=0 start=(470110.31,4349698.22) end=(470134.55,4349705.37)
+  AcDbLine layer=0 start=(470093.89,4349657.99) end=(470125.82,4349664.04)
+  AcDbMText layer=0 txt='1号矿块' pos=(470054.52,4349738.98) h=5.0
+  AcDbMText layer=0 txt='2号矿块' pos=(470134.55,4349705.37) h=5.0
+  AcDbMText layer=0 txt='3号矿块' pos=(470125.82,4349664.04) h=5.0
+=== counts ===
+  AcDbPolyline: 1086
+  AcDbText: 981
+  AcDbHatch: 31
+  AcDbLine: 3
+  AcDbMText: 3
+  AcDbOle2Frame: 1
+python : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ python -X utf8 "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_scan_ma ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_scan_manual_dwg.py", line 64, in <module>
+    main()
+    ~~~~^^
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_scan_manual_dwg.py", line 59, in main
+    acad.Quit()
+    ~~~~~~~~~^^
+  File "<COMObject AutoCAD.Application>", line 2, in Quit
+pywintypes.com_error: (-2147418111, '被呼叫方拒绝接收呼叫。', None, None)

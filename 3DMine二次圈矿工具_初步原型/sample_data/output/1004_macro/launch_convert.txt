@@ -1,0 +1,20 @@
+﻿AutoCAD launching...
+COM ready after 4s
+version: 24.2s (LMS Tech)
+gencache note: Only strings and iids can be converted to a CLSID.
+constants.ac2010_dwg: no
+constants.acR2010_dwg: no
+constants.ac2010_dxf: no
+constants.ac2013_dwg: no
+constants.ac2018_dwg: no
+constants.ac2007_dwg: no
+constants.ac2004_dwg: no
+constants.ac2000_dwg: no
+enum48: -> AC1024 size=59696
+enum49: ERR [Errno 2] No such file or directory: 'D:\\WK\\N CRT\\dwg_save_test4\\out_enum49.dwg'
+enum50: ERR [Errno 2] No such file or directory: 'D:\\WK\\N CRT\\dwg_save_test4\\out_enum50.dwg'
+enum51: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum52: ERR (-2147352567, '发生意外。', (0, 'AutoCAD', '参数无效', 'E:\\gzRJ\\CAD\\AutoCAD 2023\\HELP\\OLE_ERR.CHM', -2145320901, -2147024809), None)
+enum60: -> AC1027 size=55067
+enum61: ERR [Errno 2] No such file or directory: 'D:\\WK\\N CRT\\dwg_save_test4\\out_enum61.dwg'
+DONE

@@ -1,0 +1,5 @@
+m_pyPath set
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310\3DMine V202310\common\test_mine.py
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310\3DMine V202310\common\cui\test_mine.py
+deployed: E:\gzRJ\3Dmine\2023\3DMine V202310\3DMine V202310\common\cui\3dmine_profile_chinese\00_标准界面\test_mine.py
+menu PyMacro exists: True

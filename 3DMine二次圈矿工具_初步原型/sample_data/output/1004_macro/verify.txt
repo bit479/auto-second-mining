@@ -1,0 +1,3 @@
+﻿block 1 1.500-3.000 verts=49 faces=47 area=206.2 tri_area=206.2 diff=0.01% grid=53
+block 2 1.500-3.000 verts=17 faces=15 area=84.2 tri_area=84.2 diff=0.03% grid=29
+block 3 0.500-1.000 verts=18 faces=16 area=279.8 tri_area=279.8 diff=0.00% grid=61

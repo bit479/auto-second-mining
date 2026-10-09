@@ -1,0 +1,17 @@
+# 备份快照（不进版本库）
+_backup/
+
+# Python 缓存 / 编译产物
+__pycache__/
+*.pyc
+*.pyo
+
+# Office 临时锁文件
+~$*
+
+# 系统 / 编辑器噪声
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

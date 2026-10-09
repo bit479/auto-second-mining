@@ -1,0 +1,11 @@
+﻿python.exe : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\pyt ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\diag_grade.py", line 12, in <module>
+    data = pg.read_db(xls)
+           ^^^^^^^^^^
+AttributeError: module 'prep_generic' has no attribute 'read_db'

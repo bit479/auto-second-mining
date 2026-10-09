@@ -1,0 +1,23 @@
+﻿[Step1] 数据库: D:\WK\N CRT\北部山头3940平台2026\7、单日数据\北部山头3940平台-1004\1、3940平台 炮孔数据库1004.xls
+[Step1] 平台=3940 日期=1004 blast_id=BS-3940-1004
+[Step1] 输出目录: D:\WK\N CRT\北部山头3940平台2026\7、单日数据\北部山头3940平台-1004\二次圈矿成果_3940_1004
+[数据] 31 个炮孔
+[数据] >=0.5g/t 参与圈矿孔数 = 23（剔除 <0.5 废孔 8 个）
+[L1] 0.5-1.0 g/t: 3 块 -> #1(1孔,95m2), #2(6孔,431m2), #3(8孔,441m2)
+[L2] 1.0-1.5 g/t: 3 块 -> #1(1孔,95m2), #2(1孔,95m2), #3(1孔,95m2)
+[L3] 1.5-3.0 g/t: 3 块 -> #1(2孔,167m2), #2(1孔,95m2), #3(1孔,95m2)
+[L4] >=3.0 g/t: 1 块 -> #1(1孔,95m2)
+python.exe : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\pyt ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\prep_generic.py", line 383, in <module>
+    main()
+    ~~~~^^
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\prep_generic.py", line 229, in main
+    merged_blocks = merge_small_blocks(hi_blocks, lo_blocks)
+                    ^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'merge_small_blocks' where it is not associated with a value

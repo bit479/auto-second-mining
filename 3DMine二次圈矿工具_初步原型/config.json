@@ -1,0 +1,18 @@
+{
+  "platform": "3940",
+  "date": "0915",
+  "bench_height_m": 10.0,
+  "top_cut_pct": 98.0,
+  "grid_res_m": 1.0,
+  "min_ore_area_m2": 15.0,
+  "density_ore_t_m3": 2.7,
+  "method": "voronoi",
+  "absorb_low_grade_cells": true,
+  "absorb_max_low_ratio": 0.5,
+  "idw_cutoff_grade": 1.0,
+  "idw_power": 2.0,
+  "search_radius_m": 12.0,
+  "min_waste_area_m2": 200.0,
+  "simplify_tol_m": 0.5,
+  "min_edge_len_m": 3.0
+}

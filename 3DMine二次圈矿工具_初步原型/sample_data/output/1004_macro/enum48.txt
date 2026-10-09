@@ -1,0 +1,31 @@
+﻿python : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ python -X utf8 "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_test_en ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
+    IDispatch = pythoncom.connect(IDispatch)
+pywintypes.com_error: (-2147221021, '操作无法使用', None, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_test_enum48.py", line 18, in <module>
+    acad = win32com.client.Dispatch("AutoCAD.Application")
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
+    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
+    return (_GetGoodDispatch(IDispatch, clsctx), userName)
+            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
+    IDispatch = pythoncom.CoCreateInstance(
+        IDispatch, None, clsctx, pythoncom.IID_IDispatch
+    )
+pywintypes.com_error: (-2146959355, '服务器运行失败', None, None)

@@ -1,0 +1,35 @@
+<menu_item name="实体表面加密"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="" HelpSource="AAA"/> <Macro Path="tools\mesh\pcldensitysurface.py"/>
+<menu_item name="实体质心点"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name="AppServerM4::SolidCentroid"/> <Icon small_image_name="m4_Solid_Centroid16.png" large_image_name="m4_Solid_Centroid32.png"/> <Help Tip="实体质心点" HelpSource="AAA"/> <Macro Path=""/>
+<menu_item name="矿房设计"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="根据巷道中心和矿体设计矿房" HelpSource="AAA"/> <Macro Path="..\..\common\tools\ugtool\stope design.py"/>
+<menu_item name="矿房优化"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="根据巷道中线和矿体优化矿房设计" HelpSource="AAA"/> <Macro Path="..\..\common\tools\ugtool\stope optimization.py"/>
+<menu_item name="DirectX"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="directx_16.png" large_image_name="directx_32.png"/> <Help Tip="安装或重置DirectX" HelpSource="AAA"/> <Macro Path="..\..\common\D3D9_Redist\dxsetup.exe"/>
+<menu_item name="测试python"> <Version ID="1.0" /> <Visibility value="yes" /> <Function name="" /> <Icon small_image_name="" large_image_name="" /> <Help Tip="测试python" HelpSource="AAA" /> <Macro Path ="D:\3d_mine_2\test.py" />
+<menu_item name="测试python2"> <Version ID="1.0" /> <Visibility value="yes" /> <Function name="" /> <Icon small_image_name="" large_image_name="" /> <Help Tip="测试python" HelpSource="AAA" /> <Macro Path ="D:\3d_mine_2\test.py" />
+
+=== common\python\x64 ===
+  DLLs
+  Doc
+  LICENSE.txt
+  Lib
+  NEWS.txt
+  Scripts
+  Tools
+  etc
+  include
+  libs
+  pyodbc.pyi
+  python.exe
+  python3.dll
+  python39.dll
+  pythonw.exe
+  share
+  tcl
+  vcruntime140.dll
+  vcruntime140_1.dll
+
+=== common\plugin\python ===
+  pcd.py
+  ply.py
+  tri.py
+common\tools\mesh\pcldensitysurface.py -> True
+common\tools\ugtool\stope design.py -> True

@@ -1,0 +1,8 @@
+﻿cmd pid: 33200 exited: False
+
+   Id ProcessName MainWindowTitle
+   -- ----------- ---------------
+30200 python      二次圈矿工具客户端      
+34728 python      二次圈矿工具客户端      
+
+

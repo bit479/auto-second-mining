@@ -1,0 +1,49 @@
+﻿python.exe : D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 31243 (\N{CJK UNIFIED IDEOGR
+APH-7A0B}) missing from font(s) DejaVu Sans.
+所在位置 行:1 字符: 1
++ & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\pyt ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\WK\N CRT\3DM...s) DejaVu Sans.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 24207 (\N{CJK UNIFIED IDEOGRAPH-5E8F}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 22280 (\N{CJK UNIFIED IDEOGRAPH-5708}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 30719 (\N{CJK UNIFIED IDEOGRAPH-77FF}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 65288 (\N{FULLWIDTH LEFT PARENTHESIS}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 20985 (\N{CJK UNIFIED IDEOGRAPH-51F9}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 21253 (\N{CJK UNIFIED IDEOGRAPH-5305}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 20840 (\N{CJK UNIFIED IDEOGRAPH-5168}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 23380 (\N{CJK UNIFIED IDEOGRAPH-5B54}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 21697 (\N{CJK UNIFIED IDEOGRAPH-54C1}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 21152 (\N{CJK UNIFIED IDEOGRAPH-52A0}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 26435 (\N{CJK UNIFIED IDEOGRAPH-6743}) mi
+ssing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\render_preview.py:38: UserWarning: Glyph 65289 (\N{FULLWIDTH RIGHT PARENTHESIS}) m
+issing from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+saved: D:\WK\N CRT\北部山头3940平台2026\7、单日数据\北部山头3940平台-1004\二次圈矿成果_3940_1004\BS-3940-1004_圈矿预览_final.png

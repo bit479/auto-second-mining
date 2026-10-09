@@ -1,0 +1,2 @@
+﻿COM connected
+Open err: AutoCAD.Application.Documents

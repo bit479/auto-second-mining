@@ -1,0 +1,43 @@
+﻿python.exe : D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 20108 (\N{CJK UNIFIED IDEOGRAPH-
+4E8C}) missing from font(s) DejaVu Sans.
+所在位置 行:1 字符: 1
++ & "C:\Users\Administrator\AppData\Local\Programs\Python\Python313\pyt ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\WK\N CRT\3DM...s) DejaVu Sans.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 27425 (\N{CJK UNIFIED IDEOGRAPH-6B21}) missin
+g from font(s) DejaVu Sans.
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 22280 (\N{CJK UNIFIED IDEOGRAPH-5708}) missin
+g from font(s) DejaVu Sans.
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 30719 (\N{CJK UNIFIED IDEOGRAPH-77FF}) missin
+g from font(s) DejaVu Sans.
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 22359 (\N{CJK UNIFIED IDEOGRAPH-5757}) missin
+g from font(s) DejaVu Sans.
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:53: UserWarning: Glyph 22270 (\N{CJK UNIFIED IDEOGRAPH-56FE}) missin
+g from font(s) DejaVu Sans.
+  fig.tight_layout()
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 20108 (\N{CJK UNIFIED IDEOGRAPH-4E8C}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 27425 (\N{CJK UNIFIED IDEOGRAPH-6B21}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 22280 (\N{CJK UNIFIED IDEOGRAPH-5708}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 30719 (\N{CJK UNIFIED IDEOGRAPH-77FF}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 22359 (\N{CJK UNIFIED IDEOGRAPH-5757}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+D:\WK\N CRT\3DMine二次圈矿工具_初步原型\client\dxf_render.py:54: UserWarning: Glyph 22270 (\N{CJK UNIFIED IDEOGRAPH-56FE}) missin
+g from font(s) DejaVu Sans.
+  fig.savefig(out, dpi=110, facecolor="white", bbox_inches="tight")
+saved: D:\WK\N CRT\北部山头3940平台2026\7、单日数据\北部山头3940平台-1004\二次圈矿成果_3940_1004\BS-3940-1004_DXF预览_v33.png | lines: 277 texts: 661

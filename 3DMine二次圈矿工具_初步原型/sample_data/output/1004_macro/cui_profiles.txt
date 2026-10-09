@@ -1,0 +1,21 @@
+[.]
+   <dir> 3dmine_profile_chinese
+   <dir> 3dmine_profile_english
+   <dir> 3dmine_profile_French
+   <dir> 3dmine_profile_Russian
+   <dir> 3dmine_profile_Spanish
+   <dir> icon
+[3dmine_profile_chinese]
+   <dir> 00_标准界面
+   <dir> 01_煤炭界面
+   <dir> 02_地勘界面
+   <dir> 03_通风界面
+[3dmine_profile_english]
+   <dir> 00_Standard Profile
+   <dir> 01_Coal Profile
+   <dir> 02_Geological Profile
+   <dir> 03_Ventilation  Profile
+[3dmine_profile_French]
+[3dmine_profile_Russian]
+[3dmine_profile_Spanish]
+[icon]

@@ -1,0 +1,15 @@
+﻿=== HATCH（钻孔）尺寸 ===
+  hatch1 err: 'PolylinePath' object has no attribute 'path_type'
+  hatch2 err: 'PolylinePath' object has no attribute 'path_type'
+  hatch3 err: 'PolylinePath' object has no attribute 'path_type'
+  hatch4 err: 'PolylinePath' object has no attribute 'path_type'
+  hatch5 err: 'PolylinePath' object has no attribute 'path_type'
+  hatch6 err: 'PolylinePath' object has no attribute 'path_type'
+hatch total: 31
+=== 爆区方格网 polyline 颜色分布 ===
+color counts: {1: 199, 4: 728}
+samples: {1: (np.float64(470109.8044520001), np.float64(4349718.009789)), 4: (np.float64(470105.890023), np.float64(4349684.987328))}
+=== 0 层 polyline 颜色分布 ===
+layer0 counts: {1: 1, 7: 1, 4: 1}
+=== 品位文字颜色分布 ===
+text colors: {1: 198, 4: 739, 5: 4, 138: 31, 8: 8, 2: 1}

@@ -1,0 +1,59 @@
+----- @341 -----
+<menu_item name="RunMacroTest">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest" HelpSource="AAA" />
+      <Macro Path="E:\gzRJ\3Dmine\2022\common\test_mine.py" />
+    </menu_item>
+
+----- @183563 -----
+<menu_item name="实体表面加密">
+			<Version ID="1.0" />
+			<Visibility value="yes" />
+			<Function name="" />
+			<Icon small_image_name="pytool16.png" large_image_name="pytool32.png" />
+			<Help Tip="" HelpSource="AAA" />
+			<Macro Path="tools\mesh\pcldensitysurface.py" />
+		 </menu_item>
+
+----- @273504 -----
+<menu_item name="矿房设计">
+          <Version ID="1.0" />
+          <Visibility value="yes" />
+          <Function name="" />
+		  <Icon small_image_name="pytool16.png" large_image_name="pytool32.png" />
+          <Help Tip="根据巷道中心和矿体设计矿房" HelpSource="AAA" />
+		  <Macro Path="..\..\common\tools\ugtool\stope design.py" />
+        </menu_item>
+
+----- @273896 -----
+<menu_item name="矿房优化">
+          <Version ID="1.0" />
+          <Visibility value="yes" />
+          <Function name="" />
+		  <Icon small_image_name="pytool16.png" large_image_name="pytool32.png" />
+          <Help Tip="根据巷道中线和矿体优化矿房设计" HelpSource="AAA" />
+		  <Macro Path="..\..\common\tools\ugtool\stope optimization.py" />
+        </menu_item>
+
+----- @279622 -----
+<menu_item name="测试python">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="测试python" HelpSource="AAA" />
+	  <Macro Path ="D:\3d_mine_2\test.py" />  
+    </menu_item>
+
+----- @279907 -----
+<menu_item name="测试python2">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="测试python" HelpSource="AAA" />
+	  <Macro Path ="D:\3d_mine_2\test.py" />  
+    </menu_item>

@@ -1,0 +1,60 @@
+hwnd=0x81762 GetWindowRect ok=1 rect=(0,0)-(1536,862) w=1536 h=862
+minimized=False visible=True fg=0x81762
+VisualMine pids: 41560
+Windows of pid 41560:
+  hwnd=0x23074E title=[HardwareMonitorWindow] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1B1F96 title=[] rect=(772,369)-(1104,480) visible=False
+  hwnd=0x219A0 title=[] rect=(943,334)-(1220,537) visible=False
+  hwnd=0x170CC6 title=[] rect=(1298,145)-(1536,160) visible=False
+  hwnd=0x319F4 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x61964 title=[] rect=(7,172)-(90,201) visible=False
+  hwnd=0x918AC title=[] rect=(21,81)-(128,110) visible=False
+  hwnd=0x170C94 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x4F197C title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x7F1830 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x650C76 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x915C6 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x17175E title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x590CF4 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x2C0DE8 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1C0CB4 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x210CEE title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x200C82 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x3F1564 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x191882 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0xE1806 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0xF0CF0 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x7198E title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0xA18A0 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x2A1810 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x9C0360 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x81924 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x618A8 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x618B2 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x81888 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1418C6 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x6112AC title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x3A0346 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x2204CC title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1908C2 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1B04DA title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0xC0CFA title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x2E046A title=[] rect=(89,864)-(1543,871) visible=False
+  hwnd=0xE08AA title=[] rect=(1536,0)-(1543,864) visible=False
+  hwnd=0x640D3C title=[] rect=(89,-7)-(1543,0) visible=False
+  hwnd=0x90DDC title=[] rect=(89,0)-(96,864) visible=False
+  hwnd=0x81762 title=[3DMine 企业版 2022.4 64位 - [主层-2]] rect=(0,0)-(1536,862) visible=True
+  hwnd=0xF1594 title=[OfficePowerManagerWindow] rect=(0,0)-(136,38) visible=False
+  hwnd=0x61576 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x1C0D92 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0xA1544 title=[] rect=(0,0)-(0,0) visible=False
+  hwnd=0x41A28 title=[] rect=(0,0)-(136,38) visible=False
+  hwnd=0x818BA title=[] rect=(0,22)-(158,472) visible=False
+  hwnd=0x2008BE title=[] rect=(0,22)-(198,312) visible=False
+  hwnd=0x9A093A title=[] rect=(0,22)-(158,320) visible=False
+  hwnd=0x1516F8 title=[] rect=(0,22)-(158,320) visible=False
+  hwnd=0x170CD2 title=[GDI+ Window (VisualMine.exe)] rect=(0,0)-(1,1) visible=False
+  hwnd=0x14183A title=[MSCTFIME UI] rect=(0,0)-(0,0) visible=False
+  hwnd=0x120756 title=[Default IME] rect=(0,0)-(0,0) visible=False
+  hwnd=0x2B1556 title=[Default IME] rect=(0,0)-(0,0) visible=False
+  hwnd=0xF0CE8 title=[Default IME] rect=(0,0)-(0,0) visible=False

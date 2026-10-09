@@ -1,0 +1,27 @@
+=== 文字样式 ===
+  Standard: err <unknown>.WidthFactor
+  Annotative: err <unknown>.WidthFactor
+  Standard_Shx: err <unknown>.WidthFactor
+  3dmine_textStyle_1: err <unknown>.WidthFactor
+  3dmine_textStyle_2: err <unknown>.WidthFactor
+=== 实体抽样（每类取若干） ===
+[Polyline] layer=0 err=<unknown>.GeometricExtents
+[Polyline] layer=0 err=<unknown>.GeometricExtents
+[Polyline] layer=0 err=<unknown>.GeometricExtents
+[Polyline] layer=1.500-3.000 err=<unknown>.GeometricExtents
+[Polyline] layer=爆区方格网 err=<unknown>.GeometricExtents
+[AcDbText] layer=0 color=<COMObject <unknown>> txt='1.51' pos=(470109.1,4349718.4) h=0.13333333333333333 style=3dmine_textStyle_1
+[Polyline] layer=爆区方格网 err=<unknown>.GeometricExtents
+[AcDbText] layer=0 color=<COMObject <unknown>> txt='1.51' pos=(470106.1,4349719.4) h=0.13333333333333333 style=3dmine_textStyle_1
+[Polyline] layer=爆区方格网 err=<unknown>.GeometricExtents
+[AcDbText] layer=0 color=<COMObject <unknown>> txt='1.51' pos=(470107.1,4349719.4) h=0.13333333333333333 style=3dmine_textStyle_1
+[Polyline] layer=爆区方格网 err=<unknown>.GeometricExtents
+[AcDbText] layer=0 color=<COMObject <unknown>> txt='1.51' pos=(470108.1,4349719.4) h=0.13333333333333333 style=3dmine_textStyle_1
+[AcDbText] layer=0 color=<COMObject <unknown>> txt='1.51' pos=(470109.1,4349719.4) h=0.13333333333333333 style=3dmine_textStyle_1
+=== 矿块号 MText 与 3 条 Line ===
+Line (470108.80,4349725.01)->(470077.18,4349734.46)
+Line (470110.31,4349698.22)->(470134.55,4349705.37)
+Line (470093.89,4349657.99)->(470125.82,4349664.04)
+MText '1号矿块' at (470054.52,4349738.98)
+MText '2号矿块' at (470134.55,4349705.37)
+MText '3号矿块' at (470125.82,4349664.04)

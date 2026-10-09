@@ -1,0 +1,82 @@
+=== root ===
+  bin
+  common
+  demo
+  主层.3ds
+
+=== bin\nt_x64 关键模块 ===
+  MineApi.dll (46592)
+  Module_11_Plugin.dll (1014272)
+  Module_40_Python.dll (90112)
+  VisualMine.exe (4110848)
+  mine.pyd (3364352)
+  mine_enum.py (24508)
+  python3.dll (58384)
+  python39.dll (4457488)
+
+=== python/vba 全部 ===
+  Module_40_Python.dll
+  python3.dll
+  python39.dll
+
+=== common ===
+  D3D9_Redist
+  Slib
+  aceredist
+  block_ref
+  color
+  config
+  cui
+  database
+  device
+  dwgTemplate
+  excel
+  fonts
+  help_chn
+  holegraphic
+  linetype
+  pat
+  pitblast
+  plugin
+  print
+  python
+  register
+  temp
+  texture
+  tools
+  var_template
+  vent
+test_mine.py exists: False
+
+=== common\config ===
+  app_module.txt
+  appsetting.txt
+  cptype.txt
+  custom_color.txt
+  default_attri.dat
+  dimstyle.txt
+  drillhole_oreblock.ini
+  drillhole_zone.ini
+  dwg_section.ini
+  ellipsoid.ini
+  license.ini
+  mnuFont.mnu
+  mnuFont_eng.mnu
+  oreclass.ini
+  recent_fold.rec
+  resr_app_module.txt
+  slice.plane
+  ug_ring_blast.ini
+  user_paper_def.ini
+  workinfo.ini
+  [appsetting] m_pyPath=
+
+=== cui chinese profiles ===
+  00_标准界面
+  01_煤炭界面
+  02_地勘界面
+  03_通风界面
+  00_标准界面: PyMacro=False VBAmenu=False
+  01_煤炭界面: PyMacro=False VBAmenu=False
+  02_地勘界面: PyMacro=False VBAmenu=False
+  03_通风界面: PyMacro=False VBAmenu=False

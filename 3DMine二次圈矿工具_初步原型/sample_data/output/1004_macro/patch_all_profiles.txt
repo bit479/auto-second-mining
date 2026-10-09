@@ -1,0 +1,4 @@
+00_标准界面: already has macro group
+01_煤炭界面: patched OK
+02_地勘界面: patched OK
+03_通风界面: patched OK

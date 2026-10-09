@@ -1,0 +1,3 @@
+removed PyMacro group: 916 chars
+restored 测试python2
+XML PARSE FAIL: not well-formed (invalid token): line 2, column 1

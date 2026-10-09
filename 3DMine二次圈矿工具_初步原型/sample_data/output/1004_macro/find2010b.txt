@@ -1,0 +1,14 @@
+﻿python : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ python -X utf8 "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_find_20 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\_find_2010_enum2.py", line 25, in <module>
+    doc = acad.Documents.Open(DXF, True)
+          ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\py
+thon\Lib\site-packages\win32com\client\dynamic.py", line 631, in __getattr__
+    raise AttributeError(f"{self._username_}.{attr}")
+AttributeError: <unknown>.Open

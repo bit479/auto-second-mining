@@ -1,0 +1,3 @@
+﻿win 1536 862
+PrintWindow 1
+saved D:\WK\N CRT\3DMine二次圈矿工具_初步原型\3dmine_scripts\win_capture.bmp 5296182

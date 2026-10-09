@@ -1,0 +1,3 @@
+fg_before=0xD205C
+fg_after=0x81762 hwnd=0x81762
+esc

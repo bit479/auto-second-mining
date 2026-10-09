@@ -1,0 +1,3 @@
+﻿launch acad (prewarm)
+wait 180s for acad full load...
+FAIL: COM not ready

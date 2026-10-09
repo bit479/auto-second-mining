@@ -1,0 +1,9 @@
+﻿{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "updated_cells_count": 108,
+    "updated_range": "A1:F18",
+    "writes_range": "A1:F18"
+  }
+}

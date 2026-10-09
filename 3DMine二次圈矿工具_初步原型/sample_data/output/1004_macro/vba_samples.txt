@@ -1,0 +1,9 @@
+=== 创建点.vbm size=13312 enc~utf-16 ===
+
+=== 创建面.vbm size=31744 enc~utf-16 ===
+
+=== 创建多段线.vbm size=23040 enc~utf-16 ===
+
+=== 数据库测试_遍历所有孔_打印孔号.vbm size=27136 enc~utf-16 ===
+
+=== 创建单行文字.vbm size=27136 enc~utf-16 ===

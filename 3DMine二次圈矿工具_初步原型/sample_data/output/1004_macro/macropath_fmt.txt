@@ -1,0 +1,57 @@
+=== 2022 原版 PyMacro 组 ===
+PyMacro(^M)">
+    <menu_item name="RunMacroTest">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest" HelpSource="AAA" />
+      <Macro Path="test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest2">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest2" HelpSource="AAA" />
+      <Macro Path="..\test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest3">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest3" HelpSource="AAA" />
+      <Macro Path="..\..\common\test_mine.py" />
+    </menu_item>
+  
+
+=== 2023 当前 PyMacro 组 ===
+PyMacro(^M)">
+    <menu_item name="RunMacroTest">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest" HelpSource="AAA" />
+      <Macro Path="test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest2">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest2" HelpSource="AAA" />
+      <Macro Path="..\test_mine.py" />
+    </menu_item>
+    <menu_item name="RunMacroTest3">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="" />
+      <Icon small_image_name="" large_image_name="" />
+      <Help Tip="RunMacroTest3" HelpSource="AAA" />
+      <Macro Path="..\..\common\test_mine.py" />
+    </menu_item>
+  
+
+=== patched 2023 PyMacro group (spaced format) ===

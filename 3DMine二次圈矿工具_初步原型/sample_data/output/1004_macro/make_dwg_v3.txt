@@ -1,0 +1,6 @@
+﻿[报告PNG] D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\1004_macro\1004炮孔数据报告.png
+[品位文字] 块#1: 206 个（color=1）
+[品位文字] 块#2: 85 个（color=1）
+[品位文字] 块#3: 794 个（color=4）
+[DXF] D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\1004_macro\3940平台 1004二次圈矿矿块图_3块版_full.dxf
+[3DS] D:\WK\N CRT\3DMine二次圈矿工具_初步原型\output\1004_macro\3940平台 1004矿块边界线.3ds

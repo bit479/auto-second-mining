@@ -1,0 +1,21 @@
+﻿COM AutoCAD.Application: OK
+COM AutoCAD.Application.25: no
+COM AutoCAD.Application.24: OK
+COM ZwCAD.Application: no
+COM ZWCAD.Application: no
+COM Zcad.Application: no
+COM Gcad.Application: no
+COM GstarCAD.Application: no
+COM GstarCAD.Application.26: no
+COM CADAssist.Application: no
+COM HcCAD.Application: no
+COM BricsCAD.Application: no
+COM VisualMine.Application: no
+COM 3DMine.Application: no
+ODA: not found
+LibreDWG dwgwrite: no
+LibreDWG dwg2dxf: no
+LibreDWG dxf2dwg: no
+LibreDWG libredwg-dwgwrite: no
+TOOL ezdxf: C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runtime\bases\c98c5042338ed152c6f10ecd8591889f\python\Scripts\ezdxf.EXE
+DONE

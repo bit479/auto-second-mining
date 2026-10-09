@@ -1,0 +1,34 @@
+=== demo ===
+  专题示例
+  煤炭矿山示例
+  金属矿山示例
+
+=== common\python ===
+  x64
+
+=== common\plugin ===
+  plugin.ini
+  python
+
+=== 菜单 Macro/Python 搜索 ===
+  00_标准界面: MacroPath=7 python字=4
+     <menu_item name="实体表面加密"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="" HelpSource="AAA"/> <Mac
+     <menu_item name="实体质心点"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name="AppServerM4::SolidCentroid"/> <Icon small_image_name="m4_Solid_Centroid16.png" large_image_name="m4_Solid_Centroi
+     <menu_item name="矿房设计"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="根据巷道中心和矿体设计矿房" HelpSource="
+     <menu_item name="矿房优化"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="pytool16.png" large_image_name="pytool32.png"/> <Help Tip="根据巷道中线和矿体优化矿房设计" HelpSource
+     <menu_item name="DirectX"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="directx_16.png" large_image_name="directx_32.png"/> <Help Tip="安装或重置DirectX" HelpSo
+  01_煤炭界面: MacroPath=0 python字=0
+  02_地勘界面: MacroPath=1 python字=0
+     <menu_item name="DirectX"> <Version ID="1.0"/> <Visibility value="yes"/> <Function name=""/> <Icon small_image_name="directx_16.png" large_image_name="directx_32.png"/> <Help Tip="安装或重置DirectX" HelpSo
+  03_通风界面: MacroPath=1 python字=0
+     <menu_item name="DirectX"> <Version ID="1.0" /> <Visibility value="yes" /> <Function name="" /> <Icon small_image_name="directx_16.png" large_image_name="directx_32.png" /> <Help Tip="安装或重置DirectX" He
+
+=== license.ini ===
+[LIC]
+RemoteName=127.0.0.1
+Product=1
+KeyID=0
+KeyVersion=2021
+LocOrRem=1
+[Remote_Lic]
+Lic_Svr=0

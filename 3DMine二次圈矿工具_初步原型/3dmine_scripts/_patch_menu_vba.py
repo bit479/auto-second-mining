@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""把英文 Macro 菜单组（VBA 5 项）加入中文标准界面 menu_default.xml。"""
+p = r"E:\gzRJ\3Dmine\2022\common\cui\3dmine_profile_chinese\00_标准界面\menu_default.xml"
+s = open(p, encoding="utf-8").read()
+
+macro_group = '''  <menu_group name="宏(^V)">
+    <menu_item name="运行宏">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerMain::VBARunMacro" />
+      <Icon small_image_name="main_move.png" large_image_name="main_move32.png" />
+      <Help Tip="运行VBA宏" HelpSource="AAA" />
+    </menu_item>
+    <menu_separator------------ />
+    <menu_item name="宏安全设置">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerMain::VBASecurity" />
+      <Icon small_image_name="main_VBASecurity.png" large_image_name="main_VBASecurity32.png" />
+      <Help Tip="宏安全设置" HelpSource="AAA" />
+    </menu_item>
+    <menu_separator------------ />
+    <menu_item name="加载工程">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerMain::VBAProjectLoad" />
+      <Icon small_image_name="main_loading_the_project.png" large_image_name="main_loading_the_project32.png" />
+      <Help Tip="加载VBA工程" HelpSource="AAA" />
+    </menu_item>
+    <menu_item name="新建工程">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerMain::VBANewProject" />
+      <Icon small_image_name="main_new_obj.png" large_image_name="main_new_obj32.png" />
+      <Help Tip="新建VBA工程" HelpSource="AAA" />
+    </menu_item>
+    <menu_separator------------ />
+    <menu_item name="VBA编辑器">
+      <Version ID="1.0" />
+      <Visibility value="yes" />
+      <Function name="AppServerMain::VBAIDE" />
+      <Icon small_image_name="main_vba_editor.png" large_image_name="main_vba_editor32.png" />
+      <Help Tip="打开VBA编辑器" HelpSource="AAA" />
+    </menu_item>
+  </menu_group>
+'''
+
+# 插到 文件 菜单组之前
+anchor = '  <menu_group name="文件(^F)">'
+assert anchor in s, "anchor not found"
+s = s.replace(anchor, macro_group + "\n" + anchor, 1)
+open(p, "w", encoding="utf-8").write(s)
+print("menu patched: VBA macro group added")
