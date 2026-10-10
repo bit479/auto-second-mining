@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 
 from oreblocks import load_holes_xls                       # noqa: E402
-from strip import zone_outline, degree_blocks              # noqa: E402
+from strip import zone_outline, average_blocks             # noqa: E402
 from run_strip import pick_zone                            # noqa: E402
 from composite import load_composite_blocks                # noqa: E402
 
@@ -44,7 +44,7 @@ def run_one(date: str, comp):
     ring = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
     if ring is None:
         return None
-    blocks = degree_blocks(ore, ring, 2.7, "rules", rules_holes=holes)
+    blocks = average_blocks(ore, ring, 2.7)
     return {"date": date, "all": allh, "ore": ore, "ring": ring,
             "blocks": blocks, "pending": pending}
 

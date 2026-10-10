@@ -24,6 +24,9 @@ from scipy.spatial import Voronoi
 EXTRUDE_M = 3.0        # 外侧外推距离
 SIMPLIFY_M = 0.8       # 矿界抽稀容差(m)：让边界尽量是直线段，拐点不要过多
 SOUTH_MERGE_GAP = 8.0  # 南端与综合图历史块"能并在一起"的最大间距(m)
+# 同档碎片小于这个面积就并入相邻块。用 5 张人工图（0915/0922/1003/1004/1008）标定：
+# 40 m² + "并入平均品位最接近的邻块" 时，与人工图的分块一致率最高（0.936）。
+MIN_FRAGMENT_M2 = 40.0
 CHAIN_WINDOW_FACTOR = 1.0   # 链提取的沿向窗口 = 1.0 × 中位最近孔距
 END_SEARCH_R = 12.0    # 端部找邻孔半径
 END_LIMIT = 2          # 每端每侧最多取几个邻孔的中点
@@ -338,6 +341,103 @@ def _cells_within(holes_sub, clip: Polygon):
         p = Polygon(vor.vertices[reg]).buffer(0).intersection(clip)
         if not p.is_empty and p.area > 1e-9:
             out[h.hid] = p
+    return out
+
+
+def _components_of(cellmap, hs):
+    """按单元相接把 hs 分成若干连通组。"""
+    used = [False] * len(hs)
+    comps = []
+    for i in range(len(hs)):
+        if used[i] or hs[i].hid not in cellmap:
+            continue
+        grp = [hs[i]]
+        used[i] = True
+        changed = True
+        while changed:
+            changed = False
+            for j in range(len(hs)):
+                if used[j] or hs[j].hid not in cellmap:
+                    continue
+                if any(cellmap[a.hid].distance(cellmap[hs[j].hid]) < 1e-6 for a in grp):
+                    grp.append(hs[j])
+                    used[j] = True
+                    changed = True
+        comps.append(grp)
+    return comps
+
+
+def average_blocks(ore, outline, density: float,
+                   min_fragment: float = MIN_FRAGMENT_M2,
+                   merge_target: str = "avg"):
+    """分块定档（人工口径）：
+
+      ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
+      ② 同品位档且单元相接的孔先并成一组；
+      ③ 面积小于 min_fragment 的同档碎片，并入相邻组里**平均品位最接近**的那组
+         （人工图里 0.70 的单孔会并进旁边的高品位块，而 44 m² 的 0.61 单孔块保留）；
+      ④ 每块最后按**整块平均品位**所在档定档，体号高档在前。
+    """
+    from oreblocks import Block, Cell, level_of
+
+    if outline is None or not ore:
+        return []
+    cells = _voronoi_cells(ore, outline)
+    hs = [h for h in ore if h.hid in cells]
+    if not hs:
+        return []
+    groups = []
+    for lid in ("L4", "L3", "L2", "L1"):
+        sub = [h for h in hs if level_of(h.grade)[0] == lid]
+        for grp in _components_of(cells, sub):
+            groups.append({"holes": list(grp)})
+    for g in groups:
+        g["area"] = sum(cells[h.hid].area for h in g["holes"])
+        g["avg"] = sum(h.grade_disp for h in g["holes"]) / len(g["holes"])
+    locked = set()
+    while True:
+        cand = [i for i, g in enumerate(groups)
+                if i not in locked and g["area"] < min_fragment]
+        if not cand:
+            break
+        i = min(cand, key=lambda k: groups[k]["area"])
+        g = groups[i]
+        nb = [k for k, h in enumerate(groups) if k != i and any(
+            cells[x.hid].distance(cells[y.hid]) < 1e-6
+            for x in g["holes"] for y in h["holes"])]
+        if not nb:
+            locked.add(i)
+            continue
+        def score(t):
+            if merge_target == "shared":       # 共用边界最长
+                return -sum(cells[x.hid].intersection(cells[y.hid]).length
+                            for x in g["holes"] for y in groups[t]["holes"]
+                            if cells[x.hid].distance(cells[y.hid]) < 1e-6)
+            return abs(groups[t]["avg"] - g["avg"])   # 平均品位最接近
+
+        k = min(nb, key=score)
+        groups[k]["holes"] += g["holes"]
+        groups[k]["area"] += g["area"]
+        groups[k]["avg"] = (sum(h.grade_disp for h in groups[k]["holes"])
+                            / len(groups[k]["holes"]))
+        groups.pop(i)
+        locked = {t if t < i else t - 1 for t in locked if t != i}
+
+    out = []
+    for g in groups:
+        grp = sorted(g["holes"], key=lambda h: -h.grade_disp)
+        lid, label = level_of(g["avg"])
+        if lid is None:
+            continue
+        cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
+                   area_m2=cells[h.hid].area) for h in grp]
+        b = Block(level_id=lid, label=label, holes=grp, cells=cs)
+        b.compute(density)
+        out.append(b)
+    order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
+    out.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
+    for i, b in enumerate(out, 1):
+        b.no = i
     return out
 
 

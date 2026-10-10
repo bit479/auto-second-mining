@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 
 from oreblocks import load_holes_xls                       # noqa: E402
-from strip import zone_outline, degree_blocks, zone_chains, LAST_RING  # noqa: E402
+from strip import zone_outline, average_blocks, zone_chains, LAST_RING  # noqa: E402
 from run_strip import pick_zone                            # noqa: E402
 from composite import load_composite_blocks                # noqa: E402
 
@@ -58,7 +58,7 @@ def main() -> None:
     ore, pending = pick_zone(holes)
     comp = load_composite_blocks(COMP)
     outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast="1008")
-    blocks = degree_blocks(ore, outline, 2.7, "rules", rules_holes=holes)
+    blocks = average_blocks(ore, outline, 2.7)
     man = manual_blocks()
     man_area = sum(p.area for _, p in man)
 

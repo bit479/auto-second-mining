@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
                      write_report_xlsx)
 from oreblocks import load_holes_xls                           # noqa: E402
-from strip import degree_blocks, zone_outline                  # noqa: E402
+from strip import average_blocks, zone_outline                 # noqa: E402
 
 DENSITY = 2.7
 
@@ -94,7 +94,8 @@ def main() -> None:
 
     outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
-    blocks = degree_blocks(ore, outline, DENSITY, "rules", rules_holes=holes)
+    # 分块定档（人工口径）：同档连通块 → <40 m² 的碎片并入邻块 → 按块平均品位定档
+    blocks = average_blocks(ore, outline, DENSITY)
     # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）
     from strip import LAST_RING
     mb = LAST_RING.get("merged_block")
