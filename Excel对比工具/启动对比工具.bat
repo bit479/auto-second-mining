@@ -37,16 +37,8 @@ call :probe "C:\Python311"
 
 :launch
 if defined PYW ( set "RUN=%PYW%" ) else ( if defined PY ( set "RUN=%PY%" ) )
-if not defined RUN (
-    echo.
-    echo ERROR: Python with tkinter and openpyxl was not found on this machine.
-    echo Please install official Python from https://www.python.org
-    echo (tick "Add python.exe to PATH" during install), then run:
-    echo   pip install openpyxl
-    echo.
-    pause
-    goto :done
-)
+
+if not defined RUN goto :notfound
 
 REM gui.py is in the same folder as this bat (cwd already set above).
 REM Prefer full path; fall back to relative name if expansion failed.
@@ -55,6 +47,16 @@ if not exist "%GUISCRIPT%" set "GUISCRIPT=gui.py"
 
 REM Non-empty title "ExcelDiff" avoids the start empty-title parsing pitfall.
 start "ExcelDiff" "%RUN%" -X utf8 "%GUISCRIPT%"
+goto :done
+
+:notfound
+echo.
+echo ERROR: Python with tkinter and openpyxl was not found on this machine.
+echo Please install official Python from https://www.python.org
+echo Tick "Add python.exe to PATH" during install, then run:
+echo   pip install openpyxl
+echo.
+pause
 
 :done
 endlocal

@@ -120,35 +120,39 @@ def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
 
 
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
-    """整条矿化带的外围矿界（闭合多边形）。"""
+    """整条矿化带的外围矿界。
+
+    规则（人工流程）：每侧边界 =
+      - 外侧还有炮孔（含无品位孔）→ 取与该孔连线的中点（＝Voronoi 边）；
+      - 外侧没有炮孔 → 沿该方向外推 extrude 米。
+    实现：对所有孔（含无品位）做 Voronoi，把矿孔的单元裁剪到"全孔凸包外扩 extrude"，
+    再取并集。这样朝向邻孔的一侧自然落在中点，朝向外侧的一侧自然落在外扩 3 m 上。
+    """
     if len(ore) < 2:
         return None
-    left, right, c, u, v = zone_chains(ore, all_holes)
+    from shapely.geometry import MultiPoint
+
+    allxy = np.array([(h.x, h.y) for h in all_holes], float)
+    hull = MultiPoint([tuple(p) for p in allxy]).convex_hull.buffer(
+        extrude, join_style="mitre")
     xy = np.array([(h.x, h.y) for h in ore], float)
-    waste = [h for h in all_holes if h.grade < 0.5]
-    # 逐段局部法向外推
-    west = _offset_chain([xy[j] for j in left], c, extrude)
-    east = _offset_chain([xy[j] for j in right], c, extrude)
-    # 端部：端孔与附近所有无品位孔的中点（沿走向排序）
-    north = _end_mids(ore[right[-1]], waste, u) + _end_mids(ore[left[-1]], waste, -u)
-    south = _end_mids(ore[left[0]], waste, -u) + _end_mids(ore[right[0]], waste, u)
-    # 端部若没有邻孔（图上的南端），按用户规则"没有炮孔的一侧推 3 m"：
-    # 把两条链的端点在走向方向再外推 3 m，避免闭合线横穿炮孔。
-    if not north:
-        north = [tuple(np.array(west[-1]) + u * extrude),
-                 tuple(np.array(east[-1]) + u * extrude)]
-    if not south:
-        south = [tuple(np.array(west[0]) - u * extrude),
-                 tuple(np.array(east[0]) - u * extrude)]
-
-    def along(p):
-        return (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
-
-    ring = list(west)                                  # 左链：南→北
-    ring += sorted(north, key=lambda p: -along(p))      # 北端闭合：东→西
-    ring += list(reversed(east))                        # 右链：北→南
-    ring += sorted(south, key=lambda p: along(p))       # 南端闭合：西→东
-    poly = Polygon(ring).buffer(0)
+    b = hull.bounds
+    extra = np.array([[b[0] - 1e3, b[1] - 1e3], [b[2] + 1e3, b[1] - 1e3],
+                      [b[0] - 1e3, b[3] + 1e3], [b[2] + 1e3, b[3] + 1e3]], float)
+    far = np.array([[-9e4, -9e4], [9e4, -9e4], [-9e4, 9e4], [9e4, 9e4]], float)
+    vor = Voronoi(np.vstack([allxy, extra, far]))
+    parts = []
+    for h in ore:
+        i = int(np.argmin(np.hypot(allxy[:, 0] - h.x, allxy[:, 1] - h.y)))
+        reg = vor.regions[vor.point_region[i]]
+        if not reg or -1 in reg:
+            continue
+        cell = Polygon(vor.vertices[reg]).buffer(0).intersection(hull)
+        if not cell.is_empty:
+            parts.append(cell)
+    if not parts:
+        return None
+    poly = unary_union(parts).buffer(0)
     return poly if not poly.is_empty else None
 
 
