@@ -12,7 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from deliver import write_3ds, write_dxf, write_report_xlsx       # noqa: E402
+from deliver import (write_3ds, write_dxf, write_report_png,      # noqa: E402
+                     write_report_xlsx)
 from oreblocks import (attach_cells, build_blocks, load_holes_xls,  # noqa: E402
                        read_3dm)
 
@@ -50,12 +51,16 @@ def main() -> None:
 
     tag = "%s平台 %s" % (PLATFORM, DATE)
     xlsx = out_dir / ("%s炮孔数据报告.xlsx" % tag)
+    png = out_dir / ("%s炮孔数据报告.png" % tag)
     dxf = out_dir / ("%s二次圈矿矿块图.dxf" % tag)
     tds = out_dir / ("%s矿块边界线.3ds" % tag)
 
-    write_report_xlsx(blocks, meta, xlsx)
+    holes_all = list(holes.values())
+    write_report_xlsx(blocks, meta, xlsx, holes_all)
     print("[报告]", xlsx)
-    write_dxf(blocks, list(holes.values()), cells, meta, dxf)
+    px = write_report_png(blocks, meta, holes_all, png)
+    print("[报告PNG]", png, px)
+    write_dxf(blocks, holes_all, cells, meta, dxf, report_png=png, report_px=px)
     print("[图件]", dxf)
     write_3ds(blocks, meta, tds)
     print("[3ds ]", tds)

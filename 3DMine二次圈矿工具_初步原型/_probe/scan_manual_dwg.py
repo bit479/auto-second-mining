@@ -60,6 +60,8 @@ def main() -> None:
                 pts = [[round(coords[i], 3), round(coords[i + 1], 3)]
                        for i in range(0, len(coords) - 1, 2)]
                 polys.append({"layer": ent.Layer, "closed": bool(ent.Closed),
+                              "color": int(ent.Color),
+                              "lw": int(getattr(ent, "Lineweight", -1) or -1),
                               "elev": round(float(getattr(ent, "Elevation", 0.0) or 0.0), 3),
                               "pts": pts})
             elif name == "AcDbLine":

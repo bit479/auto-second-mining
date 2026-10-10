@@ -22,6 +22,8 @@ LEVEL_COLOR = {"L1": 4, "L2": 5, "L3": 1, "L4": 2}          # AutoCAD 色号（�
 LEVEL_RGB = {"L1": (0, 255, 255), "L2": (0, 0, 255),
              "L3": (255, 0, 0), "L4": (255, 255, 0)}
 HID_COLOR = 138          # 工程号颜色（人工图实测）
+CROSS_HALF = 0.5         # 十字半臂长(m)：人工图实测十字共 1.0 m
+TRAIL_LEN = 1.2          # 轨迹线长度(m)：人工图实测 1.2 m
 
 
 def level_id_of(grade: float):
@@ -36,12 +38,20 @@ def level_id_of(grade: float):
     return None
 
 
-def grid_cells(poly: Polygon, size: float = 1.0):
-    """按矿界裁剪的 1×1 m 方格（闭合小多边形）。"""
+def grid_cells(poly: Polygon, size: float = 1.0, origin=None):
+    """按矿界裁剪的 1×1 m 方格（闭合小多边形）。
+
+    origin=(x0,y0) 为方格原点；人工图的规律是**取矿界包围盒左下角**。
+    """
     out = []
     minx, miny, maxx, maxy = poly.bounds
-    gx0 = math.floor(minx / size) * size
-    gy0 = math.floor(miny / size) * size
+    if origin is None:
+        gx0 = math.floor(minx / size) * size
+        gy0 = math.floor(miny / size) * size
+    else:
+        ox, oy = origin
+        gx0 = ox + math.floor((minx - ox) / size) * size
+        gy0 = oy + math.floor((miny - oy) / size) * size
     x = gx0
     while x < maxx:
         y = gy0
@@ -61,7 +71,18 @@ def grid_cells(poly: Polygon, size: float = 1.0):
 
 
 # ---------------------------------------------------------------- 报告 xlsx
-def write_report_xlsx(blocks, meta, path: Path) -> None:
+def grade_stats(holes):
+    """炮孔品位统计：>=3 / 1.5-3 / 1-1.5 / 0.5-1 / <0.5 孔数。"""
+    return {
+        ">=3": sum(1 for h in holes if h.grade >= 3.0),
+        "1.5-3": sum(1 for h in holes if 1.5 <= h.grade < 3.0),
+        "1-1.5": sum(1 for h in holes if 1.0 <= h.grade < 1.5),
+        "0.5-1": sum(1 for h in holes if 0.5 <= h.grade < 1.0),
+        "<0.5": sum(1 for h in holes if h.grade < 0.5),
+    }
+
+
+def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
     import openpyxl
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
@@ -121,8 +142,29 @@ def write_report_xlsx(blocks, meta, path: Path) -> None:
     ws.cell(row=r, column=6, value=round(totals[2], 3))
     for c in range(1, 7):
         ws.cell(row=r, column=c).font = Font(bold=True)
+    last_row = r
 
-    for row in ws.iter_rows(min_row=2, max_row=r, min_col=1, max_col=6):
+    if holes:
+        r += 2
+        ws.cell(row=r, column=1, value="炮孔品位统计（孔数）").font = Font(bold=True)
+        r += 1
+        st = grade_stats(holes)
+        ws.cell(row=r, column=1, value="≥3")
+        ws.cell(row=r, column=2, value=st[">=3"])
+        ws.cell(row=r, column=3, value="1.5-3")
+        ws.cell(row=r, column=4, value=st["1.5-3"])
+        ws.cell(row=r, column=5, value="1-1.5")
+        ws.cell(row=r, column=6, value=st["1-1.5"])
+        r += 1
+        ws.cell(row=r, column=1, value="0.5-1")
+        ws.cell(row=r, column=2, value=st["0.5-1"])
+        ws.cell(row=r, column=3, value="<0.5")
+        ws.cell(row=r, column=4, value=st["<0.5"])
+        ws.cell(row=r, column=5, value="合计孔数")
+        ws.cell(row=r, column=6, value=len(holes))
+        last_row = r
+
+    for row in ws.iter_rows(min_row=2, max_row=last_row, min_col=1, max_col=6):
         for cell in row:
             cell.border = border
             if cell.column >= 3:
@@ -133,6 +175,58 @@ def write_report_xlsx(blocks, meta, path: Path) -> None:
 
 
 # ---------------------------------------------------------------- DXF
+def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
+    """把报告表格画成 PNG（用于粘贴进 CAD 图）。返回像素尺寸 (w, h)。"""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "SimSun"]
+    plt.rcParams["axes.unicode_minus"] = False
+
+    rows = [["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"]]
+    for lid in ("L4", "L3", "L2", "L1"):
+        bs = [b for b in blocks if b.level_id == lid]
+        if not bs:
+            continue
+        for b in bs:
+            rows.append([b.label, str(b.no), "%.3f" % b.volume_m3, "%.3f" % b.tonnage_t,
+                         "%.3f" % b.grade, "%.3f" % b.metal_hg])
+        st = sum(b.tonnage_t for b in bs)
+        sm = sum(b.metal_hg for b in bs)
+        rows.append(["小计", "", "%.3f" % sum(b.volume_m3 for b in bs), "%.3f" % st,
+                     "%.3f" % (sm * 100.0 / st if st else 0), "%.3f" % sm])
+    tt = sum(b.tonnage_t for b in blocks)
+    tm = sum(b.metal_hg for b in blocks)
+    rows.append(["合计", "", "%.3f" % sum(b.volume_m3 for b in blocks), "%.3f" % tt,
+                 "%.3f" % (tm * 100.0 / tt if tt else 0), "%.3f" % tm])
+
+    fig, ax = plt.subplots(figsize=(9, 0.42 * len(rows) + 1.6))
+    ax.axis("off")
+    ax.set_title("%s平台 %s炮孔数据报告" % (meta["platform"], meta["date"]),
+                 fontsize=13, pad=10)
+    tbl = ax.table(cellText=rows, loc="upper center", cellLoc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    tbl.scale(1.0, 1.35)
+    for (r0, c0), cell in tbl.get_celld().items():
+        if r0 == 0:
+            cell.set_facecolor("#D9E2F3")
+            cell.set_text_props(weight="bold")
+        elif rows[r0][0] in ("小计", "合计"):
+            cell.set_facecolor("#EDEDED")
+    if holes:
+        st = grade_stats(holes)
+        ax.text(0.01, 0.02,
+                "炮孔品位统计（孔数）：≥3 %d   1.5-3 %d   1-1.5 %d   0.5-1 %d   <0.5 %d   合计 %d"
+                % (st[">=3"], st["1.5-3"], st["1-1.5"], st["0.5-1"], st["<0.5"], len(holes)),
+                transform=ax.transAxes, fontsize=8, ha="left", va="bottom")
+    fig.tight_layout()
+    fig.savefig(str(path), dpi=dpi, facecolor="white")
+    w, h = fig.canvas.get_width_height()
+    plt.close(fig)
+    return w, h
+
+
 def _nearest_hole_grade(cell: Polygon, holes):
     c = cell.representative_point()
     best, bd = None, 1e18
@@ -143,7 +237,8 @@ def _nearest_hole_grade(cell: Polygon, holes):
     return best
 
 
-def write_dxf(blocks, holes_all, cells, meta, path: Path) -> None:
+def write_dxf(blocks, holes_all, cells, meta, path: Path,
+              report_png: Path = None, report_px=None) -> None:
     from ezdxf import new
 
     doc = new("R2010")
@@ -160,6 +255,13 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path) -> None:
 
     layer_of = {"L1": "0.500-1.000", "L2": "1.000-1.500",
                 "L3": "1.500-3.000", "L4": "3.000-999.000"}
+    # 方格相位：人工图以"矿界包围盒左下角"为原点
+    if blocks:
+        minx = min(b.polygon.bounds[0] for b in blocks if b.polygon is not None)
+        miny = min(b.polygon.bounds[1] for b in blocks if b.polygon is not None)
+        grid_origin = (minx, miny)
+    else:
+        grid_origin = (0.0, 0.0)
     # 1) 矿界（彩色闭合线）
     for b in blocks:
         if b.polygon is None:
@@ -177,9 +279,9 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path) -> None:
         if b.polygon is None:
             continue
         color = LEVEL_COLOR[b.level_id]
-        for cellp in grid_cells(b.polygon, 1.0):
+        for cellp in grid_cells(b.polygon, 1.0, grid_origin):
             msp.add_lwpolyline([(x, y) for x, y in cellp.exterior.coords], close=True,
-                               dxfattribs={"layer": "爆区方格网", "color": 7})
+                               dxfattribs={"layer": "爆区方格网", "color": color})
             n_grid += 1
             hh = _nearest_hole_grade(cellp, b.holes)
             if hh is not None:
@@ -192,15 +294,15 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path) -> None:
     # 3) 炮孔符号 + 工程号 + 品位
     for h in holes_all:
         lid = level_id_of(h.grade)
-        aci = LEVEL_COLOR.get(lid, 8)
-        # 十字 ±0.5
-        msp.add_line((h.x - 0.5, h.y), (h.x + 0.5, h.y),
-                     dxfattribs={"layer": "点", "color": 7})
-        msp.add_line((h.x, h.y - 0.5), (h.x, h.y + 0.5),
-                     dxfattribs={"layer": "点", "color": 7})
-        # 轨迹线：向西 1.2m
-        msp.add_line((h.x, h.y), (h.x - 1.2, h.y),
-                     dxfattribs={"layer": "钻孔", "color": 7, "lineweight": 35})
+        aci = LEVEL_COLOR.get(lid, 8)     # 废孔 8（灰）
+        # 十字：颜色 = 工程号色(138)，半臂 CROSS_HALF
+        msp.add_line((h.x - CROSS_HALF, h.y), (h.x + CROSS_HALF, h.y),
+                     dxfattribs={"layer": "点", "color": HID_COLOR})
+        msp.add_line((h.x, h.y - CROSS_HALF), (h.x, h.y + CROSS_HALF),
+                     dxfattribs={"layer": "点", "color": HID_COLOR})
+        # 轨迹线：向西 TRAIL_LEN，颜色 = 该孔品位档色（废孔 8）
+        msp.add_line((h.x, h.y), (h.x - TRAIL_LEN, h.y),
+                     dxfattribs={"layer": "钻孔", "color": aci, "lineweight": 35})
         # 工程号
         msp.add_text(h.hid, dxfattribs={"layer": "钻孔", "color": HID_COLOR,
                                         "height": 0.4, "style": "CN_TTF"},
@@ -250,7 +352,28 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path) -> None:
                  dxfattribs={"layer": "0", "color": 7, "height": 5.0,
                              "style": "CN_TTF"},
                  ).set_placement((minx, maxy + 12))
-    doc.saveas(str(path))
+
+    # 6) 报告图片（位图参照，贴在图右侧）
+    if report_png is not None and Path(report_png).exists():
+        try:
+            w_px, h_px = report_px if report_px else (1200, 800)
+            width_m = 40.0                      # 报告图在图纸上的宽度（米）
+            scale = width_m / float(w_px)
+            idef = doc.add_image_def(filename=str(report_png),
+                                     size_in_pixel=(w_px, h_px))
+            height_m = width_m * h_px / float(w_px)
+            msp.add_image(image_def=idef,
+                          insert=(maxx + 5.0, maxy - height_m),
+                          size_in_units=(width_m, height_m))
+            print("    报告图片已插入:", report_png)
+        except Exception as exc:
+            print("    报告图片插入失败:", exc)
+    try:
+        doc.saveas(str(path))
+    except PermissionError:
+        alt = path.with_name(path.stem + "_new" + path.suffix)
+        doc.saveas(str(alt))
+        print("    %s 被占用（CAD 里开着？），已另存为 %s" % (path.name, alt.name))
     print("    方格 %d 个；炮孔 %d 个" % (n_grid, len(holes_all)))
 
 
