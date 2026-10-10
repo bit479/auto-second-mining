@@ -42,7 +42,7 @@ def main() -> None:
 
     holes = load_holes_xls(xls)
     print("数据库: %s\n炮孔 %d 个" % (xls, len(holes)))
-    blocks = auto_blocks(holes, DENSITY)
+    blocks, pending = auto_blocks(holes, DENSITY)
     print("\n自动圈连得到 %d 个矿块：" % len(blocks))
     for b in blocks:
         print("   %d 号 %s  %10.3f m3  %10.3f t  %.3f g/t  %.3f 百克  (%s)"
@@ -52,6 +52,10 @@ def main() -> None:
     tt = sum(b.tonnage_t for b in blocks)
     tm = sum(b.metal_hg for b in blocks)
     print("合计 %.3f m3 / %.3f t / %.3f 百克" % (tv, tt, tm))
+    if pending:
+        print("\n未圈闭区域（孤立有品位孔，缺工程，待取样验证后再进行施工）：")
+        for lid, g in pending:
+            print("   %s  %s" % (lid, "、".join(h.short for h in g)))
 
     tag = "%s平台 %s" % (meta["platform"], meta["date"])
     holes_all = list(holes.values())

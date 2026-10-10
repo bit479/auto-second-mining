@@ -21,7 +21,12 @@ from scipy.spatial import Voronoi
 
 from oreblocks import Block, Cell, level_of
 
-INFLUENCE_R = 3.5     # 单孔影响半径(m)，用于自动生成矿界
+# 外推距离(m)：人工圈矿按"1/2 工程距离"外推；各平台统一按 3.0 起，可按矿区标定。
+# （1008 实测：外推 3.5 m 与人工图最贴，3.0 m 时各块小约 15~20%）
+INFLUENCE_R = 3.0
+MIN_HOLES_PER_BLOCK = 2   # 孤立单孔不单独圈矿（周围无同档相邻孔时）
+MIN_HOLE_GAP = 1.0        # 两个孔距离小于该值时视为同一个孔位（重复孔）
+ADJACENT_MAX = 8.8        # 视为"相邻"的最大孔距(m)：2×中位孔距，超过即不并块
 HULL_MARGIN = 30.0    # 爆区外扩(m)，用于给边界孔构造有界 Voronoi 单元
 
 
@@ -74,19 +79,27 @@ def _group_by_level(holes, cells):
 
 def _touching(a, b, cells, tol: float = 0.6):
     """两个孔是否相邻：单元相接（或距离在 tol 内）。"""
+    d = math.hypot(a.x - b.x, a.y - b.y)
+    if d > ADJACENT_MAX:
+        return False
     ca, cb = cells.get(a.hid), cells.get(b.hid)
     if ca is not None and cb is not None and ca.distance(cb) < 1e-6:
         return True
-    return math.hypot(a.x - b.x, a.y - b.y) <= 0.0
+    return d <= tol
 
 
 def auto_blocks(holes, density: float, influence_r: float = INFLUENCE_R):
     """返回按高档在前编号的 Block 列表（每个块已算好指标）。"""
     holes = list(holes.values()) if isinstance(holes, dict) else list(holes)
+    holes = _dedupe(holes)
     cells_all = _bounded_voronoi(holes)
     groups = _group_by_level(holes, cells_all)
     blocks = []
+    pending = []          # 不单独圈矿的孤立区（列入"缺工程，待取样验证"）
     for lid, group in groups:
+        if _distinct_positions(group) < MIN_HOLES_PER_BLOCK:
+            pending.append((lid, group))
+            continue
         # ② 自动矿界 = 各孔单元 ∩ 影响半径圆
         parts = []
         for h in group:
@@ -105,7 +118,26 @@ def auto_blocks(holes, density: float, influence_r: float = INFLUENCE_R):
         blocks.append(b)
     for i, b in enumerate(blocks, 1):
         b.no = i
-    return blocks
+    return blocks, pending
+
+
+def _distinct_positions(group, gap: float = MIN_HOLE_GAP) -> int:
+    """按孔位去重（重复孔位只算一个）。"""
+    pts = []
+    for h in group:
+        if not any(math.hypot(h.x - x, h.y - y) < gap for x, y in pts):
+            pts.append((h.x, h.y))
+    return len(pts)
+
+
+def _dedupe(holes, gap: float = MIN_HOLE_GAP):
+    """去掉重复孔位（距离 < gap 视为同一个孔，保留先出现的）。"""
+    kept = []
+    for h in holes:
+        if any(math.hypot(h.x - k.x, h.y - k.y) < gap for k in kept):
+            continue
+        kept.append(h)
+    return kept
 
 
 def _voronoi_inside(group, outline: Polygon):
