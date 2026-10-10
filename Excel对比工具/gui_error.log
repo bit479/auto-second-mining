@@ -1,0 +1,6 @@
+10:51:57  start: set_app_user_model_id
+10:51:57  start: Tk()
+10:51:58  start: App(root)
+10:51:58  start: set_window_icon
+10:51:58  start: enable_drop OK
+10:51:58  start: mainloop 进入

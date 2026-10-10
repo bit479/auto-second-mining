@@ -210,23 +210,93 @@ class App:
             messagebox.showinfo("提示", "还没有生成报告，请先「开始对比」。")
 
 
+def _write_startup_log(msg):
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "gui_error.log"), "a", encoding="utf-8") as _f:
+            from datetime import datetime
+            _f.write(datetime.now().strftime("%H:%M:%S") + "  " + msg + "\n")
+    except Exception:
+        pass
+
+
+def _report_cb_exc(exc_type, exc_value, exc_tb):
+    """mainloop 里未捕获的异常(如按钮回调)会走到这里, 记录到日志而非静默丢弃。"""
+    import traceback as _tb
+    _write_startup_log("MAINLOOP异常:\n" + "".join(_tb.format_exception(exc_type, exc_value, exc_tb)))
+
+
 def main():
     try:
         import tkinter  # 提前探测
     except ImportError:
-        messagebox.showerror("环境缺失", "当前 Python 没有 tkinter，无法启动图形界面。\n"
-                                         "请使用带 tkinter 的 Python（如官方安装版）。")
+        _fatal("当前 Python 没有 tkinter，无法启动图形界面。\n请使用带 tkinter 的 Python（如官方安装版）。")
         sys.exit(1)
+    # 每次启动先清空上一轮的日志, 保证是本轮内容
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        open(os.path.join(here, "gui_error.log"), "w", encoding="utf-8").close()
+    except Exception:
+        pass
+    _write_startup_log("start: set_app_user_model_id")
     app_icon.set_app_user_model_id()  # 必须在 Tk() 之前
+    _write_startup_log("start: Tk()")
     root = tk.Tk()
+    # mainloop 内回调异常 -> 写日志(否则 pythonw 静默吞掉)
+    try:
+        root.report_callback_exception = _report_cb_exc
+    except Exception:
+        pass
+    _write_startup_log("start: App(root)")
     app = App(root)
+    _write_startup_log("start: set_window_icon")
     app_icon.set_window_icon(root)   # 标题栏左上角 + 任务栏图标
     try:
         dragdrop.enable_drop(root, app._on_drop)
+        _write_startup_log("start: enable_drop OK")
+    except Exception as e:
+        _write_startup_log("enable_drop 跳过: " + str(e))
+    _write_startup_log("start: mainloop 进入")
+    try:
+        root.mainloop()
+    except Exception as e:
+        import traceback as _tb
+        _write_startup_log("MAINLOOP崩溃:\n" + _tb.format_exc())
+        _fatal("程序在运行过程中崩溃：\n\n" + _tb.format_exc()[-1500:])
+    _write_startup_log("start: mainloop 正常退出")
+
+
+def _fatal(err_text):
+    """pythonw 无控制台时，用原生 MessageBox 弹出错误(点确定前不消失)，并写日志。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(here, "gui_error.log"), "a", encoding="utf-8") as _f:
+            _f.write("FATAL:\n" + err_text + "\n")
     except Exception:
         pass
-    root.mainloop()
+    try:
+        import ctypes
+        MB_OK = 0x0
+        MB_ICONERROR = 0x10
+        ctypes.windll.user32.MessageBoxW(0, err_text, "Excel 差异对比工具 - 启动失败", MB_OK | MB_ICONERROR)
+    except Exception:
+        # 实在弹不出窗口, 退而用 tkinter
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            r = tk.Tk()
+            r.withdraw()
+            messagebox.showerror("启动失败", err_text)
+            r.destroy()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        _write_startup_log("FATAL(启动期):\n" + tb)
+        _fatal("程序启动失败，详情见 gui_error.log：\n\n" + tb[-1500:])

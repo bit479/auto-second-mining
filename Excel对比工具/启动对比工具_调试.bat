@@ -5,7 +5,7 @@ cd /d "%~dp0"
 set "PY="
 set "PYW="
 
-REM --- 1) 先看 PATH 里有没有 python / pythonw / py ---
+REM --- 1) PATH ---
 for %%X in (pythonw python py) do (
     if not defined PYW if not defined PY (
         where %%X >nul 2>nul && (
@@ -16,34 +16,35 @@ for %%X in (pythonw python py) do (
     )
 )
 
-REM --- 2) PATH 里没有就探测常见安装目录（本机 Python 没加进 PATH 也能用）---
+REM --- 2) 探测安装目录 ---
 if not defined PYW if not defined PY (
     call :probe "%LOCALAPPDATA%\Programs\Python\Python313"
     call :probe "%LOCALAPPDATA%\Programs\Python\Python312"
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python311"
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python310"
     call :probe "C:\Program Files\Python313"
-    call :probe "C:\Program Files\Python312"
-    call :probe "C:\Program Files\Python311"
-    call :probe "C:\Program Files\Python310"
-    call :probe "C:\Python313"
-    call :probe "C:\Python312"
-    call :probe "C:\Python311"
 )
 
 if not defined PYW if not defined PY (
     echo 未找到带 tkinter 和 openpyxl 的 Python。
-    echo 请安装官方 Python (https://www.python.org) ，安装时勾选 "Add to PATH"，
-    echo 然后执行: pip install openpyxl
     pause
     exit /b 1
 )
 
-if defined PYW (
-    start "" "%PYW%" -X utf8 "%~dp0gui.py"
-) else (
-    start "" "%PY" -X utf8 "%~dp0gui.py"
+REM 调试版: 尽量用控制台 python(崩溃时能看到红色报错)
+if not defined PY if defined PYW (
+    set "PY=%PYW:pythonw.exe=python.exe%"
+    if not exist "%PY%" set "PY="
 )
+if defined PY (
+    echo 使用: %PY%
+    echo (崩溃时下方会显示红色报错; 按任意键可关闭此窗口)
+    cmd /c ""%PY%" -X utf8 "%~dp0gui.py""
+) else (
+    echo 使用(无控制台): %PYW% ，错误将写入 gui_error.log
+    cmd /c ""%PYW%" -X utf8 "%~dp0gui.py" 2> "%~dp0gui_error.log""
+)
+echo.
+echo 程序已退出，按任意键关闭此窗口。
+pause
 endlocal
 goto :eof
 

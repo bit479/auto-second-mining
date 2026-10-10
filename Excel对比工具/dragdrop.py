@@ -27,7 +27,7 @@ else:
 
 # 保持存活: 全局 trampoline + 每窗口状态
 _trampoline = None
-_window_state = {}  # hwnd(int) -> (orig_proc_callable, handler)
+_window_state = {}  # hwnd(int) -> (orig_proc_callable, handler, root)
 
 
 def _parse_drop(hdrop):
@@ -48,12 +48,17 @@ def _make_trampoline():
     def proc(hwnd, msg, wparam, lparam):
         state = _window_state.get(int(hwnd))
         if state is not None:
-            orig_proc, handler = state
+            orig_proc, handler, root = state
             if msg == WM_DROPFILES:
                 try:
                     files = _parse_drop(wparam)
-                    if handler:
-                        handler(files)
+                    if handler and files:
+                        # 关键: 绝不在窗口过程里同步重入 tkinter。
+                        # 把回调派发到主线程消息队列, 由 mainloop 择机执行。
+                        if root is not None:
+                            root.after(0, lambda f=files: _safe_call(handler, f))
+                        else:
+                            _safe_call(handler, files)
                 except Exception:
                     pass
                 return 0
@@ -61,6 +66,13 @@ def _make_trampoline():
                 return orig_proc(hwnd, msg, wparam, lparam)
         return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
     return WNDPROC(proc)
+
+
+def _safe_call(handler, files):
+    try:
+        handler(files)
+    except Exception:
+        pass
 
 
 def enable_drop(root, handler):
@@ -94,8 +106,10 @@ def enable_drop(root, handler):
         _trampoline = _make_trampoline()
 
     orig = user32.GetWindowLongPtrW(hwnd, GWLP_WNDPROC)
-    orig_proc = WNDPROC(orig) if orig else None
-    _window_state[hwnd] = (orig_proc, handler)
+    # 必须用 int() 取出完整 64 位地址再转成函数指针, 否则 WNDPROC(c_void_p) 可能
+    # 得到被截断的地址, 调用原始窗口过程时直接访问违规 -> C 级崩溃(WER 弹窗一闪)。
+    orig_proc = WNDPROC(int(orig)) if orig else None
+    _window_state[hwnd] = (orig_proc, handler, root)
 
     user32.SetWindowLongPtrW(hwnd, GWLP_WNDPROC, _trampoline)
     return True
