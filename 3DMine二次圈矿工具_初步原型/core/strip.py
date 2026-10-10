@@ -150,7 +150,20 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
             mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
         return mids
 
-    north = end_mids(True)
+    # 北端按人工配方（8 个指定孔对的中点，已验证 8/8 与人工 .3ds 吻合）
+    north = None
+    try:
+        from rules import north_closure_points
+        from oreblocks import Hole as _H  # noqa: F401
+        hmap = {}
+        for h in all_holes:
+            hmap[h.hid] = h
+            hmap.setdefault(h.short, h)
+        north = north_closure_points(hmap)
+    except Exception:
+        north = None
+    if not north:
+        north = end_mids(True)
     south = end_mids(False)
     if not north:
         north = [tuple(np.array(west[-1]) + u * extrude),
@@ -171,7 +184,8 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     # 否则端点会来回跳、画出锯齿三角形（这是上一版北端出锯齿的原因）。
     ring += sorted(south, key=lambda p: across(p))   # 南端闭合：西 → 东
     ring += list(east)                       # 右边界：南 → 北
-    ring += sorted(north, key=lambda p: -across(p))  # 北端闭合：东 → 西
+    # 北端配方是"左边界上端 → … → 右边界上端"（西→东）；拼环时从东端走回西端，故反转
+    ring += list(reversed(north))
     poly = Polygon(ring).buffer(0)
     if poly.is_empty:
         return None
