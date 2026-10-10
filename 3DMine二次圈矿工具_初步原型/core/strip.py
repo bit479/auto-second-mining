@@ -86,7 +86,7 @@ def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=No
     for i in range(n):
         dmin.append(min(np.hypot(xy[j][0] - xy[i][0], xy[j][1] - xy[i][1])
                         for j in range(n) if j != i) if n > 1 else 0.0)
-    band = 0.8 * float(np.median(dmin)) if n > 1 else 0.0
+    band = 0.9 * float(np.median(dmin)) if n > 1 else 0.0
     left, right = [], []
     for i in range(n):
         if ore[i].short in ex:
@@ -340,7 +340,7 @@ def _cells_within(holes_sub, clip: Polygon):
 
 
 def degree_blocks(ore, outline, density: float, split_mode: str = "rules",
-                  rules_holes=None):
+                  rules_holes=None, use_recipe: bool = False):
     """矿界内按品位档分块（同档且相接的孔并成一块）。
 
     split_mode="rules"  ：用规则表里的**指定孔对中点折线**当品位界限（人工配方，
@@ -366,7 +366,13 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "rules",
             hmap.setdefault(h.short, h)
         _, _, _, _, vv = zone_chains(ore, None)
         pieces = [outline]
-        for key, ln in cut_lines(hmap, vv):
+        # 默认走**通用自动识别**（对任何炮区都适用）；只有显式要求时才用人工配方
+        if use_recipe:
+            lines = cut_lines(hmap, vv)
+        else:
+            from gradecuts import auto_cut_lines
+            lines = auto_cut_lines(ore, outline)
+        for key, ln in lines:
             new = []
             for p in pieces:
                 try:
