@@ -136,16 +136,22 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     waste = [h for h in all_holes if h.grade < 0.5]
     west = _offset_chain([xy[j] for j in left], c, extrude)
     east = _offset_chain([xy[j] for j in right], c, extrude)
-    # 端部闭合：端部若干个矿孔分别与相邻无品位孔取中点
-    def end_mids(idx_list, ref_dir, n_use=2):
+    # 端部闭合：端部一段内的**所有**矿孔都与相邻无品位孔配对取中点（人工图是一串中点）
+    s_all = (xy - c) @ u
+    t_all = (xy - c) @ v
+    span = float(s_all.max() - s_all.min())
+    band = max(12.0, 0.35 * span)          # 端部参与配对的长度
+
+    def end_mids(want_north: bool):
+        lo, hi = (s_all.max() - band, 1e18) if want_north else (-1e18, s_all.min() + band)
+        sel = [j for j in range(len(ore)) if lo <= s_all[j] <= hi]
         mids = []
-        for j in idx_list[-n_use:] if ref_dir[0] * u[0] + ref_dir[1] * u[1] > 0 \
-                else idx_list[:n_use]:
-            mids += _end_mids(ore[j], waste, ref_dir)
+        for j in sel:
+            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
         return mids
 
-    north = end_mids(right, u, 2) + end_mids(left, -u, 2)
-    south = end_mids(left, -u, 2) + end_mids(right, u, 2)
+    north = end_mids(True)
+    south = end_mids(False)
     if not north:
         north = [tuple(np.array(west[-1]) + u * extrude),
                  tuple(np.array(east[-1]) + u * extrude)]
