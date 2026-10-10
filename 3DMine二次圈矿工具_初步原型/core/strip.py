@@ -193,32 +193,41 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
             pairs.setdefault(key, []).append((mid, li, lj))
 
     pieces = [outline]
-    for key, mids in (pairs.items() if split_mode == "midline" else []):
-        # 按走向排序，连成折线，并把两端拉长到矿界之外
-        _, u, v = _pca(xy)
-        c = xy.mean(axis=0)
-        mids_sorted = sorted(mids, key=lambda m: (m[0][0] - c[0]) * u[0] + (m[0][1] - c[1]) * u[1])
-        pts = [m[0] for m in mids_sorted]
-        if len(pts) < 2:
-            continue
-        a = np.array(pts[0], float)
-        b = np.array(pts[-1], float)
-        dirv = b - a
-        n = np.linalg.norm(dirv)
-        if n < 1e-9:
-            continue
-        dirv = dirv / n
-        # 只在本档界相邻的局部范围内生效（不横扫整个矿界）
-        ext = 2.0 * adj
-        pts = [tuple(a - dirv * ext)] + pts + [tuple(b + dirv * ext)]
-        line = LineString(pts)
-        new = []
-        for p in pieces:
-            try:
-                new.extend(shp_split(p, line).geoms)
-            except Exception:
-                new.append(p)
-        pieces = new
+    if split_mode == "midline":
+        # 同一档对可能对应多条互不相连的"品位界限"（如 1 号、2 号），先按空间聚类分开
+        for key, mids in pairs.items():
+            clusters = []
+            for m in mids:
+                placed = False
+                for cl in clusters:
+                    if min(abs(m[0][0] - p[0]) + abs(m[0][1] - p[1]) for p in cl) <= 2.0 * adj:
+                        cl.append(m)
+                        placed = True
+                        break
+                if not placed:
+                    clusters.append([m])
+            for cl in clusters:
+                pts = [m[0] for m in cl]
+                if len(pts) < 2:
+                    continue
+                a = np.array(pts[0], float)
+                b = np.array(pts[-1], float)
+                dirv = b - a
+                n = np.linalg.norm(dirv)
+                if n < 1e-9:
+                    continue
+                dirv = dirv / n
+                # 沿自身方向拉到矿界之外（人工的品位界限就是横切整条矿化带）
+                ext = 200.0
+                pts = [tuple(a - dirv * ext)] + pts + [tuple(b + dirv * ext)]
+                line = LineString(pts)
+                new = []
+                for p in pieces:
+                    try:
+                        new.extend(shp_split(p, line).geoms)
+                    except Exception:
+                        new.append(p)
+                pieces = new
 
     # ---- 每个子片按"离哪个矿孔最近"归属品位档，再同档合并 ----
     buckets = {}
