@@ -208,7 +208,9 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
         if n < 1e-9:
             continue
         dirv = dirv / n
-        pts = [tuple(a - dirv * 200.0)] + pts + [tuple(b + dirv * 200.0)]
+        # 只在本档界相邻的局部范围内生效（不横扫整个矿界）
+        ext = 2.0 * adj
+        pts = [tuple(a - dirv * ext)] + pts + [tuple(b + dirv * ext)]
         line = LineString(pts)
         new = []
         for p in pieces:
