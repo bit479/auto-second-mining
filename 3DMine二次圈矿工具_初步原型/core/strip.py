@@ -200,7 +200,7 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
             for m in mids:
                 placed = False
                 for cl in clusters:
-                    if min(abs(m[0][0] - p[0]) + abs(m[0][1] - p[1]) for p in cl) <= 2.0 * adj:
+                    if min(abs(m[0][0] - q[0][0]) + abs(m[0][1] - q[0][1]) for q in cl) <= 2.0 * adj:
                         cl.append(m)
                         placed = True
                         break
