@@ -1,3 +1,0 @@
-Administrator
-PC-T78N1UKFDNR7 
-2026Äê10ÔÂ9ÈÕ  6:33:34

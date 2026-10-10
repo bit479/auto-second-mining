@@ -9,6 +9,10 @@ __pycache__/
 # Office 临时锁文件
 ~$*
 
+# AutoCAD 锁文件（打开图纸时自动生成，别进版本库）
+*.dwl
+*.dwl2
+
 # 系统 / 编辑器噪声
 Thumbs.db
 desktop.ini
