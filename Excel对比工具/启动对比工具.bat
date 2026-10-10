@@ -5,55 +5,67 @@ cd /d "%~dp0"
 set "PY="
 set "PYW="
 
-REM --- 1) 先看 PATH 里有没有 python / pythonw / py ---
-for %%X in (pythonw python py) do (
-    if not defined PYW if not defined PY (
-        where %%X >nul 2>nul && (
-            %%X -c "import tkinter,openpyxl" >nul 2>nul && (
-                if /i "%%X"=="pythonw" (set "PYW=%%X") else (set "PY=%%X")
-            )
-        )
-    )
+REM Step 1: try py launcher / pythonw / python from PATH
+where py >nul 2>nul
+if not errorlevel 1 (
+    py -c "import tkinter,openpyxl" >nul 2>nul
+    if not errorlevel 1 ( set "PY=py" & goto :launch )
+)
+where pythonw >nul 2>nul
+if not errorlevel 1 (
+    pythonw -c "import tkinter,openpyxl" >nul 2>nul
+    if not errorlevel 1 ( set "PYW=pythonw" & goto :launch )
+)
+where python >nul 2>nul
+if not errorlevel 1 (
+    python -c "import tkinter,openpyxl" >nul 2>nul
+    if not errorlevel 1 ( set "PY=python" & goto :launch )
 )
 
-REM --- 2) PATH 里没有就探测常见安装目录（本机 Python 没加进 PATH 也能用）---
-if not defined PYW if not defined PY (
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python313"
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python312"
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python311"
-    call :probe "%LOCALAPPDATA%\Programs\Python\Python310"
-    call :probe "C:\Program Files\Python313"
-    call :probe "C:\Program Files\Python312"
-    call :probe "C:\Program Files\Python311"
-    call :probe "C:\Program Files\Python310"
-    call :probe "C:\Python313"
-    call :probe "C:\Python312"
-    call :probe "C:\Python311"
-)
+REM Step 2: probe common install dirs (works even if Python is not in PATH)
+call :probe "%LOCALAPPDATA%\Programs\Python\Python313"
+call :probe "%LOCALAPPDATA%\Programs\Python\Python312"
+call :probe "%LOCALAPPDATA%\Programs\Python\Python311"
+call :probe "%LOCALAPPDATA%\Programs\Python\Python310"
+call :probe "C:\Program Files\Python313"
+call :probe "C:\Program Files\Python312"
+call :probe "C:\Program Files\Python311"
+call :probe "C:\Program Files\Python310"
+call :probe "C:\Python313"
+call :probe "C:\Python312"
+call :probe "C:\Python311"
 
-if not defined PYW if not defined PY (
-    echo 未找到带 tkinter 和 openpyxl 的 Python。
-    echo 请安装官方 Python (https://www.python.org) ，安装时勾选 "Add to PATH"，
-    echo 然后执行: pip install openpyxl
-    pause
-    exit /b 1
-)
-
+:launch
 if defined PYW (
     start "" "%PYW%" -X utf8 "%~dp0gui.py"
-) else (
-    start "" "%PY" -X utf8 "%~dp0gui.py"
+    goto :done
 )
-endlocal
-goto :eof
+if defined PY (
+    start "" "%PY" -X utf8 "%~dp0gui.py"
+    goto :done
+)
+
+echo.
+echo ERROR: Python with tkinter and openpyxl was not found on this machine.
+echo Please install official Python from https://www.python.org
+echo (tick "Add python.exe to PATH" during install), then run:
+echo   pip install openpyxl
+echo.
+pause
+goto :done
 
 :probe
 if defined PYW goto :eof
 if defined PY goto :eof
 if exist "%~1\pythonw.exe" (
-    "%~1\pythonw.exe" -c "import tkinter,openpyxl" >nul 2>nul && set "PYW=%~1\pythonw.exe" && goto :eof
+    "%~1\pythonw.exe" -c "import tkinter,openpyxl" >nul 2>nul
+    if not errorlevel 1 ( set "PYW=%~1\pythonw.exe" & goto :eof )
 )
 if exist "%~1\python.exe" (
-    "%~1\python.exe" -c "import tkinter,openpyxl" >nul 2>nul && set "PY=%~1\python.exe"
+    "%~1\python.exe" -c "import tkinter,openpyxl" >nul 2>nul
+    if not errorlevel 1 ( set "PY=%~1\python.exe" )
 )
 goto :eof
+
+:done
+endlocal

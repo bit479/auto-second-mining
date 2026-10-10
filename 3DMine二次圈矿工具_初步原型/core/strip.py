@@ -47,36 +47,21 @@ def _rows(s, gap):
     return rows
 
 
-def zone_chains(ore, all_holes=None):
+def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=()):
     """返回 (左链索引, 右链索引, 中心, 走向 u, 法向 v)；左＝法向负侧。
 
-    规则（人工流程）：以走向为轴把矿孔分东西两半（t 的中位数为界）；
-    西半侧中，在 ±W 沿向窗口内最西的孔进左链；东半侧中，窗口内最东的孔进右链。
+    方案 2（用户确认）：矿化带画一条走向中线（＝过所有矿孔质心、沿 PCA 主轴的直线），
+    中线西侧的孔串成左链、东侧的串成右链；个别孔允许人工指定（manual_left / manual_right）。
     """
     xy = np.array([(h.x, h.y) for h in ore], float)
     c, u, v = _pca(xy)
     s = (xy - c) @ u
     t = (xy - c) @ v
-    d = np.hypot(xy[:, None, 0] - xy[None, :, 0], xy[:, None, 1] - xy[None, :, 1])
-    np.fill_diagonal(d, 1e9)
-    win = CHAIN_WINDOW_FACTOR * float(np.median(d.min(axis=1)))
-    # 判"这一侧有没有炮孔"时要把**无品位孔**也算进去（用户的规则）
-    others = []
-    for h in (all_holes or []):
-        if any(h.hid == o.hid for o in ore):
-            continue
-        p = np.array([h.x, h.y]) - c
-        others.append((float(p @ u), float(p @ v)))
-    left, right = [], []
-    for i in range(len(ore)):
-        cand = [(s[j], t[j]) for j in range(len(ore)) if j != i and abs(s[j] - s[i]) <= win]
-        cand += [p for p in others if abs(p[0] - s[i]) <= win]
-        # 西侧无孔 → 该孔是西边界（左链，向西外推 3 m）
-        if all(t[i] <= p[1] + 1e-9 for p in cand):
-            left.append(i)
-        # 东侧无孔 → 该孔是东边界（右链，向东外推 3 m）
-        if all(t[i] >= p[1] - 1e-9 for p in cand):
-            right.append(i)
+    ml, mr, ex = set(manual_left), set(manual_right), set(exclude)
+    left = [i for i in range(len(ore))
+            if (t[i] <= 0 or ore[i].short in ml) and ore[i].short not in mr and ore[i].short not in ex]
+    right = [i for i in range(len(ore))
+             if (t[i] > 0 or ore[i].short in mr) and ore[i].short not in ml and ore[i].short not in ex]
     left.sort(key=lambda j: s[j])
     right.sort(key=lambda j: s[j])
     return left, right, c, u, v
