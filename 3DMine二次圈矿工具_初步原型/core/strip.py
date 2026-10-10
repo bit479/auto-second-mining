@@ -47,7 +47,7 @@ def _rows(s, gap):
     return rows
 
 
-def zone_chains(ore):
+def zone_chains(ore, all_holes=None):
     """返回 (左链索引, 右链索引, 中心, 走向 u, 法向 v)；左＝法向负侧。
 
     规则（人工流程）：以走向为轴把矿孔分东西两半（t 的中位数为界）；
@@ -60,18 +60,22 @@ def zone_chains(ore):
     d = np.hypot(xy[:, None, 0] - xy[None, :, 0], xy[:, None, 1] - xy[None, :, 1])
     np.fill_diagonal(d, 1e9)
     win = CHAIN_WINDOW_FACTOR * float(np.median(d.min(axis=1)))
-    tmid = float(np.median(t))
+    # 判"这一侧有没有炮孔"时要把**无品位孔**也算进去（用户的规则）
+    others = []
+    for h in (all_holes or []):
+        if any(h.hid == o.hid for o in ore):
+            continue
+        p = np.array([h.x, h.y]) - c
+        others.append((float(p @ u), float(p @ v)))
     left, right = [], []
     for i in range(len(ore)):
-        near = [j for j in range(len(ore)) if abs(s[j] - s[i]) <= win]
-        if len(near) == 1:                       # 窗口内只有自己 → 按在中线哪一侧归属
-            (left if t[i] <= tmid else right).append(i)
-            continue
-        # 左链：沿向窗口内没有更靠西（t 更小）的孔
-        if all(t[i] <= t[j] + 1e-9 for j in near):
+        cand = [(s[j], t[j]) for j in range(len(ore)) if j != i and abs(s[j] - s[i]) <= win]
+        cand += [p for p in others if abs(p[0] - s[i]) <= win]
+        # 西侧无孔 → 该孔是西边界（左链，向西外推 3 m）
+        if all(t[i] <= p[1] + 1e-9 for p in cand):
             left.append(i)
-        # 右链：沿向窗口内没有更靠东（t 更大）的孔
-        if all(t[i] >= t[j] - 1e-9 for j in near):
+        # 东侧无孔 → 该孔是东边界（右链，向东外推 3 m）
+        if all(t[i] >= p[1] - 1e-9 for p in cand):
             right.append(i)
     left.sort(key=lambda j: s[j])
     right.sort(key=lambda j: s[j])
@@ -91,7 +95,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     """整条矿化带的外围矿界（闭合多边形）。"""
     if len(ore) < 2:
         return None
-    left, right, c, u, v = zone_chains(ore)
+    left, right, c, u, v = zone_chains(ore, all_holes)
     xy = np.array([(h.x, h.y) for h in ore], float)
     waste = [h for h in all_holes if h.grade < 0.5]
     west = [tuple(xy[j] - v * extrude) for j in left]

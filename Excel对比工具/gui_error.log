@@ -1,6 +1,2 @@
-10:51:57  start: set_app_user_model_id
-10:51:57  start: Tk()
-10:51:58  start: App(root)
-10:51:58  start: set_window_icon
-10:51:58  start: enable_drop OK
-10:51:58  start: mainloop 杩涘叆
+'utf8' 不是内部或外部命令，也不是可运行的程序
+或批处理文件。
