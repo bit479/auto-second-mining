@@ -76,6 +76,48 @@ def _mids_to_waste(hole, waste, radius=END_SEARCH_R, limit=END_LIMIT):
     return out
 
 
+def _offset_chain(pts, centroid, dist):
+    """按每个点的局部法向（相邻两段方向的平均的垂线）向外平移 dist。"""
+    pts = [np.array(p, float) for p in pts]
+    n = len(pts)
+    out = []
+    for i in range(n):
+        if n == 1:
+            d = np.array([0.0, 0.0])
+        elif i == 0:
+            d = pts[1] - pts[0]
+        elif i == n - 1:
+            d = pts[-1] - pts[-2]
+        else:
+            a = pts[i] - pts[i - 1]
+            b = pts[i + 1] - pts[i]
+            a = a / (np.linalg.norm(a) + 1e-12)
+            b = b / (np.linalg.norm(b) + 1e-12)
+            d = a + b
+        nd = np.linalg.norm(d)
+        if nd < 1e-9:
+            d = np.array([0.0, 1.0])
+        else:
+            d = d / nd
+        nrm = np.array([-d[1], d[0]])          # 垂线方向
+        if np.dot(nrm, pts[i] - np.asarray(centroid, float)) < 0:
+            nrm = -nrm                          # 指向矿化带外侧
+        out.append(tuple(pts[i] + nrm * dist))
+    return out
+
+
+def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
+    """端部闭合：端孔与附近所有无品位孔的中点，沿 ref_dir 排序。"""
+    mids = []
+    for w in waste:
+        d = math.hypot(end_hole.x - w.x, end_hole.y - w.y)
+        if d <= radius:
+            mids.append(((end_hole.x + w.x) / 2.0, (end_hole.y + w.y) / 2.0))
+    r = np.asarray(ref_dir, float)
+    mids.sort(key=lambda p: (p[0] - end_hole.x) * r[0] + (p[1] - end_hole.y) * r[1])
+    return mids
+
+
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     """整条矿化带的外围矿界（闭合多边形）。"""
     if len(ore) < 2:
@@ -83,18 +125,20 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     left, right, c, u, v = zone_chains(ore, all_holes)
     xy = np.array([(h.x, h.y) for h in ore], float)
     waste = [h for h in all_holes if h.grade < 0.5]
-    west = [tuple(xy[j] - v * extrude) for j in left]
-    east = [tuple(xy[j] + v * extrude) for j in right]
-    north = _mids_to_waste(ore[left[-1]], waste) + _mids_to_waste(ore[right[-1]], waste)
-    south = _mids_to_waste(ore[left[0]], waste) + _mids_to_waste(ore[right[0]], waste)
+    # 逐段局部法向外推
+    west = _offset_chain([xy[j] for j in left], c, extrude)
+    east = _offset_chain([xy[j] for j in right], c, extrude)
+    # 端部：端孔与附近所有无品位孔的中点（沿走向排序）
+    north = _end_mids(ore[right[-1]], waste, u) + _end_mids(ore[left[-1]], waste, -u)
+    south = _end_mids(ore[left[0]], waste, -u) + _end_mids(ore[right[0]], waste, u)
 
     def along(p):
         return (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
 
-    ring = list(west)
-    ring += sorted(north, key=lambda p: -along(p))
-    ring += list(reversed(east))
-    ring += sorted(south, key=lambda p: along(p))
+    ring = list(west)                                  # 左链：南→北
+    ring += sorted(north, key=lambda p: -along(p))      # 北端闭合：东→西
+    ring += list(reversed(east))                        # 右链：北→南
+    ring += sorted(south, key=lambda p: along(p))       # 南端闭合：西→东
     poly = Polygon(ring).buffer(0)
     return poly if not poly.is_empty else None
 

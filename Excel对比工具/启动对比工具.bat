@@ -36,23 +36,29 @@ call :probe "C:\Python312"
 call :probe "C:\Python311"
 
 :launch
-if defined PYW (
-    start "" "%PYW%" -X utf8 "%~dp0gui.py"
-    goto :done
-)
-if defined PY (
-    start "" "%PY" -X utf8 "%~dp0gui.py"
+if defined PYW ( set "RUN=%PYW%" ) else ( if defined PY ( set "RUN=%PY%" ) )
+if not defined RUN (
+    echo.
+    echo ERROR: Python with tkinter and openpyxl was not found on this machine.
+    echo Please install official Python from https://www.python.org
+    echo (tick "Add python.exe to PATH" during install), then run:
+    echo   pip install openpyxl
+    echo.
+    pause
     goto :done
 )
 
-echo.
-echo ERROR: Python with tkinter and openpyxl was not found on this machine.
-echo Please install official Python from https://www.python.org
-echo (tick "Add python.exe to PATH" during install), then run:
-echo   pip install openpyxl
-echo.
-pause
-goto :done
+REM gui.py is in the same folder as this bat (cwd already set above).
+REM Prefer full path; fall back to relative name if expansion failed.
+set "GUISCRIPT=%~dp0gui.py"
+if not exist "%GUISCRIPT%" set "GUISCRIPT=gui.py"
+
+REM Non-empty title "ExcelDiff" avoids the start empty-title parsing pitfall.
+start "ExcelDiff" "%RUN%" -X utf8 "%GUISCRIPT%"
+
+:done
+endlocal
+goto :eof
 
 :probe
 if defined PYW goto :eof
@@ -66,6 +72,3 @@ if exist "%~1\python.exe" (
     if not errorlevel 1 ( set "PY=%~1\python.exe" )
 )
 goto :eof
-
-:done
-endlocal
