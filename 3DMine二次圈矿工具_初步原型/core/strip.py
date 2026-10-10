@@ -162,11 +162,16 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     def along(p):
         return (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
 
+    def across(p):
+        return (p[0] - c[0]) * v[0] + (p[1] - c[1]) * v[1]
+
     # 拼接顺序严格照人工：左边界(北→南) -> 南端闭合 -> 右边界(南→北) -> 北端闭合
     ring = list(reversed(west))              # 左边界：北 → 南
-    ring += sorted(south, key=lambda p: along(p))    # 南端闭合：西 → 东
+    # 端部闭合按**横向**排序（从东侧走到西侧 / 西侧走到东侧），不要再按走向排序，
+    # 否则端点会来回跳、画出锯齿三角形（这是上一版北端出锯齿的原因）。
+    ring += sorted(south, key=lambda p: across(p))   # 南端闭合：西 → 东
     ring += list(east)                       # 右边界：南 → 北
-    ring += sorted(north, key=lambda p: -along(p))   # 北端闭合：从东端往西走
+    ring += sorted(north, key=lambda p: -across(p))  # 北端闭合：东 → 西
     poly = Polygon(ring).buffer(0)
     if poly.is_empty:
         return None
