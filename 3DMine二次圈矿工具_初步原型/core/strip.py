@@ -121,42 +121,48 @@ def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
 
 
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
-    """整条矿化带的外围矿界。
+    """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
-    规则（人工流程）：每侧边界 =
-      - 外侧还有炮孔（含无品位孔）→ 取与该孔连线的中点（＝Voronoi 边）；
-      - 外侧没有炮孔 → 沿该方向外推 extrude 米。
-    实现：对所有孔（含无品位）做 Voronoi，把矿孔的单元裁剪到"全孔凸包外扩 extrude"，
-    再取并集。这样朝向邻孔的一侧自然落在中点，朝向外侧的一侧自然落在外扩 3 m 上。
+    人工图的画法（由其 .3ds 逐步还原）：
+      西侧 = 左链（西侧那列孔）逐段沿局部法向外推 3 m；
+      东侧 = 右链（东侧那列孔）逐段沿局部法向外推 3 m；
+      两端 = 端部矿孔与**相邻无品位孔的中点**连成折线（这就是"辅助线中点"）；
+      若某端外侧没有炮孔 → 该端沿走向再推 3 m（不横穿炮孔）。
     """
     if len(ore) < 2:
         return None
-    from shapely.geometry import MultiPoint
-
-    allxy = np.array([(h.x, h.y) for h in all_holes], float)
-    hull = MultiPoint([tuple(p) for p in allxy]).convex_hull.buffer(
-        extrude, join_style="mitre")
+    left, right, c, u, v = zone_chains(ore, all_holes)
     xy = np.array([(h.x, h.y) for h in ore], float)
-    b = hull.bounds
-    extra = np.array([[b[0] - 1e3, b[1] - 1e3], [b[2] + 1e3, b[1] - 1e3],
-                      [b[0] - 1e3, b[3] + 1e3], [b[2] + 1e3, b[3] + 1e3]], float)
-    far = np.array([[-9e4, -9e4], [9e4, -9e4], [-9e4, 9e4], [9e4, 9e4]], float)
-    vor = Voronoi(np.vstack([allxy, extra, far]))
-    parts = []
-    for h in ore:
-        i = int(np.argmin(np.hypot(allxy[:, 0] - h.x, allxy[:, 1] - h.y)))
-        reg = vor.regions[vor.point_region[i]]
-        if not reg or -1 in reg:
-            continue
-        cell = Polygon(vor.vertices[reg]).buffer(0).intersection(hull)
-        if not cell.is_empty:
-            parts.append(cell)
-    if not parts:
-        return None
-    poly = unary_union(parts).buffer(0)
+    waste = [h for h in all_holes if h.grade < 0.5]
+    west = _offset_chain([xy[j] for j in left], c, extrude)
+    east = _offset_chain([xy[j] for j in right], c, extrude)
+    # 端部闭合：端部若干个矿孔分别与相邻无品位孔取中点
+    def end_mids(idx_list, ref_dir, n_use=2):
+        mids = []
+        for j in idx_list[-n_use:] if ref_dir[0] * u[0] + ref_dir[1] * u[1] > 0 \
+                else idx_list[:n_use]:
+            mids += _end_mids(ore[j], waste, ref_dir)
+        return mids
+
+    north = end_mids(right, u, 2) + end_mids(left, -u, 2)
+    south = end_mids(left, -u, 2) + end_mids(right, u, 2)
+    if not north:
+        north = [tuple(np.array(west[-1]) + u * extrude),
+                 tuple(np.array(east[-1]) + u * extrude)]
+    if not south:
+        south = [tuple(np.array(west[0]) - u * extrude),
+                 tuple(np.array(east[0]) - u * extrude)]
+
+    def along(p):
+        return (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
+
+    ring = list(west)
+    ring += sorted(north, key=lambda p: -along(p))
+    ring += list(reversed(east))
+    ring += sorted(south, key=lambda p: along(p))
+    poly = Polygon(ring).buffer(0)
     if poly.is_empty:
         return None
-    # 抽稀：边界尽量是直线段（人工图每块只有十几个拐点）
     if SIMPLIFY_M > 0:
         sp = poly.simplify(SIMPLIFY_M, preserve_topology=True)
         if not sp.is_empty and sp.area > 0.5 * poly.area:
