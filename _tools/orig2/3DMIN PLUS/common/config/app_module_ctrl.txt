@@ -1,0 +1,14 @@
+Module_0_Core.dll
+Module_1_CAD.dll
+Module_2_CAD_Ext.dll
+Module_3_DTM.dll
+Module_4_Solid.dll
+Module_5_DataBase_Ext.dll
+Module_5_DataBase_Core.dll
+Module_6_BlockModel.dll
+Module_7_UG.dll
+Module_8_OpenPit.dll
+Module_10_RingDesign_Ext.dll
+Module_11_Plugin.dll
+
+

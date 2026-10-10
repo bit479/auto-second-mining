@@ -13,6 +13,7 @@ from pathlib import Path
 
 BASE = Path(r"E:\gzRJ\3Dmine\3Dmine plus e无限台安装\3DMIN PLUS")
 MENU = BASE / r"common\cui\3dmine_profile_chinese\00_标准界面\menu_default.xml"
+MODULE_LIST = BASE / r"common\config\app_module.txt"
 PY_TOOLS = BASE / r"common\py_tools"
 MACRO_SRC = Path(__file__).with_name("dm_probe_py2.py")
 MACRO_DST = PY_TOOLS / "dm_probe_py2.py"
@@ -24,7 +25,7 @@ GROUP = (
     '    <menu_item name="Probe API">\n'
     '      <Version ID="1.0" />\n'
     '      <Visibility value="yes" />\n'
-    '      <Function name="" />\n'
+    '      <Function name="AppServerM40::testVR" />\n'
     '      <Icon small_image_name="" large_image_name="" />\n'
     '      <Help Tip="dump 3DMine python api" HelpSource="AAA" />\n'
     '      <Macro Path ="' + VALUE + '" />\n'
@@ -45,6 +46,21 @@ def apply() -> None:
     else:
         log("backup exists -> %s" % bak)
 
+    mbak = MODULE_LIST.with_name(MODULE_LIST.name + "." + STAMP)
+    if not mbak.exists():
+        shutil.copy2(MODULE_LIST, mbak)
+        log("backup -> %s" % mbak)
+    else:
+        log("backup exists -> %s" % mbak)
+    mods = MODULE_LIST.read_text(encoding="gbk", errors="replace").splitlines()
+    if "Module_40_Python.dll" in [m.strip() for m in mods]:
+        log("Module_40_Python.dll already listed")
+    else:
+        mods = [m for m in mods if m.strip() != ""]
+        mods.append("Module_40_Python.dll")
+        MODULE_LIST.write_text("\r\n".join(mods) + "\r\n", encoding="gbk")
+        log("Module_40_Python.dll appended to app_module.txt")
+
     PY_TOOLS.mkdir(parents=True, exist_ok=True)
     shutil.copy2(MACRO_SRC, MACRO_DST)
     log("macro deployed -> %s" % MACRO_DST)
@@ -64,6 +80,10 @@ def revert() -> None:
     if bak.exists():
         shutil.copy2(bak, MENU)
         log("restored <- %s" % bak)
+    mbak = MODULE_LIST.with_name(MODULE_LIST.name + "." + STAMP)
+    if mbak.exists():
+        shutil.copy2(mbak, MODULE_LIST)
+        log("restored <- %s" % mbak)
     if MACRO_DST.exists():
         MACRO_DST.unlink()
         log("removed %s" % MACRO_DST)

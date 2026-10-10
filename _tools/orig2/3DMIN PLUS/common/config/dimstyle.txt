@@ -1,0 +1,10 @@
+m_rulerExtedDist=1.250
+m_rulerOffsetDist=0.625
+m_arrowHeight=2.500
+m_textHeight=2.500
+m_textHornPos=0
+m_textVertPos=1
+m_textAligment=1
+m_fontName=txt.shx
+m_decimalCount=2
+m_degreePrecisionCount=2
