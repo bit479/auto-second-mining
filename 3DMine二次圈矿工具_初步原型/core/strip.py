@@ -16,6 +16,7 @@ import math
 
 import numpy as np
 from shapely.geometry import Polygon
+from shapely.ops import unary_union
 from scipy.spatial import Voronoi
 
 EXTRUDE_M = 3.0        # 外侧外推距离
@@ -160,19 +161,90 @@ def _voronoi_cells(ore, clip: Polygon):
     return out
 
 
-def degree_blocks(ore, outline, density: float):
-    """矿界内按品位档分块（同档且相接的孔并成一块）。"""
+def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
+    """矿界内按品位档分块（同档且相接的孔并成一块）。
+
+    split_mode="voronoi"：用矿孔 Voronoi 单元并集作为各档范围（当前更贴近人工）；
+    split_mode="midline"：用"跨档邻孔中点折线"切分（人工的品位界限做法，仍在标定）。
+    """
     from oreblocks import Block, Cell
+    from oreblocks import level_of
+    from shapely.geometry import LineString
+    from shapely.ops import split as shp_split
 
     if outline is None or not ore:
         return []
-    cells = _voronoi_cells(ore, outline)
+    # ---- 分档：用"跨档邻孔中点折线"把矿界切开（对应人工的"品位界限"）----
+    xy = np.array([(h.x, h.y) for h in ore], float)
+    d = np.hypot(xy[:, None, 0] - xy[None, :, 0], xy[:, None, 1] - xy[None, :, 1])
+    np.fill_diagonal(d, 1e9)
+    adj = 1.6 * float(np.median(d.min(axis=1)))
+    pairs = {}
+    for i in range(len(ore)):
+        for j in range(i + 1, len(ore)):
+            if d[i][j] > adj:
+                continue
+            li = level_of(ore[i].grade)[0]
+            lj = level_of(ore[j].grade)[0]
+            if li == lj:
+                continue
+            key = tuple(sorted((li, lj)))
+            mid = ((ore[i].x + ore[j].x) / 2.0, (ore[i].y + ore[j].y) / 2.0)
+            pairs.setdefault(key, []).append((mid, li, lj))
+
+    pieces = [outline]
+    for key, mids in (pairs.items() if split_mode == "midline" else []):
+        # 按走向排序，连成折线，并把两端拉长到矿界之外
+        _, u, v = _pca(xy)
+        c = xy.mean(axis=0)
+        mids_sorted = sorted(mids, key=lambda m: (m[0][0] - c[0]) * u[0] + (m[0][1] - c[1]) * u[1])
+        pts = [m[0] for m in mids_sorted]
+        if len(pts) < 2:
+            continue
+        a = np.array(pts[0], float)
+        b = np.array(pts[-1], float)
+        dirv = b - a
+        n = np.linalg.norm(dirv)
+        if n < 1e-9:
+            continue
+        dirv = dirv / n
+        pts = [tuple(a - dirv * 200.0)] + pts + [tuple(b + dirv * 200.0)]
+        line = LineString(pts)
+        new = []
+        for p in pieces:
+            try:
+                new.extend(shp_split(p, line).geoms)
+            except Exception:
+                new.append(p)
+        pieces = new
+
+    # ---- 每个子片按"离哪个矿孔最近"归属品位档，再同档合并 ----
+    buckets = {}
+    if split_mode == "midline":
+        for p in pieces:
+            if p.area < 0.5:
+                continue
+            rp = p.representative_point()
+            best = min(ore, key=lambda h: (h.x - rp.x) ** 2 + (h.y - rp.y) ** 2)
+            buckets.setdefault(level_of(best.grade)[0], []).append(p)
+
+    cells_all = _voronoi_cells(ore, outline)
     blocks = []
     for lid, lo, hi, label in (("L4", 3.0, 9e9, "3.000-999.000"),
                                ("L3", 1.5, 3.0, "1.500-3.000"),
                                ("L2", 1.0, 1.5, "1.000-1.500"),
                                ("L1", 0.5, 1.0, "0.500-1.000")):
-        hs = [h for h in ore if lo <= h.grade < hi and h.hid in cells]
+        region = None
+        if split_mode == "midline":
+            for p in buckets.get(lid, []):
+                region = p if region is None else region.union(p)
+        else:
+            hs0 = [h for h in ore if lo <= h.grade < hi and h.hid in cells_all]
+            if hs0:
+                region = unary_union([cells_all[h.hid] for h in hs0])
+        if region is None:
+            continue
+        hs = [h for h in ore if lo <= h.grade < hi and h.hid in cells_all]
         used = [False] * len(hs)
         groups = []
         for i in range(len(hs)):
@@ -186,14 +258,18 @@ def degree_blocks(ore, outline, density: float):
                 for j in range(len(hs)):
                     if used[j]:
                         continue
-                    if any(cells[a.hid].distance(cells[hs[j].hid]) < 1e-6 for a in grp):
+                    if any(cells_all[a.hid].distance(cells_all[hs[j].hid]) < 1e-6 for a in grp):
                         grp.append(hs[j])
                         used[j] = True
                         changed = True
             groups.append(grp)
         for grp in groups:
-            cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
-                       area_m2=cells[h.hid].area) for h in grp]
+            sub = unary_union([cells_all[h.hid] for h in grp]).intersection(region)
+            if sub.is_empty or sub.area < 0.5:
+                continue
+            cs = [Cell(hid=h.hid, hole=h,
+                       polygon=cells_all[h.hid].intersection(sub),
+                       area_m2=cells_all[h.hid].intersection(sub).area) for h in grp]
             b = Block(level_id=lid, label=label, holes=list(grp), cells=cs)
             b.compute(density)
             blocks.append(b)
