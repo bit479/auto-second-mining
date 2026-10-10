@@ -132,6 +132,14 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     # 端部：端孔与附近所有无品位孔的中点（沿走向排序）
     north = _end_mids(ore[right[-1]], waste, u) + _end_mids(ore[left[-1]], waste, -u)
     south = _end_mids(ore[left[0]], waste, -u) + _end_mids(ore[right[0]], waste, u)
+    # 端部若没有邻孔（图上的南端），按用户规则"没有炮孔的一侧推 3 m"：
+    # 把两条链的端点在走向方向再外推 3 m，避免闭合线横穿炮孔。
+    if not north:
+        north = [tuple(np.array(west[-1]) + u * extrude),
+                 tuple(np.array(east[-1]) + u * extrude)]
+    if not south:
+        south = [tuple(np.array(west[0]) - u * extrude),
+                 tuple(np.array(east[0]) - u * extrude)]
 
     def along(p):
         return (p[0] - c[0]) * u[0] + (p[1] - c[1]) * u[1]
