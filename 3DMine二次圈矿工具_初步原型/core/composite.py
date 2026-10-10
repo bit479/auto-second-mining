@@ -100,4 +100,12 @@ def merge_outline(block_poly: Polygon, comp_blocks, max_gap: float = 4.5):
                 group.append(p)
                 n += 1
                 changed = True
-    return unary_union(group), n
+    merged = unary_union(group)
+    # 合并后把"断口"补上：先外扩 gap/2 再收回来，使几块连成一条闭合轮廓
+    if merged.geom_type == "MultiPolygon":
+        d = max_gap / 2.0 + 0.1
+        closed = merged.buffer(d, join_style="mitre").buffer(
+            -d, join_style="mitre")
+        if not closed.is_empty:
+            merged = closed
+    return merged, n
