@@ -35,7 +35,12 @@ def parse_tag(name: str):
     return plat, (d.group(1) if d else "")
 
 
-def pick_zone(holes, gap=1.0, adjacent_max=8.8):
+# 孤立孔判定：矿孔之间相距 ≤ 15 m 才算"连在同一条矿化带上"（用户 2026-10-10 定）。
+# 依据：1004 人工图把北边间隔 10.6~13.9 m 的孔都连成一条；1008 的 P43 离主带 21.4 m 没圈。
+ZONE_LINK_M = 15.0
+
+
+def pick_zone(holes, gap=1.0, adjacent_max=ZONE_LINK_M):
     """返回 (主矿化带矿孔, 待取样孤立孔组)。"""
     ore = [h for h in holes.values() if h.grade >= 0.5]
     kept = []
