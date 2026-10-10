@@ -86,9 +86,19 @@ def main() -> None:
           % (len(allh), len([h for h in allh if h.grade >= 0.5]),
              len(ore), len(pending)))
 
-    outline = zone_outline(ore, allh, 3.0)
+    comp = []
+    if comp_dwg:
+        from composite import load_composite_blocks
+        comp = load_composite_blocks(comp_dwg)
+        print("综合图历史矿块 %d 个" % len(comp))
+
+    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp)
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
-    blocks = degree_blocks(ore, outline, DENSITY)
+    blocks = degree_blocks(ore, outline, DENSITY, "rules", rules_holes=holes)
+    # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）
+    from strip import LAST_RING
+    mb = LAST_RING.get("merged_block")
+    cands = [c for c in comp if mb is not None and c[2] is mb] or None
     for b in blocks:
         print("   %d 号 %s  %9.3f m2  %10.3f m3  %10.3f t  %.3f g/t  %.3f 百克  (%s)"
               % (b.no, b.label, b.area_m2, b.volume_m3, b.tonnage_t, b.grade,
@@ -102,12 +112,6 @@ def main() -> None:
         for g in pending:
             print("   " + "、".join(h.short for h in g))
 
-    comp = []
-    if comp_dwg:
-        from composite import load_composite_blocks
-        comp = load_composite_blocks(comp_dwg)
-        print("综合图历史矿块 %d 个" % len(comp))
-
     tag = "%s平台 %s" % (meta["platform"], meta["date"])
     xlsx = out_dir / ("%s炮孔数据报告.xlsx" % tag)
     png = out_dir / ("%s炮孔数据报告.png" % tag)
@@ -117,8 +121,9 @@ def main() -> None:
     png_used, pw, ph = write_report_png(blocks, meta, allh, png)
     write_dxf(blocks, allh, [], meta, dxf,
               report_png=png_used, report_px=(pw, ph),
-              pending=[("L1", g) for g in pending], composite_blocks=comp)
-    write_3ds(blocks, meta, tds, composite_blocks=comp)
+              pending=[("L1", g) for g in pending], composite_blocks=comp,
+              merge_candidates=cands)
+    write_3ds(blocks, meta, tds, composite_blocks=comp, merge_candidates=cands)
     print("完成 -> %s" % out_dir)
 
 

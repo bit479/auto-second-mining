@@ -14,12 +14,20 @@ import numpy as np
 from shapely.geometry import LineString, Polygon
 from shapely.ops import split as shp_split
 
-# 每条品位界限：孔对序列（中点依次连线）
+# 每条品位界限：孔对序列（中点依次连线）。已逐点对齐用户 1008 的
+# 「1号品位界限.3ds」「2号品位界限.3ds」：
+#   1 号：mid(P14,P12) 单点，方向取矿化带法向（与人工线夹角 1.0°）
+#   2 号：8 个中点，逐点吻合（上一版漏了 mid(P7,P8)）
 GRADE_LINES = {
-    "L1_L2": [("P14", "P12")],
-    "L2_L3": [("P8", "P13"), ("P12", "P8"), ("P6", "P7"), ("P5", "P6"),
-              ("P5", "P4"), ("P3", "P4"), ("P2", "P4")],
+    "1号": [("P14", "P12")],
+    "2号": [("P8", "P13"), ("P12", "P8"), ("P7", "P8"), ("P6", "P7"),
+            ("P5", "P6"), ("P5", "P4"), ("P3", "P4"), ("P2", "P4")],
 }
+
+# 人工指定"不进左右链"的孔：这类孔夹在矿化带中间（两侧都是矿孔），
+# 让它进链会把矿界鼓出去。1008 的 P8 就是这种（人工右链是 P2、P4、P6、P9）。
+# 注意：P8 仍然属于矿块、照常参与算量，只是不参与"画边界的两条链"。
+CHAIN_EXCLUDE = ["P8"]
 
 # ---- 外围矿界四段（用户人工画法的完整配方，逐点验算吻合） ----
 # 北端"右上边界"：从左边界上端点出发，依次连这些孔对的中点，最后接到右边界上端点
@@ -41,6 +49,64 @@ def north_closure_points(holes, hole_prefix="BS-3940-1008-"):
             continue
         pts.append(((pa.x + pb.x) / 2.0, (pa.y + pb.y) / 2.0))
     return pts
+
+
+def extend_ends(core, span=100.0):
+    """把折线两端沿**各自那一端的分段方向**向外延伸（切割线必须贯穿矿界）。
+
+    这一步是 1008 上反复试出来的关键：不能沿整条线的平均方向延伸，
+    否则端点会偏到矿界内侧、切不断。
+    """
+    import numpy as np
+
+    p = np.array(core[0], float)
+    q = np.array(core[1], float)
+    d = p - q
+    d = d / (np.linalg.norm(d) + 1e-12)
+    r = np.array(core[-1], float)
+    s = np.array(core[-2], float)
+    e = r - s
+    e = e / (np.linalg.norm(e) + 1e-12)
+    return [tuple(p + d * span)] + [tuple(x) for x in core] + [tuple(r + e * span)]
+
+
+def grade_cut_lines(holes, span=100.0, prefix="BS-3940-1008-"):
+    """把规则表折算成两条"贯穿矿界"的切割线坐标序列。"""
+    out = {}
+    for key, pairs in GRADE_LINES.items():
+        core = []
+        for a, b in pairs:
+            ha = holes.get(prefix + a) or holes.get(a)
+            hb = holes.get(prefix + b) or holes.get(b)
+            if ha is None or hb is None:
+                continue
+            core.append(((ha.x + hb.x) / 2.0, (ha.y + hb.y) / 2.0))
+        if len(core) >= 2:
+            out[key] = extend_ends(core, span)
+        elif len(core) == 1:
+            out[key] = core
+    return out
+
+
+def cut_lines(holes, normal, span=100.0, prefix="BS-3940-1008-"):
+    """把规则表折算成"穿过矿界"的切割线（LineString 列表）。
+
+    多中点线：两端沿**各自那一端的分段方向**外延（1008 上验证的关键）；
+    单中点线：沿矿化带法向 normal 向两侧外延（人工 1 号线就是这么画的）。
+    """
+    lines = []
+    for key, pairs in GRADE_LINES.items():
+        pts = [p for p in (_mid(holes, a, b) for a, b in pairs) if p]
+        if len(pts) == 1:
+            x, y = pts[0]
+            nx, ny = float(normal[0]), float(normal[1])
+            pts = [(x - nx * span, y - ny * span),
+                   (x + nx * span, y + ny * span)]
+        elif len(pts) >= 2:
+            pts = extend_ends(pts, span)
+        if len(pts) >= 2:
+            lines.append((key, LineString(pts)))
+    return lines
 
 
 def _mid(holes, a, b):

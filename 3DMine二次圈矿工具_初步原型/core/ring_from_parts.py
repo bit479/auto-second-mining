@@ -24,12 +24,29 @@ def read_points(p: Path):
         if not s:
             continue
         parts = [x.strip() for x in s.split(",")]
-        if len(parts) >= 4 and parts[0] == "1":
+        # 顶点行形如 "1,<N>,<E>,<Z>,"（5 段）；文件头是 11 段，必须跳过，
+        # 否则会多出一个 (0,7) 假点（上一版就是这么污染的）
+        if 4 <= len(parts) <= 6 and parts[0] == "1":
             try:
                 pts.append((float(parts[2]), float(parts[1])))   # X=E, Y=N
             except Exception:
                 pass
     return pts
+
+
+def build_ring_polygon(poly_buffer: bool = True):
+    """不打印，直接返回按人工 4 段拼出的矿界多边形（供其它脚本调用）。"""
+    ring = []
+    for n in PARTS:
+        pts = read_points(D / n)
+        if not pts:
+            continue
+        if ring and (abs(ring[-1][0] - pts[0][0]) < 1e-6
+                     and abs(ring[-1][1] - pts[0][1]) < 1e-6):
+            pts = pts[1:]
+        ring += pts
+    poly = Polygon(ring)
+    return poly.buffer(0) if poly_buffer else poly
 
 
 def build_ring():

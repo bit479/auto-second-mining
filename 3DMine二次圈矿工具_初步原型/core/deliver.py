@@ -272,7 +272,7 @@ BLANK_NOTE = "（缺工程，待取样验证后再进行施工）"
 def write_dxf(blocks, holes_all, cells, meta, path: Path,
               report_png: Path = None, report_px=None,
               pending=None, composite_blocks=None, merge_gap: float = 8.0,
-              check_merge: bool = True) -> None:
+              check_merge: bool = True, merge_candidates=None) -> None:
     from ezdxf import new
 
     doc = new("R2010")
@@ -297,9 +297,12 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
             for r in rings:
                 msp.add_lwpolyline([(x, y) for x, y, *_ in r.coords], close=True,
                                    dxfattribs={"layer": COMPOSITE_LAYER, "color": 9})
-    if check_merge and composite_blocks:
+    # 合并候选：默认全部历史块；给了 merge_candidates 就只用这些
+    # （1008：只并"当日矿界真正接上的那一块"，否则会把综合图的大轮廓也吞进来）
+    cands = merge_candidates if merge_candidates is not None else composite_blocks
+    if check_merge and cands:
         for b in blocks:
-            mo, n = merge_outline(b.polygon, composite_blocks, merge_gap)
+            mo, n = merge_outline(b.polygon, cands, merge_gap)
             merged_outlines.append(mo)
             if n:
                 print("    %d 号矿块与综合图 %d 个历史矿块合并（间距≤%.1fm）" % (b.no, n, merge_gap))
@@ -470,7 +473,8 @@ def _nearest_on_boundary(poly: Polygon, tx: float, ty: float):
 
 # ---------------------------------------------------------------- 3ds
 def write_3ds(blocks, meta, path: Path,
-              composite_blocks=None, merge_gap: float = 8.0) -> None:
+              composite_blocks=None, merge_gap: float = 8.0,
+              merge_candidates=None) -> None:
     """照 3DMine 选择集格式：每个矿块一条字符串，表头末字段为品位类型名。"""
     lines = ["%s, 3DMine String File" % path, "file_version=3DMine_2009"]
     sid = 0
@@ -478,8 +482,9 @@ def write_3ds(blocks, meta, path: Path,
         if b.polygon is None:
             continue
         outline = b.polygon
-        if composite_blocks:
-            mo, n = merge_outline(b.polygon, composite_blocks, merge_gap)
+        cands = merge_candidates if merge_candidates is not None else composite_blocks
+        if cands:
+            mo, n = merge_outline(b.polygon, cands, merge_gap)
             if mo is not None:
                 outline = mo
         sid += 1
