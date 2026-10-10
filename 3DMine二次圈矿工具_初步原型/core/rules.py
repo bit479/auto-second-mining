@@ -21,6 +21,27 @@ GRADE_LINES = {
               ("P5", "P4"), ("P3", "P4"), ("P2", "P4")],
 }
 
+# ---- 外围矿界四段（用户人工画法的完整配方，逐点验算吻合） ----
+# 北端"右上边界"：从左边界上端点出发，依次连这些孔对的中点，最后接到右边界上端点
+NORTH_CLOSURE_PAIRS = [("P35", "P23"), ("P23", "P24"), ("P23", "P22"),
+                       ("P22", "P14"), ("P13", "P14"), ("P12", "P13"),
+                       ("P11", "P8"), ("P9", "P10")]
+# 南端"与综合图边界"：从左边界下端沿左侧走向向下延伸到综合图边界，
+# 连综合图上部的拐点，再接到右边界下端（拐点从综合图边界上取）
+SOUTH_CLOSURE = "left_end -> extend_along_left -> composite_top_vertices -> right_end"
+
+
+def north_closure_points(holes, hole_prefix="BS-3940-1008-"):
+    """按配方算出右上边界的中点序列（不含两端矿界端点）。"""
+    pts = []
+    for a, b in NORTH_CLOSURE_PAIRS:
+        pa = holes.get(hole_prefix + a) or holes.get(a)
+        pb = holes.get(hole_prefix + b) or holes.get(b)
+        if pa is None or pb is None:
+            continue
+        pts.append(((pa.x + pb.x) / 2.0, (pa.y + pb.y) / 2.0))
+    return pts
+
 
 def _mid(holes, a, b):
     ha = holes.get("BS-3940-1008-" + a) or holes.get(a)
