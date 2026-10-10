@@ -58,9 +58,10 @@ def main() -> None:
     holes_all = list(holes.values())
     write_report_xlsx(blocks, meta, xlsx, holes_all)
     print("[报告]", xlsx)
-    px = write_report_png(blocks, meta, holes_all, png)
-    print("[报告PNG]", png, px)
-    write_dxf(blocks, holes_all, cells, meta, dxf, report_png=png, report_px=px)
+    png_used, pw, ph = write_report_png(blocks, meta, holes_all, png)
+    print("[报告PNG]", png_used, (pw, ph))
+    write_dxf(blocks, holes_all, cells, meta, dxf,
+              report_png=png_used, report_px=(pw, ph))
     print("[图件]", dxf)
     write_3ds(blocks, meta, tds)
     print("[3ds ]", tds)

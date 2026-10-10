@@ -21,9 +21,11 @@ from shapely.ops import unary_union
 LEVEL_COLOR = {"L1": 4, "L2": 5, "L3": 1, "L4": 2}          # AutoCAD 色号（青/蓝/红/黄）
 LEVEL_RGB = {"L1": (0, 255, 255), "L2": (0, 0, 255),
              "L3": (255, 0, 0), "L4": (255, 255, 0)}
-HID_COLOR = 138          # 工程号颜色（人工图实测）
-CROSS_HALF = 0.5         # 十字半臂长(m)：人工图实测十字共 1.0 m
+HID_COLOR = 138          # 工程号 ACI 色号（人工图实测）
+HID_TRUE_COLOR = 0x004C4C   # 工程号/十字 真彩色 RGB(0,76,76)（用户指定）
+CROSS_HALF = 0.5         # 十字半臂长(m)：用户指定十字总长 1.0 m
 TRAIL_LEN = 1.2          # 轨迹线长度(m)：人工图实测 1.2 m
+GRID_RULE = "center"     # 方格取舍：只保留格心落在矿界内的格（与人工图一致）
 
 
 def level_id_of(grade: float):
@@ -38,12 +40,14 @@ def level_id_of(grade: float):
     return None
 
 
-def grid_cells(poly: Polygon, size: float = 1.0, origin=None):
+def grid_cells(poly: Polygon, size: float = 1.0, origin=None, rule: str = None):
     """按矿界裁剪的 1×1 m 方格（闭合小多边形）。
 
     origin=(x0,y0) 为方格原点；人工图的规律是**取矿界包围盒左下角**。
+    rule="center" 时只保留方格中心落在矿界内的格（与人工图一致）。
     """
     out = []
+    rule = rule or GRID_RULE
     minx, miny, maxx, maxy = poly.bounds
     if origin is None:
         gx0 = math.floor(minx / size) * size
@@ -58,7 +62,10 @@ def grid_cells(poly: Polygon, size: float = 1.0, origin=None):
         while y < maxy:
             c = box(x, y, x + size, y + size)
             inter = c.intersection(poly)
-            if not inter.is_empty and inter.area > 1e-9:
+            keep = (not inter.is_empty and inter.area > 1e-9)
+            if keep and rule == "center":
+                keep = poly.contains(c.centroid)
+            if keep:
                 if inter.geom_type == "Polygon":
                     out.append(inter)
                 else:
@@ -214,17 +221,35 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
             cell.set_text_props(weight="bold")
         elif rows[r0][0] in ("小计", "合计"):
             cell.set_facecolor("#EDEDED")
-    if holes:
-        st = grade_stats(holes)
-        ax.text(0.01, 0.02,
-                "炮孔品位统计（孔数）：≥3 %d   1.5-3 %d   1-1.5 %d   0.5-1 %d   <0.5 %d   合计 %d"
-                % (st[">=3"], st["1.5-3"], st["1-1.5"], st["0.5-1"], st["<0.5"], len(holes)),
-                transform=ax.transAxes, fontsize=8, ha="left", va="bottom")
     fig.tight_layout()
-    fig.savefig(str(path), dpi=dpi, facecolor="white")
+    # 只露出标题 + 表格（裁掉四周空白）
+    out = path
+    try:
+        fig.savefig(str(out), dpi=dpi, facecolor="white",
+                    bbox_inches="tight", pad_inches=0.02)
+    except PermissionError:
+        out = path.with_name(path.stem + "_new" + path.suffix)
+        fig.savefig(str(out), dpi=dpi, facecolor="white",
+                    bbox_inches="tight", pad_inches=0.02)
+        print("    %s 被占用，已另存为 %s" % (path.name, out.name))
     w, h = fig.canvas.get_width_height()
     plt.close(fig)
-    return w, h
+    # 再裁掉四周空白：只留标题 + 表格
+    try:
+        from PIL import Image, ImageChops
+        im = Image.open(out).convert("RGB")
+        bg = Image.new("RGB", im.size, (255, 255, 255))
+        bbox = ImageChops.difference(im, bg).getbbox()
+        if bbox:
+            pad = 6
+            bbox = (max(0, bbox[0] - pad), max(0, bbox[1] - pad),
+                    min(im.size[0], bbox[2] + pad), min(im.size[1], bbox[3] + pad))
+            im = im.crop(bbox)
+            im.save(out)
+            w, h = im.size
+    except Exception as exc:
+        print("    报告图裁剪跳过:", exc)
+    return out, w, h
 
 
 def _nearest_hole_grade(cell: Polygon, holes):
@@ -297,14 +322,17 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
         aci = LEVEL_COLOR.get(lid, 8)     # 废孔 8（灰）
         # 十字：颜色 = 工程号色(138)，半臂 CROSS_HALF
         msp.add_line((h.x - CROSS_HALF, h.y), (h.x + CROSS_HALF, h.y),
-                     dxfattribs={"layer": "点", "color": HID_COLOR})
+                     dxfattribs={"layer": "点", "color": HID_COLOR,
+                                 "true_color": HID_TRUE_COLOR})
         msp.add_line((h.x, h.y - CROSS_HALF), (h.x, h.y + CROSS_HALF),
-                     dxfattribs={"layer": "点", "color": HID_COLOR})
+                     dxfattribs={"layer": "点", "color": HID_COLOR,
+                                 "true_color": HID_TRUE_COLOR})
         # 轨迹线：向西 TRAIL_LEN，颜色 = 该孔品位档色（废孔 8）
         msp.add_line((h.x, h.y), (h.x - TRAIL_LEN, h.y),
                      dxfattribs={"layer": "钻孔", "color": aci, "lineweight": 35})
         # 工程号
         msp.add_text(h.hid, dxfattribs={"layer": "钻孔", "color": HID_COLOR,
+                                        "true_color": HID_TRUE_COLOR,
                                         "height": 0.4, "style": "CN_TTF"},
                      ).set_placement((h.x - 2.28, h.y + 0.40))
         # 品位（分级色）
