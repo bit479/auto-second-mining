@@ -194,20 +194,46 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
 
     pieces = [outline]
     if split_mode == "midline":
-        # 同一档对可能对应多条互不相连的"品位界限"（如 1 号、2 号），先按空间聚类分开
+        # 品位界限是一棵"树"：先连主界线，再挂分支。做法：
+        # 把跨档中点建成图（近邻连边），再拆成极大路径（端点/分支点处断开）。
         for key, mids in pairs.items():
-            clusters = []
-            for m in mids:
-                placed = False
-                for cl in clusters:
-                    if min(abs(m[0][0] - q[0][0]) + abs(m[0][1] - q[0][1]) for q in cl) <= 2.0 * adj:
-                        cl.append(m)
-                        placed = True
-                        break
-                if not placed:
-                    clusters.append([m])
-            for cl in clusters:
-                pts = [m[0] for m in cl]
+            pts_all = [m[0] for m in mids]
+            n = len(pts_all)
+            if n < 2:
+                continue
+            lim = max(1.6 * adj, 4.0)
+            nb = {i: set() for i in range(n)}
+            for i in range(n):
+                for j in range(i + 1, n):
+                    if math.hypot(pts_all[i][0] - pts_all[j][0],
+                                  pts_all[i][1] - pts_all[j][1]) <= lim:
+                        nb[i].add(j)
+                        nb[j].add(i)
+            # 从"端点或分支点"出发走极大路径
+            visited_edges = set()
+            paths = []
+            starts = [i for i in range(n) if len(nb[i]) != 2] or [0]
+            for s in starts:
+                for nx in nb[s]:
+                    e = (min(s, nx), max(s, nx))
+                    if e in visited_edges:
+                        continue
+                    path = [s, nx]
+                    visited_edges.add(e)
+                    prev, cur = s, nx
+                    while len(nb[cur]) == 2:
+                        nxt = [t for t in nb[cur] if t != prev]
+                        if not nxt:
+                            break
+                        nxt = nxt[0]
+                        ee = (min(cur, nxt), max(cur, nxt))
+                        if ee in visited_edges:
+                            break
+                        visited_edges.add(ee)
+                        path.append(nxt)
+                        prev, cur = cur, nxt
+                    paths.append([pts_all[i] for i in path])
+            for pts in paths:
                 if len(pts) < 2:
                     continue
                 a = np.array(pts[0], float)
@@ -217,8 +243,7 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "voronoi"):
                 if n < 1e-9:
                     continue
                 dirv = dirv / n
-                # 沿自身方向拉到矿界之外（人工的品位界限就是横切整条矿化带）
-                ext = 200.0
+                ext = 200.0      # 人工的品位界限是横切整条矿化带
                 pts = [tuple(a - dirv * ext)] + pts + [tuple(b + dirv * ext)]
                 line = LineString(pts)
                 new = []
