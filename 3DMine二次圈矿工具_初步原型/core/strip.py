@@ -233,7 +233,8 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
 
 
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
-                 comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP):
+                 comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP,
+                 blast: str = None):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -263,16 +264,17 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
             mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
         return mids
 
-    # 北端按人工配方（8 个指定孔对的中点，已验证 8/8 与人工 .3ds 吻合）
+    # 北端：只有"配方所属炮区"才用人工配方（8 个指定孔对的中点，1008 上 8/8 吻合）。
+    # 别的炮区孔号虽然同名但位置不同，必须走通用的"邻孔中点"闭合。
     north = None
     try:
-        from rules import north_closure_points
-        from oreblocks import Hole as _H  # noqa: F401
-        hmap = {}
-        for h in all_holes:
-            hmap[h.hid] = h
-            hmap.setdefault(h.short, h)
-        north = north_closure_points(hmap)
+        from rules import north_closure_points, NORTH_RECIPE_BLAST
+        if blast and blast == NORTH_RECIPE_BLAST:
+            hmap = {}
+            for h in all_holes:
+                hmap[h.hid] = h
+                hmap.setdefault(h.short, h)
+            north = north_closure_points(hmap)
     except Exception:
         north = None
     if not north:

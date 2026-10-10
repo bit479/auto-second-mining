@@ -92,7 +92,7 @@ def main() -> None:
         comp = load_composite_blocks(comp_dwg)
         print("综合图历史矿块 %d 个" % len(comp))
 
-    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp)
+    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
     blocks = degree_blocks(ore, outline, DENSITY, "rules", rules_holes=holes)
     # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）

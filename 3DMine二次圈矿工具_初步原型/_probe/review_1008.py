@@ -57,7 +57,7 @@ def main() -> None:
     allh = list(holes.values())
     ore, pending = pick_zone(holes)
     comp = load_composite_blocks(COMP)
-    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp)
+    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast="1008")
     blocks = degree_blocks(ore, outline, 2.7, "rules", rules_holes=holes)
     man = manual_blocks()
     man_area = sum(p.area for _, p in man)
