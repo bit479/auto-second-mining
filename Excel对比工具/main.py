@@ -31,7 +31,7 @@ def run(path_a: str, path_b: str, out_path: str) -> dict:
     wb_b = read_workbook(path_b)
     print("[3/3] 逐单元格对比中...")
     result = compare_workbooks(wb_a, wb_b)
-    write_report(result, path_a, path_b, out_path, source_rows=wb_a)
+    write_report(result, path_a, path_b, out_path, source_a=wb_a, source_b=wb_b)
     t = result["totals"]
     n = diff_count(result)
     print("-" * 48)

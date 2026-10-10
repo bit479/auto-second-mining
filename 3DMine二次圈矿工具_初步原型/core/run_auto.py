@@ -35,7 +35,7 @@ def main() -> None:
     if not plat or not date:
         p, d = parse_tag(xls)
         plat, date = plat or p, date or d
-    out_dir = Path(sys.argv[4]) if len(sys.argv) > 4 else \
+    out_dir = Path(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4] else \
         xls.parent / ("二次圈矿成果_%s_%s" % (plat or "?", date or "?"))
     out_dir.mkdir(parents=True, exist_ok=True)
     meta = {"platform": plat or "?", "date": date or "?", "density": DENSITY}
@@ -43,6 +43,11 @@ def main() -> None:
     holes = load_holes_xls(xls)
     print("数据库: %s\n炮孔 %d 个" % (xls, len(holes)))
     blocks, pending = auto_blocks(holes, DENSITY)
+    comp = []
+    if len(sys.argv) > 5 and sys.argv[5]:
+        from composite import load_composite_blocks
+        comp = load_composite_blocks(sys.argv[5])
+        print("综合图历史矿块 %d 个" % len(comp))
     print("\n自动圈连得到 %d 个矿块：" % len(blocks))
     for b in blocks:
         print("   %d 号 %s  %10.3f m3  %10.3f t  %.3f g/t  %.3f 百克  (%s)"
@@ -67,8 +72,9 @@ def main() -> None:
     png_used, pw, ph = write_report_png(blocks, meta, holes_all, png)
     cells_dummy = [c for b in blocks for c in b.cells]
     write_dxf(blocks, holes_all, cells_dummy, meta, dxf,
-              report_png=png_used, report_px=(pw, ph))
-    write_3ds(blocks, meta, tds)
+              report_png=png_used, report_px=(pw, ph),
+              pending=pending, composite_blocks=comp)
+    write_3ds(blocks, meta, tds, composite_blocks=comp)
     print("\n完成 ->", out_dir)
 
 

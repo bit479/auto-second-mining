@@ -35,13 +35,15 @@ _BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
 _WRAP = Alignment(vertical="top", wrap_text=True)
 
 
-def write_report(result, path_a: str, path_b: str, out_path: str, source_rows=None):
-    """source_rows: 可选 {name: [[...]]}，用于生成高亮可视化网格；不传则跳过可视化。"""
+def write_report(result, path_a: str, path_b: str, out_path: str,
+                source_a=None, source_b=None):
+    """source_a / source_b: 可选 {name: [[...]]}，用于生成「两文件并集」的高亮可视化网格；
+    不传则跳过可视化。可视化网格取两文件并集维度，单元格显示 B 的值(无则 A 的值)。"""
     wb = Workbook()
     _write_summary(wb, result, path_a, path_b)
     _write_diff_list(wb, result)
-    if source_rows:
-        _write_visuals(wb, result, source_rows)
+    if source_a is not None or source_b is not None:
+        _write_visuals(wb, result, source_a or {}, source_b or {})
     wb.save(out_path)
     return out_path
 
@@ -136,7 +138,7 @@ def _write_diff_list(wb, result):
     ws.freeze_panes = "A2"
 
 
-def _write_visuals(wb, result, source_rows):
+def _write_visuals(wb, result, source_a, source_b):
     for s in result["sheets"]:
         name = s["name"]
         safe = name[:28] if len(name) <= 31 else name[:28] + "…"
@@ -145,15 +147,21 @@ def _write_visuals(wb, result, source_rows):
         if title in wb.sheetnames:
             title = f"对比_{safe}_{s['name']}"[:31]
         ws = wb.create_sheet(title)
-        rows_a = source_rows.get(name, [])
+        rows_a = source_a.get(name, [])
+        rows_b = source_b.get(name, [])
         # 收集差异坐标便于快速查表
         mark = {(ci["r"], ci["c"]): ci["type"] for ci in s["cells"]}
-        maxr = max(len(rows_a), 1)
-        maxc = max(_maxc(rows_a), 1)
+        maxr = max(len(rows_a), len(rows_b), 1)
+        maxc = max(_maxc(rows_a), _maxc(rows_b), 1)
         for r in range(maxr):
             for c in range(maxc):
-                v = _cell_get(rows_a, r, c)
-                cell = ws.cell(row=r + 1, column=c + 1, value=_to_text(v))
+                va = _cell_get(rows_a, r, c)
+                vb = _cell_get(rows_b, r, c)
+                # 显示 B 的值(无则 A 的值)；相等单元格两者内容一致
+                disp = vb if _nonempty(vb) else va
+                if not _nonempty(disp) and not _nonempty(va) and not _nonempty(vb):
+                    continue
+                cell = ws.cell(row=r + 1, column=c + 1, value=_to_text(disp))
                 cell.border = _BORDER
                 t = mark.get((r, c))
                 if t:
@@ -170,6 +178,14 @@ def _cell_get(rows, r, c):
         if c < len(row):
             return row[c]
     return None
+
+
+def _nonempty(v):
+    if v is None:
+        return False
+    if isinstance(v, str) and v.strip() == "":
+        return False
+    return True
 
 
 def _maxc(rows):

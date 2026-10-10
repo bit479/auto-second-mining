@@ -18,6 +18,8 @@ from pathlib import Path
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import unary_union
 
+from composite import load_composite_blocks, merge_outline      # noqa: E402
+
 LEVEL_COLOR = {"L1": 4, "L2": 5, "L3": 1, "L4": 2}          # AutoCAD 色号（青/蓝/红/黄）
 LEVEL_RGB = {"L1": (0, 255, 255), "L2": (0, 0, 255),
              "L3": (255, 0, 0), "L4": (255, 255, 0)}
@@ -262,8 +264,15 @@ def _nearest_hole_grade(cell: Polygon, holes):
     return best
 
 
+BLANK_LAYER = "缺工程待取样"
+COMPOSITE_LAYER = "综合图_历史矿块"
+BLANK_NOTE = "（缺工程，待取样验证后再进行施工）"
+
+
 def write_dxf(blocks, holes_all, cells, meta, path: Path,
-              report_png: Path = None, report_px=None) -> None:
+              report_png: Path = None, report_px=None,
+              pending=None, composite_blocks=None, merge_gap: float = 4.5,
+              check_merge: bool = True) -> None:
     from ezdxf import new
 
     doc = new("R2010")
@@ -271,7 +280,7 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
     for lid, name in (("L1", "0.500-1.000"), ("L2", "1.000-1.500"),
                       ("L3", "1.500-3.000"), ("L4", "3.000-999.000")):
         doc.layers.add(name, color=LEVEL_COLOR[lid])
-    for n in ("爆区方格网", "钻孔", "点"):
+    for n in ("爆区方格网", "钻孔", "点", BLANK_LAYER, COMPOSITE_LAYER):
         if n not in doc.layers:
             doc.layers.add(n, color=7)
     cn = doc.styles.add("CN_TTF", font="simsunb.ttf")
@@ -280,6 +289,22 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
 
     layer_of = {"L1": "0.500-1.000", "L2": "1.000-1.500",
                 "L3": "1.500-3.000", "L4": "3.000-999.000"}
+    # 0) 综合图历史矿块（细线参照）+ 当日矿块与综合图合并后的轮廓
+    merged_outlines = []
+    if composite_blocks:
+        for _, col, p in composite_blocks:
+            rings = [p.exterior] + list(p.interiors)
+            for r in rings:
+                msp.add_lwpolyline([(x, y) for x, y, *_ in r.coords], close=True,
+                                   dxfattribs={"layer": COMPOSITE_LAYER, "color": 9})
+    if check_merge and composite_blocks:
+        for b in blocks:
+            mo, n = merge_outline(b.polygon, composite_blocks, merge_gap)
+            merged_outlines.append(mo)
+            if n:
+                print("    %d 号矿块与综合图 %d 个历史矿块合并（间距≤%.1fm）" % (b.no, n, merge_gap))
+    else:
+        merged_outlines = [b.polygon for b in blocks]
     # 方格相位：人工图以"矿界包围盒左下角"为原点
     if blocks:
         minx = min(b.polygon.bounds[0] for b in blocks if b.polygon is not None)
@@ -288,15 +313,27 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
     else:
         grid_origin = (0.0, 0.0)
     # 1) 矿界（彩色闭合线）
-    for b in blocks:
-        if b.polygon is None:
+    for b, outline in zip(blocks, merged_outlines):
+        if outline is None:
             continue
-        polys = list(b.polygon.geoms) if b.polygon.geom_type == "MultiPolygon" else [b.polygon]
+        polys = list(outline.geoms) if outline.geom_type == "MultiPolygon" else [outline]
         for p in polys:
             msp.add_lwpolyline([(x, y) for x, y in p.exterior.coords], close=True,
                                dxfattribs={"layer": layer_of[b.level_id],
                                            "color": LEVEL_COLOR[b.level_id],
                                            "lineweight": 30})
+
+    # 0b) 空白区（孤立有品位孔，缺工程待取样）
+    if pending:
+        for lid, g in pending:
+            for h in g:
+                c = Point(h.x, h.y).buffer(3.0, resolution=24)
+                msp.add_lwpolyline([(x, y) for x, y in c.exterior.coords], close=True,
+                                   dxfattribs={"layer": BLANK_LAYER, "color": 6})
+                msp.add_text("%s %.2f  %s" % (h.hid, h.grade_disp, BLANK_NOTE),
+                             dxfattribs={"layer": BLANK_LAYER, "color": 6,
+                                         "height": 0.8, "style": "CN_TTF"},
+                             ).set_placement((h.x - 2.28, h.y - 3.2))
 
     # 2) 1m 方格 + 方格中心品位
     n_grid = 0
@@ -432,17 +469,23 @@ def _nearest_on_boundary(poly: Polygon, tx: float, ty: float):
 
 
 # ---------------------------------------------------------------- 3ds
-def write_3ds(blocks, meta, path: Path) -> None:
+def write_3ds(blocks, meta, path: Path,
+              composite_blocks=None, merge_gap: float = 4.5) -> None:
     """照 3DMine 选择集格式：每个矿块一条字符串，表头末字段为品位类型名。"""
     lines = ["%s, 3DMine String File" % path, "file_version=3DMine_2009"]
     sid = 0
     for b in blocks:
         if b.polygon is None:
             continue
+        outline = b.polygon
+        if composite_blocks:
+            mo, n = merge_outline(b.polygon, composite_blocks, merge_gap)
+            if mo is not None:
+                outline = mo
         sid += 1
         lines.append("%d,7,0,1.00,1.00,1.00,0,0.5,0,Continuous,%s" % (sid, b.label))
         lines.append("0,0,0,0,0,0,0,0,")
-        polys = list(b.polygon.geoms) if b.polygon.geom_type == "MultiPolygon" else [b.polygon]
+        polys = list(outline.geoms) if outline.geom_type == "MultiPolygon" else [outline]
         for p in polys:
             for x, y in p.exterior.coords:
                 lines.append("1,%.6f,%.6f,%.6f," % (y, x, 0.0))   # 3ds 顺序 N,E,Z
