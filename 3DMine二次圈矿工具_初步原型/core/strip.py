@@ -20,6 +20,7 @@ from shapely.ops import unary_union
 from scipy.spatial import Voronoi
 
 EXTRUDE_M = 3.0        # 外侧外推距离
+SIMPLIFY_M = 0.8       # 矿界抽稀容差(m)：让边界尽量是直线段，拐点不要过多
 CHAIN_WINDOW_FACTOR = 1.0   # 链提取的沿向窗口 = 1.0 × 中位最近孔距
 END_SEARCH_R = 12.0    # 端部找邻孔半径
 END_LIMIT = 2          # 每端每侧最多取几个邻孔的中点
@@ -153,7 +154,14 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M):
     if not parts:
         return None
     poly = unary_union(parts).buffer(0)
-    return poly if not poly.is_empty else None
+    if poly.is_empty:
+        return None
+    # 抽稀：边界尽量是直线段（人工图每块只有十几个拐点）
+    if SIMPLIFY_M > 0:
+        sp = poly.simplify(SIMPLIFY_M, preserve_topology=True)
+        if not sp.is_empty and sp.area > 0.5 * poly.area:
+            poly = sp
+    return poly
 
 
 def _voronoi_cells(ore, clip: Polygon):
