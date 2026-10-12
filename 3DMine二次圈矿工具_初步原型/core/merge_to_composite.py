@@ -74,12 +74,12 @@ def _acad(start: bool = False, timeout_s: float = 120.0):
 def merge(comp_dwg: Path, tds: Path, out_dwg: Path = None, start: bool = False):
     comp_dwg, tds = Path(comp_dwg), Path(tds)
     if not comp_dwg.exists():
-        return False, "找不到综合图：%s" % comp_dwg
+        return False, "找不到综合图：%s" % comp_dwg, None
     if not tds.exists():
-        return False, "找不到 .3ds：%s" % tds
+        return False, "找不到 .3ds：%s" % tds, None
     blocks = read_3ds_blocks(tds)
     if not blocks:
-        return False, "没从 .3ds 里读出矿块"
+        return False, "没从 .3ds 里读出矿块", None
     import re as _re
     m = _re.search(r"(\d{3,4})(?!.*\d)", tds.stem)
     tag = m.group(1) if m else (tds.stem.replace("矿块边界线", "").strip() or "new")
@@ -88,7 +88,7 @@ def merge(comp_dwg: Path, tds: Path, out_dwg: Path = None, start: bool = False):
     shutil.copy2(comp_dwg, out_dwg)          # 只动副本
     acad = _acad(start=start)
     if acad is None:
-        return False, "AutoCAD COM 未就绪（副本已复制：%s）" % out_dwg
+        return False, "AutoCAD COM 未就绪（副本已复制：%s）" % out_dwg, out_dwg
     doc = None
     try:
         doc = acad.Documents.Open(str(out_dwg), False)
@@ -127,15 +127,69 @@ def merge(comp_dwg: Path, tds: Path, out_dwg: Path = None, start: bool = False):
                 print("  加多段线失败 %s: %s" % (label, exc))
         doc.Save()
         msg = "并入 %d 块 -> %s" % (added, out_dwg)
-        return True, msg
+        return True, msg, out_dwg
     except Exception as exc:
-        return False, "并入失败：%s（副本保留在 %s）" % (exc, out_dwg)
+        return False, "并入失败：%s（副本保留在 %s）" % (exc, out_dwg), out_dwg
     finally:
         if doc is not None:
             try:
                 doc.Close(True)
             except Exception:
                 pass
+
+
+def preview(comp_dwg: Path, blocks, out_png: Path, cache_json: Path = None):
+    """出一张"并入后长什么样"的预览：综合图轮廓（灰）+ 本次并入的块（彩色）。"""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "SimSun"]
+        plt.rcParams["axes.unicode_minus"] = False
+        from shapely.geometry import box, LineString
+        import json as _json
+    except Exception as exc:
+        return None, "预览图跳过：%s" % exc
+    cand = Path(cache_json) if cache_json else \
+        Path(comp_dwg).with_name(Path(comp_dwg).stem + "_scan.json")
+    xs = [p[0] for _, pts in blocks for p in pts]
+    ys = [p[1] for _, pts in blocks for p in pts]
+    pad = 25.0
+    bb = (min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad)
+    fig, ax = plt.subplots(figsize=(11, 11), dpi=100)
+    n_draw = 0
+    if cand.exists():
+        try:
+            data = _json.loads(cand.read_text(encoding="utf-8"))
+            region = box(*bb)
+            for pl in data.get("polylines", []):
+                pts = pl.get("pts") or []
+                if len(pts) < 2:
+                    continue
+                ln = LineString(pts)
+                if not ln.intersects(region):
+                    continue
+                xs2, ys2 = ln.xy
+                ax.plot(xs2, ys2, color="#9a9a9a", lw=0.7, zorder=2)
+                n_draw += 1
+        except Exception:
+            pass
+    colors = {"0.500-1.000": "#a9d6d0", "1.000-1.500": "#b4a7d6",
+              "1.500-3.000": "#ffd966", "3.000-999.000": "#f4b183"}
+    for label, pts in blocks:
+        ax.fill([p[0] for p in pts], [p[1] for p in pts],
+                color=colors.get(label, "#cccccc"), alpha=0.75, zorder=3)
+        ax.plot([p[0] for p in pts] + [pts[0][0]], [p[1] for p in pts] + [pts[0][1]],
+                color="#c00000", lw=1.6, zorder=4)
+    ax.set_xlim(bb[0], bb[2])
+    ax.set_ylim(bb[1], bb[3])
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.2)
+    ax.set_title("并入预览：彩色=本次并入的 %d 块，灰线=综合图原有" % len(blocks))
+    fig.tight_layout()
+    fig.savefig(str(out_png))
+    plt.close(fig)
+    return out_png, "预览已出（综合图原有线条 %d 条）" % n_draw
 
 
 def main() -> None:
@@ -146,8 +200,15 @@ def main() -> None:
     for a in sys.argv[3:]:
         if not a.startswith("--"):
             out = Path(a)
-    ok, msg = merge(Path(sys.argv[1]), Path(sys.argv[2]), out, start="--start" in sys.argv)
+    ok, msg, out_dwg = merge(Path(sys.argv[1]), Path(sys.argv[2]), out,
+                             start="--start" in sys.argv)
     print(("OK  " if ok else "FAIL ") + msg)
+    if ok and out_dwg:
+        blocks = read_3ds_blocks(Path(sys.argv[2]))
+        png = Path(str(out_dwg)).with_name(Path(str(out_dwg)).stem + "_预览.png")
+        r = preview(Path(sys.argv[1]), blocks, png)
+        if r[0]:
+            print("     ", r[1], "->", r[0])
     sys.exit(0 if ok else 1)
 
 

@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
                      write_report_xlsx)
 from oreblocks import load_holes_xls                           # noqa: E402
-from strip import average_blocks, zone_outline                 # noqa: E402
+from pipeline import pick_zone, run_blast                      # noqa: E402
 import params as _params                                       # noqa: E402
 
 DENSITY = 2.7
@@ -38,37 +38,8 @@ def parse_tag(name: str):
 
 # 孤立孔判定：矿孔之间相距 ≤ 15 m 才算"连在同一条矿化带上"（用户 2026-10-10 定）。
 # 依据：1004 人工图把北边间隔 10.6~13.9 m 的孔都连成一条；1008 的 P43 离主带 21.4 m 没圈。
+# 现在这段逻辑在 pipeline.py，这里保留常量名给别的脚本引用。
 ZONE_LINK_M = 15.0
-
-
-def pick_zone(holes, gap=1.0, adjacent_max=ZONE_LINK_M):
-    """返回 (主矿化带矿孔, 待取样孤立孔组)。"""
-    ore = [h for h in holes.values() if h.grade >= 0.5]
-    kept = []
-    for h in ore:
-        if any(abs(h.x - k.x) < gap and abs(h.y - k.y) < gap for k in kept):
-            continue
-        kept.append(h)
-    groups, used = [], [False] * len(kept)
-    for i in range(len(kept)):
-        if used[i]:
-            continue
-        g = [kept[i]]
-        used[i] = True
-        changed = True
-        while changed:
-            changed = False
-            for j in range(len(kept)):
-                if used[j]:
-                    continue
-                if any(math.hypot(a.x - kept[j].x, a.y - kept[j].y) <= adjacent_max
-                       for a in g):
-                    g.append(kept[j])
-                    used[j] = True
-                    changed = True
-        groups.append(g)
-    groups.sort(key=len, reverse=True)
-    return (groups[0] if groups else []), groups[1:]
 
 
 def main() -> None:
@@ -87,32 +58,26 @@ def main() -> None:
     print("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
           % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
 
-    holes = load_holes_xls(xls)
-    allh = list(holes.values())
-    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
-    print("数据库: %s" % xls)
-    print("炮孔 %d 个；矿孔 %d 个；主矿化带 %d 孔；孤立待取样 %d 组"
-          % (len(allh), len([h for h in allh if h.grade >= 0.5]),
-             len(ore), len(pending)))
-
     comp = []
     if comp_dwg:
         from composite import load_composite_blocks
         comp = load_composite_blocks(comp_dwg)
         print("综合图历史矿块 %d 个" % len(comp))
 
-    outline = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
-                           merge_gap=P["merge_gap_m"], blast=date,
-                           simplify=P["simplify_m"],
-                           alpha_k=P.get("ring_alpha_k", 0.0))
-    print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
-    from strip import LAST_RING
-    for w in (LAST_RING.get("warn") or []):
+    holes = load_holes_xls(xls)
+    allh = list(holes.values())
+    res = run_blast(holes, allh, P, comp, blast=date)
+    ore, pending, blocks = res["ore"], res["pending"], res["blocks"]
+    print("数据库: %s" % xls)
+    print("炮孔 %d 个；矿孔 %d 个；主矿化带 %d 孔；孤立待取样 %d 组"
+          % (len(allh), len([h for h in allh if h.grade >= 0.5]),
+             len(ore), len(pending)))
+
+    for w in res["warn"]:
         print("   [矿界自检] %s（已自动修补成单块并把矿孔包进来，建议目视复核）" % w)
-    # 分块定档（人工口径）：同档连通块 → <40 m² 的碎片并入邻块 → 按块平均品位定档
-    blocks = average_blocks(ore, outline, DENSITY,
-                            min_fragment=P["min_fragment_m2"])
-    # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）
+    for r in res["rings"]:
+        print("外围矿界面积 = %.3f m2" % r.area)
+    from strip import LAST_RING
     mb = LAST_RING.get("merged_block")
     cands = [c for c in comp if mb is not None and c[2] is mb] or None
     for b in blocks:

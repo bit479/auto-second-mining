@@ -429,7 +429,10 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         # 用"廊道"把外面的孔接回主环：从主环上最近的点拉一条 extrude 粗的带
         for h in out:
             pt = Point(h.x, h.y)
-            near = nearest_points(poly.exterior, pt)[0]
+            rings = [poly.exterior] if poly.geom_type == "Polygon" else \
+                [g.exterior for g in poly.geoms]
+            near = min((nearest_points(r, pt)[0] for r in rings),
+                       key=lambda q: q.distance(pt))
             # 端点再往外伸 0.8 m：不然孔正好落在廊道端面上，contains 判不进
             d = np.array([h.x - near.x, h.y - near.y], float)
             n = np.linalg.norm(d)

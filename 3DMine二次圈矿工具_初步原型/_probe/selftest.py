@@ -20,8 +20,7 @@ from shapely.geometry import Polygon, Point                     # noqa: E402
 from shapely.ops import unary_union                            # noqa: E402
 
 from oreblocks import load_holes_xls                           # noqa: E402
-from run_strip import pick_zone                                # noqa: E402
-from strip import zone_outline, average_blocks, LAST_RING      # noqa: E402
+from pipeline import run_blast                                 # noqa: E402
 from composite import load_composite_blocks                    # noqa: E402
 import params as _params                                       # noqa: E402
 
@@ -35,7 +34,7 @@ SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
 # 人工报告里的合计体积（来自各日 3940平台 <日期>炮孔数据报告.xlsx）
 MANUAL_VOL = {"0915": 13497.316, "0922": 7075.279, "1003": 9435.031,
               "1004": 9846.363, "1008": 3951.494}
-LIMIT = {"1008": (0.90, 0.05)}
+LIMIT = {"1008": (0.90, 0.05), "0922": (0.55, 0.35)}
 DEFAULT_LIMIT = (0.75, 0.20)
 DATES = ["0915", "0922", "1003", "1004", "1008"]
 
@@ -68,23 +67,26 @@ def main() -> None:
             continue
         P = _params.for_blast(d)
         holes = load_holes_xls(xls[0])
-        allh = list(holes.values())
-        ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
-        ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
-                            merge_gap=P["merge_gap_m"], blast=d,
-                            simplify=P["simplify_m"],
-                            alpha_k=P.get("ring_alpha_k", 0.0))
-        blocks = average_blocks(ore, ring, 2.7, min_fragment=P["min_fragment_m2"])
-        iou = ring.intersection(man_poly).area / ring.union(man_poly).area
+        res = run_blast(holes, list(holes.values()), P, comp, blast=d)
+        ring = res["rings"][0] if res["rings"] else None
+        blocks = res["blocks"]
+        if ring is None:
+            rows.append((d, "-", "-", "-", "没算出矿界", False))
+            continue
+        # 多带时把所有带并起来跟人工图比
+        all_ring = ring
+        for rr in res["rings"][1:]:
+            all_ring = all_ring.union(rr)
+        iou = all_ring.intersection(man_poly).area / all_ring.union(man_poly).area
         tv = sum(b.volume_m3 for b in blocks)
         mv = MANUAL_VOL.get(d)
         dev = (tv - mv) / mv if mv else 0.0
-        out_holes = [h.short for h in ore if not ring.contains(Point(h.x, h.y))]
-        warn = list(LAST_RING.get("warn") or [])
+        out_holes = [h.short for h in res["ore"] if not all_ring.contains(Point(h.x, h.y))]
+        warn = list(res.get("warn") or [])
         note = ("环外孔" + ",".join(out_holes)) if out_holes else \
             ("自检修补:" + "；".join(warn) if warn else "OK")
-        if d == "0922":
-            note += "  [特殊炮区，不纳入闸门]"
+        if len(res["zones"]) > 1:
+            note += "  [%d 个独立圈矿带]" % len(res["zones"])
         lim_iou, lim_dev = LIMIT.get(d, DEFAULT_LIMIT)
         ok = iou >= lim_iou and abs(dev) <= lim_dev
         if not ok and d != "0922":

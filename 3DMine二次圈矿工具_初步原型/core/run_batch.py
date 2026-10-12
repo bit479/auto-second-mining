@@ -28,8 +28,8 @@ matplotlib.rcParams["axes.unicode_minus"] = False
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from oreblocks import load_holes_xls                        # noqa: E402
-from strip import zone_outline, average_blocks, LAST_RING   # noqa: E402
-from run_strip import pick_zone, DENSITY                    # noqa: E402
+from pipeline import run_blast                              # noqa: E402
+from run_strip import DENSITY                               # noqa: E402
 import params as _params                                    # noqa: E402
 
 COLORS = {"L4": "#f4b183", "L3": "#ffd966", "L2": "#b4a7d6", "L1": "#a9d6d0"}
@@ -54,21 +54,13 @@ def run_day(folder: Path, comp):
         plat = plat or plat2
     P = _params.for_blast(date)
     holes = load_holes_xls(xls)
-    allh = list(holes.values())
-    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
-    if len(ore) < 2:
+    res = run_blast(holes, list(holes.values()), P, comp, blast=date)
+    if not res["blocks"]:
         return None
-    ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
-                        merge_gap=P["merge_gap_m"], blast=date,
-                        simplify=P["simplify_m"],
-                        alpha_k=P.get("ring_alpha_k", 0.0))
-    if ring is None:
-        return None
-    blocks = average_blocks(ore, ring, DENSITY, min_fragment=P["min_fragment_m2"])
-    return {"date": date, "platform": plat, "folder": folder, "xls": xls,
-            "holes": allh, "ore": ore, "pending": pending, "ring": ring,
-            "blocks": blocks, "params": P,
-            "warn": list(LAST_RING.get("warn") or [])}
+    res.update({"date": date, "platform": plat, "folder": folder, "xls": xls,
+                "params": P, "holes": res["holes"],
+                "ring": res["rings"][0] if res["rings"] else None})
+    return res
 
 
 def write_summary_xlsx(out: Path, results) -> None:
