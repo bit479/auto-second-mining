@@ -72,7 +72,8 @@ def main() -> None:
         ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
         ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
                             merge_gap=P["merge_gap_m"], blast=d,
-                            simplify=P["simplify_m"])
+                            simplify=P["simplify_m"],
+                            alpha_k=P.get("ring_alpha_k", 0.0))
         blocks = average_blocks(ore, ring, 2.7, min_fragment=P["min_fragment_m2"])
         iou = ring.intersection(man_poly).area / ring.union(man_poly).area
         tv = sum(b.volume_m3 for b in blocks)

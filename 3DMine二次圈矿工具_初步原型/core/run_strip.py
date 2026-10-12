@@ -103,7 +103,8 @@ def main() -> None:
 
     outline = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
                            merge_gap=P["merge_gap_m"], blast=date,
-                           simplify=P["simplify_m"])
+                           simplify=P["simplify_m"],
+                           alpha_k=P.get("ring_alpha_k", 0.0))
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
     from strip import LAST_RING
     for w in (LAST_RING.get("warn") or []):

@@ -19,7 +19,7 @@ from shapely.geometry import Polygon
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 from shapely.ops import unary_union
-from scipy.spatial import Voronoi
+from scipy.spatial import Delaunay, Voronoi
 
 EXTRUDE_M = 3.0        # 外侧外推距离
 SIMPLIFY_M = 0.8       # 矿界抽稀容差(m)：让边界尽量是直线段，拐点不要过多
@@ -63,6 +63,30 @@ def _rows(s, gap):
     if cur:
         rows.append(cur)
     return rows
+
+
+def _alpha_shape(xy, k: float):
+    """凹包：Delaunay 三角网保留"最长边 < k × 最近邻距离中位数"的三角形。
+
+    只在参数 `ring_alpha_k > 0` 时启用：把"链式外推环"和"外轮廓外推环"并起来，
+    用来兜住那种孔列多、走向弯的矿化带（链式外推在那种形状上会夹断）。
+    """
+    from itertools import combinations
+    xy = np.asarray(xy, float)
+    if len(xy) < 3:
+        return None
+    nn = [min(np.hypot(xy[j][0] - xy[i][0], xy[j][1] - xy[i][1])
+              for j in range(len(xy)) if j != i) for i in range(len(xy))]
+    th = k * float(np.median(nn))
+    tri = Delaunay(xy)
+    polys = []
+    for s in tri.simplices:
+        p = xy[s]
+        if max(np.hypot(*(p[(i + 1) % 3] - p[i])) for i in range(3)) < th:
+            polys.append(Polygon(p))
+    if not polys:
+        return None
+    return unary_union(polys).buffer(0)
 
 
 def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=None):
@@ -259,7 +283,8 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
 
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP,
-                 blast: str = None, simplify: float = None):
+                 blast: str = None, simplify: float = None,
+                 alpha_k: float = 0.0):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -332,6 +357,11 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
     poly = Polygon(ring).buffer(0)
     if poly.is_empty:
         return None
+    if alpha_k and alpha_k > 0:
+        # 宽/弯矿化带的兜底：并上"矿孔外轮廓 + extrude"的外推环
+        sh = _alpha_shape(xy, float(alpha_k))
+        if sh is not None and not sh.is_empty:
+            poly = unary_union([poly, sh.buffer(extrude, join_style="mitre")]).buffer(0)
     LAST_RING["merged_block"] = merged_block
     LAST_RING["ring"] = ring
     simp = SIMPLIFY_M if simplify is None else float(simplify)

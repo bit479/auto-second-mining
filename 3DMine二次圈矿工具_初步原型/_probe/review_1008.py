@@ -28,6 +28,7 @@ from oreblocks import load_holes_xls                       # noqa: E402
 from strip import zone_outline, average_blocks, zone_chains, LAST_RING  # noqa: E402
 from run_strip import pick_zone                            # noqa: E402
 from composite import load_composite_blocks                # noqa: E402
+import params as _params                                   # noqa: E402
 
 D = Path(r"D:\WK\N CRT\北部山头3940平台2026")
 DB = D / r"7、单日数据\北部山头3940平台-1008\1、3940平台 炮孔数据库1008.xls"
@@ -53,12 +54,16 @@ def manual_blocks():
 
 def main() -> None:
     tag = sys.argv[1] if len(sys.argv) > 1 else "auto"
+    P = _params.for_blast("1008")
     holes = load_holes_xls(DB)
     allh = list(holes.values())
-    ore, pending = pick_zone(holes)
+    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
     comp = load_composite_blocks(COMP)
-    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast="1008")
-    blocks = average_blocks(ore, outline, 2.7)
+    outline = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
+                           merge_gap=P["merge_gap_m"], blast="1008",
+                           simplify=P["simplify_m"],
+                           alpha_k=P.get("ring_alpha_k", 0.0))
+    blocks = average_blocks(ore, outline, 2.7, min_fragment=P["min_fragment_m2"])
     man = manual_blocks()
     man_area = sum(p.area for _, p in man)
 

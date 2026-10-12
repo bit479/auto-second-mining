@@ -24,6 +24,7 @@ from oreblocks import load_holes_xls                       # noqa: E402
 from strip import zone_outline, average_blocks             # noqa: E402
 from run_strip import pick_zone                            # noqa: E402
 from composite import load_composite_blocks                # noqa: E402
+import params as _params                                   # noqa: E402
 
 DAY = ROOT.parent / "北部山头3940平台2026"
 DATA = DAY / "7、单日数据"
@@ -53,9 +54,13 @@ def auto_blocks(date, comp):
     xls = sorted(folder.glob("1、*.xls"))[0]
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    ore, pending = pick_zone(holes)
-    ring = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
-    blocks = average_blocks(ore, ring, 2.7)
+    P = _params.for_blast(date)
+    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
+    ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
+                        merge_gap=P["merge_gap_m"], blast=date,
+                        simplify=P["simplify_m"],
+                        alpha_k=P.get("ring_alpha_k", 0.0))
+    blocks = average_blocks(ore, ring, 2.7, min_fragment=P["min_fragment_m2"])
     return allh, ore, ring, blocks
 
 

@@ -60,7 +60,8 @@ def run_day(folder: Path, comp):
         return None
     ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
                         merge_gap=P["merge_gap_m"], blast=date,
-                        simplify=P["simplify_m"])
+                        simplify=P["simplify_m"],
+                        alpha_k=P.get("ring_alpha_k", 0.0))
     if ring is None:
         return None
     blocks = average_blocks(ore, ring, DENSITY, min_fragment=P["min_fragment_m2"])

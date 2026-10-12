@@ -21,10 +21,12 @@ DEFAULTS = {
     "merge_gap_m": 8.0,        # 南端接综合图历史块的最大间距(m)
     "grid_res_m": 1.0,         # 方格网边长(m)
     "simplify_m": 0.8,         # 矿界抽稀容差(m)
+    "ring_alpha_k": 0.0,       # >0 时把"矿孔外轮廓+外推"并进矿界（宽/弯矿带兜底）
     "density_waste": 2.65,     # 0–0.5 档容重
     "density_ore": 2.7,        # 0.5 以上各档容重
     "platforms": {             # 按平台覆盖（键 = 炮区号，如 "1003"）
         "1003": {"extrude_m": 2.5},
+        "1004": {"ring_alpha_k": 1.5},
     },
 }
 
