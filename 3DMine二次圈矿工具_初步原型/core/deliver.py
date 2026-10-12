@@ -209,21 +209,37 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
     rows.append(["合计", "", "%.3f" % sum(b.volume_m3 for b in blocks), "%.3f" % tt,
                  "%.3f" % (tm * 100.0 / tt if tt else 0), "%.3f" % tm])
 
-    fig, ax = plt.subplots(figsize=(9, 0.42 * len(rows) + 1.6))
+    # 主表 + 下面一张小的"炮孔品位统计"表（主表保持与人工报告版式一致）
+    st = grade_stats(holes) if holes else {}
+    st_rows = [["炮孔品位统计", "≥3", "1.5-3", "1-1.5", "0.5-1", "<0.5", "合计"],
+               ["孔数", str(st.get(">=3", 0)), str(st.get("1.5-3", 0)),
+                str(st.get("1-1.5", 0)), str(st.get("0.5-1", 0)),
+                str(st.get("<0.5", 0)),
+                str(sum(st.values())) if st else "0"]]
+    h_main = 0.42 * len(rows) + 1.6
+    fig, ax = plt.subplots(figsize=(9, h_main + (0.8 if st else 0.0)))
     ax.axis("off")
     ax.set_title("%s平台 %s炮孔数据报告" % (meta["platform"], meta["date"]),
                  fontsize=13, pad=10)
-    tbl = ax.table(cellText=rows, loc="upper center", cellLoc="center")
+    tbl = ax.table(cellText=rows, cellLoc="center",
+                   bbox=[0.0, 0.16 if st else 0.0, 1.0, 0.78 if st else 1.0])
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9)
-    tbl.scale(1.0, 1.35)
     for (r0, c0), cell in tbl.get_celld().items():
         if r0 == 0:
             cell.set_facecolor("#D9E2F3")
             cell.set_text_props(weight="bold")
         elif rows[r0][0] in ("小计", "合计"):
             cell.set_facecolor("#EDEDED")
-    fig.tight_layout()
+    if st:
+        t2 = ax.table(cellText=st_rows, cellLoc="center",
+                      bbox=[0.14, 0.0, 0.72, 0.085])
+        t2.auto_set_font_size(False)
+        t2.set_fontsize(8.5)
+        for (r0, c0), cell in t2.get_celld().items():
+            if r0 == 0:
+                cell.set_facecolor("#D9E2F3")
+                cell.set_text_props(weight="bold")
     # 只露出标题 + 表格（裁掉四周空白）
     out = path
     try:
