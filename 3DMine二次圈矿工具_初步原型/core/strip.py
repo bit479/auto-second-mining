@@ -240,6 +240,14 @@ def _offset_chain(pts, centroid, dist, outward=None):
     return out
 
 
+def _smooth_chain(pts, tol: float):
+    """把链折线先抽稀（道格拉斯-普客）再外推：治那些"孔在横向 zigzag"造成的锯齿尖刺。"""
+    if not tol or tol <= 0 or len(pts) < 3:
+        return [tuple(p) for p in pts]
+    ln = LineString([tuple(p) for p in pts]).simplify(float(tol))
+    return [tuple(c[:2]) for c in ln.coords]
+
+
 def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
     """端部闭合：端孔与附近所有无品位孔的中点，沿 ref_dir 排序。"""
     mids = []
@@ -429,7 +437,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  blast: str = None, simplify: float = None,
                  alpha_k: float = 0.0, chain_mode: str = "pca",
                  ring_mode: str = "chain", chain_left=(), chain_right=(),
-                 chain_exclude=None):
+                 chain_exclude=None, chain_smooth_m: float = 0.0):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -457,8 +465,11 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
             exclude=(None if chain_exclude is None else tuple(chain_exclude)))
     xy = np.array([(h.x, h.y) for h in ore], float)
     waste = [h for h in all_holes if h.grade < 0.5]
-    west = _offset_chain([xy[j] for j in left], c, extrude, outward=-v)
-    east = _offset_chain([xy[j] for j in right], c, extrude, outward=v)
+    csm = float(chain_smooth_m or 0.0)
+    west = _offset_chain(_smooth_chain([xy[j] for j in left], csm), c, extrude,
+                         outward=-v)
+    east = _offset_chain(_smooth_chain([xy[j] for j in right], csm), c, extrude,
+                         outward=v)
     # 端部闭合：端部一段内的**所有**矿孔都与相邻无品位孔配对取中点（人工图是一串中点）
     s_all = (xy - c) @ u
     t_all = (xy - c) @ v
