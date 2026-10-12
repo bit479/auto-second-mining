@@ -21,8 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 
 from oreblocks import load_holes_xls                       # noqa: E402
-from strip import zone_outline, average_blocks             # noqa: E402
-from run_strip import pick_zone                            # noqa: E402
+from pipeline import run_blast                             # noqa: E402
 from composite import load_composite_blocks                # noqa: E402
 import params as _params                                   # noqa: E402
 
@@ -55,13 +54,11 @@ def auto_blocks(date, comp):
     holes = load_holes_xls(xls)
     allh = list(holes.values())
     P = _params.for_blast(date)
-    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
-    ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
-                        merge_gap=P["merge_gap_m"], blast=date,
-                        simplify=P["simplify_m"],
-                        alpha_k=P.get("ring_alpha_k", 0.0))
-    blocks = average_blocks(ore, ring, 2.7, min_fragment=P["min_fragment_m2"])
-    return allh, ore, ring, blocks
+    res = run_blast(holes, allh, P, comp, blast=date)
+    ring = res["rings"][0] if res["rings"] else None
+    for rr in res["rings"][1:]:
+        ring = ring.union(rr)
+    return allh, res["ore"], ring, res["blocks"]
 
 
 def draw_manual(ax, man, title):
