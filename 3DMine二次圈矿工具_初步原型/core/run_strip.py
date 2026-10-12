@@ -99,10 +99,12 @@ def main() -> None:
 
     outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
+    from strip import LAST_RING
+    for w in (LAST_RING.get("warn") or []):
+        print("   [矿界自检] %s（已自动修补成单块并把矿孔包进来，建议目视复核）" % w)
     # 分块定档（人工口径）：同档连通块 → <40 m² 的碎片并入邻块 → 按块平均品位定档
     blocks = average_blocks(ore, outline, DENSITY)
     # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）
-    from strip import LAST_RING
     mb = LAST_RING.get("merged_block")
     cands = [c for c in comp if mb is not None and c[2] is mb] or None
     for b in blocks:

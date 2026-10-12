@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import ctypes
+import ctypes.wintypes  # 必须显式导入子模块, 否则 ctypes.wintypes 不一定被绑定
 import os
 import sys
 

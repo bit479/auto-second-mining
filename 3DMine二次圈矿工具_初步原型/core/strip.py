@@ -24,6 +24,13 @@ from scipy.spatial import Voronoi
 EXTRUDE_M = 3.0        # 外侧外推距离
 SIMPLIFY_M = 0.8       # 矿界抽稀容差(m)：让边界尽量是直线段，拐点不要过多
 SOUTH_MERGE_GAP = 8.0  # 南端与综合图历史块"能并在一起"的最大间距(m)
+# 南端可并的历史矿块图层白名单。设为 None = 不限图层。
+#
+# 曾经试过"只并品位图层"（想避开综合图里图层 0 的整片采场轮廓，1004 那张 725 m² 的
+# 把整个矿化带都包住了），但配合"走短弧"之后实测**不限图层更好**：
+#   1008 IoU 0.93 / 0915 0.91 / 1003 0.85 / 1004 0.77（限图层时 1004 只有 -4% 但 0915 掉到 0.87）
+# 真正解决 1004 的是"短弧 + 自检修补"，不是图层过滤。
+COMPOSITE_BLOCK_LAYERS = None
 # 同档碎片小于这个面积就并入相邻块。用 5 张人工图（0915/0922/1003/1004/1008）标定：
 # 40 m² + "并入平均品位最接近的邻块" 时，与人工图的分块一致率最高（0.936）。
 MIN_FRAGMENT_M2 = 40.0
@@ -177,8 +184,13 @@ def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
     return mids
 
 
-def _arc_through_north(poly: Polygon, a, b):
-    """沿多边形外环取一条从 a 到 b、经过最北顶点的弧（返回含端点的坐标表）。"""
+def _arc_through_north(poly: Polygon, a, b, prefer: str = "short"):
+    """沿多边形外环取一条从 a 到 b 的弧（返回含端点的坐标表）。
+
+    prefer="short" ：取更短的那条（1004 那种"大轮廓把整条矿化带包住"的情况，
+                     按最北顶点选弧会绕地球一圈，必须按长度选）；
+    prefer="north" ：取经过最北顶点的那条（1008 的历史行为）。
+    """
     coords = list(poly.exterior.coords)[:-1]
     for p in (a, b):
         best = None
@@ -200,7 +212,14 @@ def _arc_through_north(poly: Polygon, a, b):
     if ia > ib:
         arc1 = list(reversed(arc1))
         arc2 = list(reversed(arc2))
-    pick = arc1 if max(p[1] for p in arc1) >= max(p[1] for p in arc2) else arc2
+    if prefer == "short":
+        len1 = sum(math.hypot(arc1[k + 1][0] - arc1[k][0], arc1[k + 1][1] - arc1[k][1])
+                   for k in range(len(arc1) - 1))
+        len2 = sum(math.hypot(arc2[k + 1][0] - arc2[k][0], arc2[k + 1][1] - arc2[k][1])
+                   for k in range(len(arc2) - 1))
+        pick = arc1 if len1 <= len2 else arc2
+    else:
+        pick = arc1 if max(p[1] for p in arc1) >= max(p[1] for p in arc2) else arc2
     return [tuple(p) for p in pick]
 
 
@@ -214,7 +233,10 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
     """
     best, bestd = None, 1e18
     for item in (comp_blocks or []):
-        poly = item[2]
+        layer, poly = item[0], item[2]
+        if COMPOSITE_BLOCK_LAYERS is not None and layer not in COMPOSITE_BLOCK_LAYERS:
+            # 图层 0 的整片采场轮廓不是历史矿块（并进来会把环拆散）
+            continue
         if poly is None or poly.is_empty:
             continue
         d = min(Point(le).distance(poly), Point(re).distance(poly))
@@ -316,6 +338,34 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         sp = poly.simplify(SIMPLIFY_M, preserve_topology=True)
         if not sp.is_empty and sp.area > 0.5 * poly.area:
             poly = sp
+    # ---- 自检与修补：矿界必须是**整块**、且把所有矿孔包在里面 ----
+    warn = []
+    if poly.geom_type == "MultiPolygon":
+        warn.append("矿界原本碎成 %d 片" % len(poly.geoms))
+        poly = unary_union(list(poly.geoms))
+    out = [h for h in ore if not poly.contains(Point(h.x, h.y))]
+    if out:
+        warn.append("%d 个矿孔原本落在矿界外（%s）"
+                    % (len(out), "、".join(h.short for h in out[:6])))
+        # 用"廊道"把外面的孔接回主环：从主环上最近的点拉一条 extrude 粗的带
+        for h in out:
+            pt = Point(h.x, h.y)
+            near = nearest_points(poly.exterior, pt)[0]
+            # 端点再往外伸 0.8 m：不然孔正好落在廊道端面上，contains 判不进
+            d = np.array([h.x - near.x, h.y - near.y], float)
+            n = np.linalg.norm(d)
+            d = d / n if n > 1e-9 else np.array([1.0, 0.0])
+            tip = (h.x + d[0] * 0.8, h.y + d[1] * 0.8)
+            poly = unary_union([poly, LineString([near, tip]).buffer(
+                extrude + 0.2, join_style="mitre", cap_style="flat")])
+            poly = poly.buffer(0.1, join_style="mitre").buffer(
+                -0.1, join_style="mitre")
+        left = [h.short for h in ore if not poly.contains(Point(h.x, h.y))]
+        if left:
+            warn.append("仍在外：%s" % "、".join(left))
+    if poly.geom_type != "Polygon":
+        poly = max(poly.geoms, key=lambda g: g.area)
+    LAST_RING["warn"] = warn
     return poly
 
 
