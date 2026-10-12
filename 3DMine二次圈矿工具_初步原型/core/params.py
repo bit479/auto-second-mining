@@ -23,11 +23,23 @@ DEFAULTS = {
     "simplify_m": 0.8,         # 矿界抽稀容差(m)
     "ring_alpha_k": 0.0,       # >0 时把"矿孔外轮廓+外推"并进矿界（宽/弯矿带兜底）
     "isolated_min_holes": 3,   # 孤立小组孔数 ≥ 这个值就单独圈成矿块，否则列待取样
+    # 人工指定链（留空=自动判定）。填了就以人工为准：
+    #   chain_left / chain_right = 强制进左/右链的孔号（如 ["P14","P32"]）
+    #   chain_exclude            = 强制不进任何链的孔号（内部孔）
+    "chain_left": [],
+    "chain_right": [],
+    "chain_exclude": [],
     "density_waste": 2.65,     # 0–0.5 档容重
     "density_ore": 2.7,        # 0.5 以上各档容重
     "platforms": {             # 按平台覆盖（键 = 炮区号，如 "1003"）
-        "1003": {"extrude_m": 2.5},
-        "1004": {"ring_alpha_k": 1.5},
+        # 下面这些"链"是用人工图贪心标定出来的（_probe/tune_chains.py）：
+        # 从自动分链出发，逐个试着把"没进链的孔"放进左/右链，取 IoU 最大的组合。
+        # 1008 标定结果是"不用加"——说明自动判定在它上面本来就对。
+        "1003": {"extrude_m": 2.5,
+                 "chain_left": ["P2", "P3"],
+                 "chain_right": ["P12", "P13", "P16", "P17", "P21", "P23", "P25"]},
+        "1004": {"ring_alpha_k": 1.5, "chain_right": ["P8", "P11"]},
+        "0915": {"chain_right": ["P8", "P10"]},
         # 0922 人工图的外推量到 6.9 m（比其它炮区大一倍），块界因此宽得多
         "0922": {"extrude_m": 6.9},
     },

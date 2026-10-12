@@ -64,7 +64,10 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
         ring = zone_outline(zn, allh, P["extrude_m"], comp_blocks=comp_blocks,
                             merge_gap=P["merge_gap_m"], blast=blast,
                             simplify=P["simplify_m"],
-                            alpha_k=P.get("ring_alpha_k", 0.0))
+                            alpha_k=P.get("ring_alpha_k", 0.0),
+                            chain_left=P.get("chain_left") or (),
+                            chain_right=P.get("chain_right") or (),
+                            chain_exclude=P.get("chain_exclude"))
         if ring is None:
             continue
         rings.append(ring)

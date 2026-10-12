@@ -325,10 +325,111 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
     return out, best
 
 
+def _finish_ring(poly, ore, extrude, simplify):
+    """收尾：抽稀 → 自检（必须整块且包住所有矿孔）→ 修补。"""
+    LAST_RING["merged_block"] = LAST_RING.get("merged_block")
+    simp = SIMPLIFY_M if simplify is None else float(simplify)
+    if simp > 0:
+        sp = poly.simplify(simp, preserve_topology=True)
+        if not sp.is_empty and sp.area > 0.5 * poly.area:
+            poly = sp
+    warn = []
+    if poly.geom_type == "MultiPolygon":
+        warn.append("矿界原本碎成 %d 片" % len(poly.geoms))
+        poly = unary_union(list(poly.geoms))
+    out = [h for h in ore if not poly.contains(Point(h.x, h.y))]
+    if out:
+        warn.append("%d 个矿孔原本落在矿界外（%s）"
+                    % (len(out), "、".join(h.short for h in out[:6])))
+        # 用"廊道"把外面的孔接回主环：从主环上最近的点拉一条 extrude 粗的带
+        for h in out:
+            pt = Point(h.x, h.y)
+            rings = [poly.exterior] if poly.geom_type == "Polygon" else \
+                [g.exterior for g in poly.geoms]
+            near = min((nearest_points(r, pt)[0] for r in rings),
+                       key=lambda q: q.distance(pt))
+            d = np.array([h.x - near.x, h.y - near.y], float)
+            n = np.linalg.norm(d)
+            d = d / n if n > 1e-9 else np.array([1.0, 0.0])
+            tip = (h.x + d[0] * 0.8, h.y + d[1] * 0.8)
+            poly = unary_union([poly, LineString([near, tip]).buffer(
+                extrude + 0.2, join_style="mitre", cap_style="flat")])
+            poly = poly.buffer(0.1, join_style="mitre").buffer(
+                -0.1, join_style="mitre")
+        rest = [h.short for h in ore if not poly.contains(Point(h.x, h.y))]
+        if rest:
+            warn.append("仍在外：%s" % "、".join(rest))
+    if poly.geom_type != "Polygon":
+        poly = max(poly.geoms, key=lambda g: g.area)
+    LAST_RING["warn"] = warn
+    return poly
+
+
+def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
+                blast: str, k: float):
+    """外轮廓环：矿孔凹包 + 外推，再把北端闭合与南端接综合图的"走廊"补进来。
+
+    专治"孔列多、走向弯"的矿带——那时按走向中线分左右链会把外圈孔判成内部孔，
+    链式外推就少包一块（0915 的 P14、P32 就是这样）。
+    """
+    xy = np.array([(h.x, h.y) for h in ore], float)
+    sh = _alpha_shape(xy, k)
+    if sh is None or sh.is_empty:
+        return None
+    if sh.geom_type != "Polygon":
+        sh = max(sh.geoms, key=lambda g: g.area)
+    poly = sh.buffer(extrude, join_style="mitre").buffer(0)
+    c, u, v = _pca(xy)
+    s_all = (xy - c) @ u
+    waste = [h for h in all_holes if h.grade < 0.5]
+    span = float(s_all.max() - s_all.min())
+    band = max(12.0, 0.35 * span)
+
+    def end_mids(want_north: bool):
+        lo, hi = (s_all.max() - band, 1e18) if want_north else (-1e18, s_all.min() + band)
+        sel = [j for j in range(len(ore)) if lo <= s_all[j] <= hi]
+        mids = []
+        for j in sel:
+            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
+        return mids
+
+    north = None
+    try:
+        from rules import north_closure_points, NORTH_RECIPE_BLAST
+        if blast and blast == NORTH_RECIPE_BLAST:
+            hmap = {}
+            for h in all_holes:
+                hmap[h.hid] = h
+                hmap.setdefault(h.short, h)
+            north = north_closure_points(hmap)
+    except Exception:
+        north = None
+    if not north:
+        north = end_mids(True)
+    if north and len(north) >= 2:
+        poly = unary_union([poly, LineString([tuple(p) for p in north]).buffer(
+            max(1.5, extrude * 0.8), join_style="mitre")]).buffer(0)
+
+    left, right, c2, u2, v2 = zone_chains(ore, all_holes)
+    xy_l = np.array([(ore[j].x, ore[j].y) for j in left], float)
+    xy_r = np.array([(ore[j].x, ore[j].y) for j in right], float)
+    if len(xy_l) and len(xy_r):
+        le = tuple(_offset_chain([xy_l[0]], c, extrude, outward=-v)[0])
+        re_ = tuple(_offset_chain([xy_r[0]], c, extrude, outward=v)[0])
+        south, merged_block = south_closure(le, re_, comp_blocks, merge_gap)
+        LAST_RING["merged_block"] = merged_block
+        if south and len(south) >= 2:
+            poly = unary_union([poly, LineString([tuple(p) for p in south]).buffer(
+                max(1.5, extrude * 0.8), join_style="mitre")]).buffer(0)
+    return poly
+
+
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP,
                  blast: str = None, simplify: float = None,
-                 alpha_k: float = 0.0, chain_mode: str = "pca"):
+                 alpha_k: float = 0.0, chain_mode: str = "pca",
+                 ring_mode: str = "chain", chain_left=(), chain_right=(),
+                 chain_exclude=None):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -339,11 +440,21 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
     """
     if len(ore) < 2:
         return None
+    if ring_mode == "alpha":
+        poly = _alpha_ring(ore, all_holes, extrude, comp_blocks, merge_gap,
+                           blast, alpha_k or 2.0)
+        if poly is not None and not poly.is_empty:
+            poly = _finish_ring(poly, ore, extrude, simplify)
+            LAST_RING["merged_block"] = LAST_RING.get("merged_block")
+            return poly
     if chain_mode == "alpha":
         left, right, c, u, v = zone_chains_alpha(
             ore, all_holes, k=(alpha_k if alpha_k and alpha_k > 0 else 2.0))
     else:
-        left, right, c, u, v = zone_chains(ore, all_holes)
+        left, right, c, u, v = zone_chains(
+            ore, all_holes, manual_left=chain_left or (),
+            manual_right=chain_right or (),
+            exclude=(None if chain_exclude is None else tuple(chain_exclude)))
     xy = np.array([(h.x, h.y) for h in ore], float)
     waste = [h for h in all_holes if h.grade < 0.5]
     west = _offset_chain([xy[j] for j in left], c, extrude, outward=-v)
@@ -412,43 +523,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
             poly = unary_union([poly, sh.buffer(extrude, join_style="mitre")]).buffer(0)
     LAST_RING["merged_block"] = merged_block
     LAST_RING["ring"] = ring
-    simp = SIMPLIFY_M if simplify is None else float(simplify)
-    if simp > 0:
-        sp = poly.simplify(simp, preserve_topology=True)
-        if not sp.is_empty and sp.area > 0.5 * poly.area:
-            poly = sp
-    # ---- 自检与修补：矿界必须是**整块**、且把所有矿孔包在里面 ----
-    warn = []
-    if poly.geom_type == "MultiPolygon":
-        warn.append("矿界原本碎成 %d 片" % len(poly.geoms))
-        poly = unary_union(list(poly.geoms))
-    out = [h for h in ore if not poly.contains(Point(h.x, h.y))]
-    if out:
-        warn.append("%d 个矿孔原本落在矿界外（%s）"
-                    % (len(out), "、".join(h.short for h in out[:6])))
-        # 用"廊道"把外面的孔接回主环：从主环上最近的点拉一条 extrude 粗的带
-        for h in out:
-            pt = Point(h.x, h.y)
-            rings = [poly.exterior] if poly.geom_type == "Polygon" else \
-                [g.exterior for g in poly.geoms]
-            near = min((nearest_points(r, pt)[0] for r in rings),
-                       key=lambda q: q.distance(pt))
-            # 端点再往外伸 0.8 m：不然孔正好落在廊道端面上，contains 判不进
-            d = np.array([h.x - near.x, h.y - near.y], float)
-            n = np.linalg.norm(d)
-            d = d / n if n > 1e-9 else np.array([1.0, 0.0])
-            tip = (h.x + d[0] * 0.8, h.y + d[1] * 0.8)
-            poly = unary_union([poly, LineString([near, tip]).buffer(
-                extrude + 0.2, join_style="mitre", cap_style="flat")])
-            poly = poly.buffer(0.1, join_style="mitre").buffer(
-                -0.1, join_style="mitre")
-        left = [h.short for h in ore if not poly.contains(Point(h.x, h.y))]
-        if left:
-            warn.append("仍在外：%s" % "、".join(left))
-    if poly.geom_type != "Polygon":
-        poly = max(poly.geoms, key=lambda g: g.area)
-    LAST_RING["warn"] = warn
-    return poly
+    return _finish_ring(poly, ore, extrude, simplify)
 
 
 def _voronoi_cells(ore, clip: Polygon):
