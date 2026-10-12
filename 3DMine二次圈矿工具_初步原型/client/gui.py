@@ -82,6 +82,24 @@ class App:
         tk.Entry(row3, textvariable=self.var_out).pack(side="left", fill="x", expand=True)
         tk.Button(row3, text="浏览...", command=self.browse_out).pack(side="left", padx=4)
 
+        # ---- 参数区（按平台可覆盖，存 圈矿参数.json）----
+        pf = tk.LabelFrame(root, text="参数（留空=用默认；改完点“存为当前平台”）",
+                           padx=10, pady=6)
+        pf.pack(fill="x", padx=10, pady=(0, 4))
+        self.var_p = {}
+        for i, (key, label) in enumerate((("extrude_m", "外推(m)"),
+                                          ("zone_link_m", "连接半径(m)"),
+                                          ("min_fragment_m2", "最小块段(m²)"),
+                                          ("merge_gap_m", "接综合图(m)"))):
+            tk.Label(pf, text=label).grid(row=0, column=i * 2, sticky="e", padx=(6, 2))
+            v = tk.StringVar()
+            tk.Entry(pf, textvariable=v, width=7).grid(row=0, column=i * 2 + 1, sticky="w")
+            self.var_p[key] = v
+        tk.Button(pf, text="存为当前平台", command=self.save_params).grid(
+            row=0, column=8, padx=10)
+        tk.Label(pf, text="（外推 3.0 / 连接 15 / 最小块段 40 / 接图 8；1003 已单独设 2.5）",
+                 fg="#666").grid(row=1, column=0, columnspan=8, sticky="w", pady=(4, 0))
+
         # ---- 按钮 ----
         btn = tk.Frame(root)
         btn.pack(fill="x", padx=10, pady=4)
@@ -110,6 +128,48 @@ class App:
                  wraplength=860).pack(fill="x", padx=10, pady=(0, 8))
 
         self.busy = False
+        self.refresh_params()
+
+    # ---------- 参数 ----------
+    def _params_mod(self):
+        if str(CORE) not in sys.path:
+            sys.path.insert(0, str(CORE))
+        import params
+        return params
+
+    def refresh_params(self):
+        try:
+            p = self._params_mod()
+            date = self.var_date.get().strip() or ""
+            P = p.for_blast(date) if date else p.load()
+            for k, v in self.var_p.items():
+                v.set("%g" % float(P.get(k, 0.0)))
+        except Exception:
+            pass
+
+    def save_params(self):
+        try:
+            p = self._params_mod()
+            cfg = p.load()
+            date = self.var_date.get().strip()
+            vals = {}
+            for k, v in self.var_p.items():
+                s = v.get().strip()
+                if s:
+                    vals[k] = float(s)
+            if not vals:
+                messagebox.showinfo("参数", "没有要保存的值。")
+                return
+            if date:
+                cfg.setdefault("platforms", {}).setdefault(date, {}).update(vals)
+                path = p.save(cfg)
+                messagebox.showinfo("参数", "已按平台 %s 保存到：\n%s" % (date, path))
+            else:
+                cfg.update(vals)
+                path = p.save(cfg)
+                messagebox.showinfo("参数", "已保存为全局默认：\n%s" % path)
+        except Exception as ex:
+            messagebox.showerror("参数", "保存失败：%s" % ex)
 
     # ---------- 界面动作 ----------
     def browse(self):
@@ -133,6 +193,7 @@ class App:
             if cand.exists():
                 self.var_comp.set(str(cand))
                 break
+        self.refresh_params()
 
     def browse_comp(self):
         f = filedialog.askopenfilename(

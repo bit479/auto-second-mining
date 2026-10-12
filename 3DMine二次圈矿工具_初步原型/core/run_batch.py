@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from oreblocks import load_holes_xls                        # noqa: E402
 from strip import zone_outline, average_blocks, LAST_RING   # noqa: E402
 from run_strip import pick_zone, DENSITY                    # noqa: E402
+import params as _params                                    # noqa: E402
 
 COLORS = {"L4": "#f4b183", "L3": "#ffd966", "L2": "#b4a7d6", "L1": "#a9d6d0"}
 LV_TXT = {"L4": "≥3", "L3": "1.5-3", "L2": "1-1.5", "L1": "0.5-1"}
@@ -51,18 +52,22 @@ def run_day(folder: Path, comp):
     if not date:
         plat2, date = parse_folder(xls.name)
         plat = plat or plat2
+    P = _params.for_blast(date)
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    ore, pending = pick_zone(holes)
+    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
     if len(ore) < 2:
         return None
-    ring = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
+    ring = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
+                        merge_gap=P["merge_gap_m"], blast=date,
+                        simplify=P["simplify_m"])
     if ring is None:
         return None
-    blocks = average_blocks(ore, ring, DENSITY)
+    blocks = average_blocks(ore, ring, DENSITY, min_fragment=P["min_fragment_m2"])
     return {"date": date, "platform": plat, "folder": folder, "xls": xls,
             "holes": allh, "ore": ore, "pending": pending, "ring": ring,
-            "blocks": blocks, "warn": list(LAST_RING.get("warn") or [])}
+            "blocks": blocks, "params": P,
+            "warn": list(LAST_RING.get("warn") or [])}
 
 
 def write_summary_xlsx(out: Path, results) -> None:
@@ -85,6 +90,13 @@ def write_summary_xlsx(out: Path, results) -> None:
                     round(sum(b.volume_m3 for b in r["blocks"]), 3),
                     round(sum(b.tonnage_t for b in r["blocks"]), 3),
                     round(sum(b.metal_hg for b in r["blocks"]), 3)])
+    ws3 = wb.create_sheet("参数")
+    ws3.append(["日期", "外推(m)", "连接半径(m)", "最小块段(m²)", "接综合图(m)", "矿界自检"])
+    for r in results:
+        P = r.get("params", {})
+        ws3.append([r["date"], P.get("extrude_m"), P.get("zone_link_m"),
+                    P.get("min_fragment_m2"), P.get("merge_gap_m"),
+                    "；".join(r.get("warn") or []) or "OK"])
     xlsx = out / "批量汇总.xlsx"
     wb.save(xlsx)
     print("汇总表 ->", xlsx)

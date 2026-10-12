@@ -23,6 +23,7 @@ from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
                      write_report_xlsx)
 from oreblocks import load_holes_xls                           # noqa: E402
 from strip import average_blocks, zone_outline                 # noqa: E402
+import params as _params                                       # noqa: E402
 
 DENSITY = 2.7
 
@@ -82,10 +83,13 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     comp_dwg = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else None
     meta = {"platform": plat or "?", "date": date or "?", "density": DENSITY}
+    P = _params.for_blast(date)
+    print("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
+          % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
 
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    ore, pending = pick_zone(holes)
+    ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])
     print("数据库: %s" % xls)
     print("炮孔 %d 个；矿孔 %d 个；主矿化带 %d 孔；孤立待取样 %d 组"
           % (len(allh), len([h for h in allh if h.grade >= 0.5]),
@@ -97,13 +101,16 @@ def main() -> None:
         comp = load_composite_blocks(comp_dwg)
         print("综合图历史矿块 %d 个" % len(comp))
 
-    outline = zone_outline(ore, allh, 3.0, comp_blocks=comp, blast=date)
+    outline = zone_outline(ore, allh, P["extrude_m"], comp_blocks=comp,
+                           merge_gap=P["merge_gap_m"], blast=date,
+                           simplify=P["simplify_m"])
     print("外围矿界面积 = %.3f m2" % (outline.area if outline else 0))
     from strip import LAST_RING
     for w in (LAST_RING.get("warn") or []):
         print("   [矿界自检] %s（已自动修补成单块并把矿孔包进来，建议目视复核）" % w)
     # 分块定档（人工口径）：同档连通块 → <40 m² 的碎片并入邻块 → 按块平均品位定档
-    blocks = average_blocks(ore, outline, DENSITY)
+    blocks = average_blocks(ore, outline, DENSITY,
+                            min_fragment=P["min_fragment_m2"])
     # 只并"矿界南端真正接上的那一块"历史矿块（避免把综合图的大轮廓一起吞进来）
     mb = LAST_RING.get("merged_block")
     cands = [c for c in comp if mb is not None and c[2] is mb] or None

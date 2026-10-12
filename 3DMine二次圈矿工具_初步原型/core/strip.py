@@ -259,7 +259,7 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
 
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP,
-                 blast: str = None):
+                 blast: str = None, simplify: float = None):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -334,8 +334,9 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         return None
     LAST_RING["merged_block"] = merged_block
     LAST_RING["ring"] = ring
-    if SIMPLIFY_M > 0:
-        sp = poly.simplify(SIMPLIFY_M, preserve_topology=True)
+    simp = SIMPLIFY_M if simplify is None else float(simplify)
+    if simp > 0:
+        sp = poly.simplify(simp, preserve_topology=True)
         if not sp.is_empty and sp.area > 0.5 * poly.area:
             poly = sp
     # ---- 自检与修补：矿界必须是**整块**、且把所有矿孔包在里面 ----
