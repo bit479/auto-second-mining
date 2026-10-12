@@ -37,6 +37,7 @@ MIN_FRAGMENT_M2 = 40.0
 CHAIN_WINDOW_FACTOR = 1.0   # 链提取的沿向窗口 = 1.0 × 中位最近孔距
 END_SEARCH_R = 12.0    # 端部找邻孔半径
 END_LIMIT = 2          # 每端每侧最多取几个邻孔的中点
+MIN_HOLES_FOR_INTERIOR = 6   # 少于这么多孔就不做"内部孔"剔除（小组直接分左右）
 
 # 最近一次 zone_outline 的结果细节（供出图/交付用）
 LAST_RING: dict = {}
@@ -116,6 +117,18 @@ def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=No
     t = (xy - c) @ v
     ml, mr, ex = set(manual_left), set(manual_right), set(exclude)
     n = len(ore)
+    if n < MIN_HOLES_FOR_INTERIOR:
+        # 孔很少的带（比如 4 孔的孤立小组）本来就两列都占不满，
+        # 再按"两侧都有孔"剔内部孔会把该带的孔剔出去，直接按走向中线分左右。
+        left = [i for i in range(n)
+                if (t[i] <= 0 or ore[i].short in ml) and ore[i].short not in ex
+                and ore[i].short not in mr]
+        right = [i for i in range(n)
+                 if (t[i] > 0 or ore[i].short in mr) and ore[i].short not in ex
+                 and ore[i].short not in ml]
+        left.sort(key=lambda j: s[j])
+        right.sort(key=lambda j: s[j])
+        return left, right, c, u, v
     dmin = []
     for i in range(n):
         dmin.append(min(np.hypot(xy[j][0] - xy[i][0], xy[j][1] - xy[i][1])
@@ -333,7 +346,7 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
     return out, best
 
 
-def _finish_ring(poly, ore, extrude, simplify):
+def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
     """收尾：抽稀 → 自检（必须整块且包住所有矿孔）→ 修补。"""
     LAST_RING["merged_block"] = LAST_RING.get("merged_block")
     simp = SIMPLIFY_M if simplify is None else float(simplify)
@@ -359,9 +372,21 @@ def _finish_ring(poly, ore, extrude, simplify):
             d = np.array([h.x - near.x, h.y - near.y], float)
             n = np.linalg.norm(d)
             d = d / n if n > 1e-9 else np.array([1.0, 0.0])
-            tip = (h.x + d[0] * 0.8, h.y + d[1] * 0.8)
+            # 端头也留足 extrude：修补出来的矿界也要保证"孔到界 ≈ 3 m"，
+            # 否则孔会贴着边界（0915 修补后曾只有 0.8 m）
+            # 修补廊道别比"3 m 量级"还粗：0915（外推 3 m）要留足余量，
+            # 0922（外推 8 m）照 8 m 撑开会把体积顶上去，所以两头都封顶。
+            half = min(extrude + 0.2, 4.0)
+            # repair_tip<0 = "自动"（extrude+0.8，最多 4 m）；否则用给定值
+            if repair_tip is None:
+                tip_ext = 0.8
+            elif float(repair_tip) < 0:
+                tip_ext = min(extrude + 0.8, 4.0)
+            else:
+                tip_ext = float(repair_tip)
+            tip = (h.x + d[0] * tip_ext, h.y + d[1] * tip_ext)
             poly = unary_union([poly, LineString([near, tip]).buffer(
-                extrude + 0.2, join_style="mitre", cap_style="flat")])
+                half, join_style="mitre", cap_style="flat")])
             poly = poly.buffer(0.1, join_style="mitre").buffer(
                 -0.1, join_style="mitre")
         rest = [h.short for h in ore if not poly.contains(Point(h.x, h.y))]
@@ -437,7 +462,8 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  blast: str = None, simplify: float = None,
                  alpha_k: float = 0.0, chain_mode: str = "pca",
                  ring_mode: str = "chain", chain_left=(), chain_right=(),
-                 chain_exclude=None, chain_smooth_m: float = 0.0):
+                 chain_exclude=None, chain_smooth_m: float = 0.0,
+                 repair_tip_m: float = None):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -452,7 +478,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         poly = _alpha_ring(ore, all_holes, extrude, comp_blocks, merge_gap,
                            blast, alpha_k or 2.0)
         if poly is not None and not poly.is_empty:
-            poly = _finish_ring(poly, ore, extrude, simplify)
+            poly = _finish_ring(poly, ore, extrude, simplify, repair_tip_m)
             LAST_RING["merged_block"] = LAST_RING.get("merged_block")
             return poly
     if chain_mode == "alpha":
@@ -534,7 +560,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
             poly = unary_union([poly, sh.buffer(extrude, join_style="mitre")]).buffer(0)
     LAST_RING["merged_block"] = merged_block
     LAST_RING["ring"] = ring
-    return _finish_ring(poly, ore, extrude, simplify)
+    return _finish_ring(poly, ore, extrude, simplify, repair_tip_m)
 
 
 def _voronoi_cells(ore, clip: Polygon):
