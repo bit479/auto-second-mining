@@ -613,7 +613,8 @@ def _components_of(cellmap, hs):
 
 def average_blocks(ore, outline, density: float,
                    min_fragment: float = MIN_FRAGMENT_M2,
-                   merge_target: str = "avg", merge_gap: float = 0.0):
+                   merge_target: str = "avg", merge_gap: float = 0.0,
+                   same_block=None):
     """分块定档（人工口径）：
 
       ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
@@ -695,6 +696,22 @@ def average_blocks(ore, outline, density: float,
                     break
                 if changed:
                     break
+
+    # 人工指定"这些孔算同一块"：把包含它们的那些组并起来
+    # （1004 人工图把 {P1,P2,P3}(2.18) 与 {P4,P6}(1.38) 并成一块 1.85）
+    for names in (same_block or []):
+        want = set(names)
+        hit = [k for k, g in enumerate(groups)
+               if any(h.short in want for h in g["holes"])]
+        if len(hit) < 2:
+            continue
+        base = hit[0]
+        for k in sorted(hit[1:], reverse=True):
+            groups[base]["holes"] += groups[k]["holes"]
+            groups[base]["area"] += groups[k]["area"]
+            groups.pop(k)
+        groups[base]["avg"] = (sum(h.grade_disp for h in groups[base]["holes"])
+                               / len(groups[base]["holes"]))
 
     out = []
     for g in groups:

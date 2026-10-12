@@ -76,7 +76,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
         warns += list(LAST_RING.get("warn") or [])
         blocks += average_blocks(zn, ring, P.get("density_ore", 2.7),
                                  min_fragment=P["min_fragment_m2"],
-                                 merge_gap=P.get("block_merge_gap", 0.0))
+                                 merge_gap=P.get("block_merge_gap", 0.0),
+                                 same_block=P.get("same_block") or [])
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(blocks, 1):
