@@ -613,7 +613,7 @@ def _components_of(cellmap, hs):
 
 def average_blocks(ore, outline, density: float,
                    min_fragment: float = MIN_FRAGMENT_M2,
-                   merge_target: str = "avg"):
+                   merge_target: str = "avg", merge_gap: float = 0.0):
     """分块定档（人工口径）：
 
       ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
@@ -666,6 +666,35 @@ def average_blocks(ore, outline, density: float,
                             / len(groups[k]["holes"]))
         groups.pop(i)
         locked = {t if t < i else t - 1 for t in locked if t != i}
+
+    # 相邻块再合并：两块的**平均品位差**小于 merge_gap 就并成一块
+    # （1004 人工图把 {P1,P2,P3}(2.18) 和 {P4,P6}(1.38) 并成了一块 1.85，
+    #  而 725 那块(0.82) 与它差 1.0，没并——所以这是按炮区标定的开关）
+    if merge_gap and float(merge_gap) > 0:
+        gap = float(merge_gap)
+        changed = True
+        while changed and len(groups) > 1:
+            changed = False
+            for i in range(len(groups)):
+                for j in range(len(groups)):
+                    if i == j:
+                        continue
+                    gi, gj = groups[i], groups[j]
+                    if abs(gi["avg"] - gj["avg"]) > gap:
+                        continue
+                    if not any(cells[x.hid].distance(cells[y.hid]) < 1e-6
+                               for x in gi["holes"] for y in gj["holes"]):
+                        continue
+                    lo, hi = sorted((i, j))
+                    groups[lo]["holes"] += groups[hi]["holes"]
+                    groups[lo]["area"] += groups[hi]["area"]
+                    groups[lo]["avg"] = (sum(h.grade_disp for h in groups[lo]["holes"])
+                                         / len(groups[lo]["holes"]))
+                    groups.pop(hi)
+                    changed = True
+                    break
+                if changed:
+                    break
 
     out = []
     for g in groups:

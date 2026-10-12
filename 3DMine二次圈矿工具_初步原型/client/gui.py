@@ -27,6 +27,7 @@ RUN_STRIP = CORE / "run_strip.py"
 DXF2DWG = CORE / "dxf2dwg.py"
 RUN_BATCH = CORE / "run_batch.py"
 MERGE_COMP = CORE / "merge_to_composite.py"
+CALIBRATE = CORE / "calibrate.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -117,6 +118,9 @@ class App:
         self.btn_merge = tk.Button(btn, text="并入综合图（副本）…", command=self.start_merge,
                                    padx=10)
         self.btn_merge.pack(side="left", padx=8)
+        self.btn_cal = tk.Button(btn, text="用人工图标定本炮区…", command=self.start_calibrate,
+                                 padx=10)
+        self.btn_cal.pack(side="left", padx=8)
         self.var_dwg = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="转 DWG 2010（需本机 AutoCAD；失败就留 DXF）",
                        variable=self.var_dwg).pack(side="left", padx=12)
@@ -229,8 +233,52 @@ class App:
         self.btn_start.config(state="disabled" if busy else "normal")
         self.btn_batch.config(state="disabled" if busy else "normal")
         self.btn_merge.config(state="disabled" if busy else "normal")
+        self.btn_cal.config(state="disabled" if busy else "normal")
 
     # ---------- 主流程 ----------
+    def start_calibrate(self):
+        """拿一张人工圈矿图，自动标出该炮区的"外推距离 + 左右链"并写进参数。"""
+        if self.busy:
+            return
+        date = self.var_date.get().strip()
+        if not date:
+            messagebox.showwarning("缺少参数", "先填/选日期（炮区号，如 1008）。")
+            return
+        dwg = filedialog.askopenfilename(
+            title="选择该炮区的人工圈矿图 DWG",
+            initialdir=str(Path(self.var_xls.get()).parent) if self.var_xls.get() else None,
+            filetypes=[("DWG", "*.dwg")])
+        if not dwg:
+            return
+        self.set_busy(True)
+        self.log.delete("1.0", "end")
+        self.log_line("标定炮区 %s，人工图 %s" % (date, dwg))
+        self.log_line("-" * 68)
+
+        def job():
+            ok = True
+            try:
+                p = subprocess.Popen([PY, "-X", "utf8", str(CALIBRATE), date, dwg, "--write"],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_NO_WINDOW)
+                for line in p.stdout:
+                    self.log_line(line.rstrip())
+                p.wait(timeout=3600)
+                ok = p.returncode == 0
+            except Exception as ex:
+                self.log_line("[异常] %s" % ex)
+                ok = False
+            self.log_line("-" * 68)
+            if ok:
+                self.refresh_params()
+                self.var_res.set("标定完成，参数已写入 圈矿参数.json（见日志）")
+            else:
+                self.var_res.set("（标定未完成，详见日志）")
+            self.set_busy(False)
+
+        threading.Thread(target=job, daemon=True).start()
+
     def start_merge(self):
         """把当天的矿块边界并进综合图的一个副本（原件不动）。"""
         if self.busy:
