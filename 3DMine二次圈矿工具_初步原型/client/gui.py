@@ -26,6 +26,7 @@ CORE = ROOT / "core"
 RUN_STRIP = CORE / "run_strip.py"
 DXF2DWG = CORE / "dxf2dwg.py"
 RUN_BATCH = CORE / "run_batch.py"
+MERGE_COMP = CORE / "merge_to_composite.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -113,6 +114,9 @@ class App:
         self.btn_batch = tk.Button(btn, text="批量跑整个目录…", command=self.start_batch,
                                    padx=10)
         self.btn_batch.pack(side="left", padx=8)
+        self.btn_merge = tk.Button(btn, text="并入综合图（副本）…", command=self.start_merge,
+                                   padx=10)
+        self.btn_merge.pack(side="left", padx=8)
         self.var_dwg = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="转 DWG 2010（需本机 AutoCAD；失败就留 DXF）",
                        variable=self.var_dwg).pack(side="left", padx=12)
@@ -224,8 +228,55 @@ class App:
         self.busy = busy
         self.btn_start.config(state="disabled" if busy else "normal")
         self.btn_batch.config(state="disabled" if busy else "normal")
+        self.btn_merge.config(state="disabled" if busy else "normal")
 
     # ---------- 主流程 ----------
+    def start_merge(self):
+        """把当天的矿块边界并进综合图的一个副本（原件不动）。"""
+        if self.busy:
+            return
+        comp = self.var_comp.get().strip()
+        if not comp or not Path(comp).exists():
+            comp = filedialog.askopenfilename(
+                title="选择综合图 DWG", filetypes=[("DWG", "*.dwg")])
+            if not comp:
+                return
+            self.var_comp.set(comp)
+        out = self.var_out.get().strip()
+        guess = Path(out) / "矿块边界线.3ds" if out else None
+        init = str(Path(out)) if out and Path(out).exists() else str(Path(comp).parent)
+        tds = filedialog.askopenfilename(
+            title="选择本日的矿块边界线 .3ds（一般在当天成果目录里）",
+            initialdir=init, filetypes=[("3DS", "*.3ds")])
+        if not tds:
+            return
+        self.set_busy(True)
+        self.log.delete("1.0", "end")
+        self.log_line("并入副本：综合图 %s" % comp)
+        self.log_line("矿块边界线：%s" % tds)
+        self.log_line("-" * 68)
+
+        def job():
+            ok = True
+            try:
+                p = subprocess.Popen([PY, "-X", "utf8", str(MERGE_COMP), comp, tds],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_NO_WINDOW)
+                for line in p.stdout:
+                    self.log_line(line.rstrip())
+                p.wait(timeout=1800)
+                ok = p.returncode == 0
+            except Exception as ex:
+                self.log_line("[异常] %s" % ex)
+                ok = False
+            self.log_line("-" * 68)
+            self.log_line("原件始终没动；复核副本没问题后，你再决定要不要替换原件。")
+            self.var_res.set("（副本见上方日志；原件未改动）" if ok else "（并入失败，详见日志）")
+            self.set_busy(False)
+
+        threading.Thread(target=job, daemon=True).start()
+
     def start_batch(self):
         """选一个"装着多个单日炮区"的父目录，一次跑完并出横向汇总。"""
         if self.busy:

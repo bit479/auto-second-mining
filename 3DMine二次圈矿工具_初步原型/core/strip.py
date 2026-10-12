@@ -150,6 +150,50 @@ def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=No
     return left, right, c, u, v
 
 
+def zone_chains_alpha(ore, all_holes=None, k: float = 2.0):
+    """按**矿孔外轮廓的顺序**分左右链（链式外推的兜底方案）。
+
+    走向中线分法（zone_chains）假设矿化带是"两列"的条带；孔列多、走向弯时
+    左右链会交错、外推出来的环会夹断（1004 原来 10/23 个孔被甩到环外）。
+    这里改成：先算矿孔的凹包轮廓，把外圈孔按轮廓顺序排成一圈，
+    再从"沿走向最南"和"最北"两个孔把圈切两半——西边半圈＝左链、东边半圈＝右链，
+    两条链天然首尾相接于南北两端。
+    """
+    n = len(ore)
+    if n < 3:
+        return zone_chains(ore, all_holes)
+    xy = np.array([(h.x, h.y) for h in ore], float)
+    sh = _alpha_shape(xy, k)
+    if sh is None or sh.is_empty or sh.geom_type != "Polygon":
+        return zone_chains(ore, all_holes)
+    ring = sh.exterior
+    pos = []
+    for i in range(n):
+        pos.append(ring.project(Point(xy[i][0], xy[i][1])))
+    order = sorted(range(n), key=lambda i: pos[i])
+    c, u, v = _pca(xy)
+    s = (xy - c) @ u
+    t = (xy - c) @ v
+    i_south = min(order, key=lambda i: s[i])
+    i_north = max(order, key=lambda i: s[i])
+    ks = order.index(i_south)
+    kn = order.index(i_north)
+    lo, hi = sorted((ks, kn))
+    arc1 = order[lo:hi + 1]                       # 南→北 的一条半圈
+    arc2 = order[hi:] + order[:lo + 1]            # 另一条半圈
+    # 哪条是西侧：看该半圈上孔的横向坐标 t 的均值，小的那条是西侧
+    m1 = float(np.mean([t[i] for i in arc1]))
+    m2 = float(np.mean([t[i] for i in arc2]))
+    west_arc, east_arc = (arc1, arc2) if m1 <= m2 else (arc2, arc1)
+    left = list(west_arc)
+    right = list(east_arc)
+    if s[left[0]] > s[left[-1]]:
+        left = list(reversed(left))
+    if s[right[0]] > s[right[-1]]:
+        right = list(reversed(right))
+    return left, right, c, u, v
+
+
 def _mids_to_waste(hole, waste, radius=END_SEARCH_R, limit=END_LIMIT):
     cand = sorted(waste, key=lambda w: math.hypot(hole.x - w.x, hole.y - w.y))
     out = []
@@ -284,7 +328,7 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
 def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  comp_blocks=None, merge_gap: float = SOUTH_MERGE_GAP,
                  blast: str = None, simplify: float = None,
-                 alpha_k: float = 0.0):
+                 alpha_k: float = 0.0, chain_mode: str = "pca"):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -295,7 +339,11 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
     """
     if len(ore) < 2:
         return None
-    left, right, c, u, v = zone_chains(ore, all_holes)
+    if chain_mode == "alpha":
+        left, right, c, u, v = zone_chains_alpha(
+            ore, all_holes, k=(alpha_k if alpha_k and alpha_k > 0 else 2.0))
+    else:
+        left, right, c, u, v = zone_chains(ore, all_holes)
     xy = np.array([(h.x, h.y) for h in ore], float)
     waste = [h for h in all_holes if h.grade < 0.5]
     west = _offset_chain([xy[j] for j in left], c, extrude, outward=-v)
