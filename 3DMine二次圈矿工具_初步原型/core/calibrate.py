@@ -32,6 +32,9 @@ import params as _params                                        # noqa: E402
 
 PROBE = ROOT / "_probe"
 SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
+# 人工报告里的合计体积（用来算体积差；没有的炮区就不做体积优选）
+MANUAL_VOL = {"0915": 13497.316, "0922": 7075.279, "1003": 9435.031,
+              "1004": 9846.363, "1008": 3951.494}
 
 
 def scan_manual(dwg: Path, out_json: Path, tries: int = 5) -> bool:
@@ -58,6 +61,18 @@ def manual_union(json_path: Path):
         if poly.area >= 5.0:
             polys.append(poly)
     return unary_union(polys) if polys else None
+
+
+def manual_block_count(json_path: Path) -> int:
+    """人工图里有几个块（面积 ≥5 m² 的折线数）——用来约束"自动块的个数要对得上"。"""
+    data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    n = 0
+    for p in data.get("polylines", []):
+        if p.get("layer") in SKIP or len(p.get("pts", [])) < 3:
+            continue
+        if Polygon(p["pts"]).buffer(0).area >= 5.0:
+            n += 1
+    return n
 
 
 def iou(a, b):
@@ -89,6 +104,7 @@ def main() -> None:
         i = sys.argv.index("--extrude")
         grid = [float(x) for x in sys.argv[i + 1:] if not x.startswith("-")]
     write = "--write" in sys.argv
+    by_volume = "--by-volume" in sys.argv
 
     # 找该炮区的数据库与综合图（同目录/上级目录里带"综合"的 dwg）
     day = None
@@ -129,7 +145,7 @@ def main() -> None:
     allh = list(holes.values())
     P0 = _params.for_blast(date)
     ore, _ = pick_zone(holes, adjacent_max=P0["zone_link_m"])
-    best = None
+    cands = []
     for ex in (grid or [P0["extrude_m"]]):
         P = dict(P0)
         P["extrude_m"] = float(ex)
@@ -155,13 +171,25 @@ def main() -> None:
         ring, blocks, tv = evaluate(holes, allh, P, comp, date, ml, mr)
         print("  外推 %4.1f m → IoU %.3f  体积 %9.1f  %d 块"
               % (ex, sc, tv, len(blocks)))
-        if best is None or sc > best[0]:
-            best = (sc, float(ex), ml, mr, tv, len(blocks))
-    if best is None:
+        cands.append((sc, float(ex), ml, mr, tv, len(blocks)))
+    if not cands:
         print("没算出来")
         return
+    mv = MANUAL_VOL.get(date)
+    if by_volume and mv:
+        # 先按"块数要与人工图一致 + IoU 在最佳附近"筛，再取体积差最小的
+        n_man = manual_block_count(scan_json)
+        top = max(c[0] for c in cands)
+        pool = [c for c in cands if c[0] >= top - 0.02 and c[5] == n_man]
+        if not pool:
+            pool = [c for c in cands if c[0] >= top - 0.02] or cands
+        best = min(pool, key=lambda c: abs(c[4] - mv))
+    else:
+        best = max(cands, key=lambda c: c[0])
     sc, ex, ml, mr, tv, nb = best
-    print("\n最佳：外推 %.1f m  IoU %.3f  体积 %.1f  %d 块" % (ex, sc, tv, nb))
+    dev = (tv - mv) / mv * 100 if mv else 0.0
+    print("\n最佳：外推 %.1f m  IoU %.3f  体积 %.1f (%+.1f%%)  %d 块"
+          % (ex, sc, tv, dev, nb))
     print("  chain_left  = %s" % json.dumps(ml, ensure_ascii=False))
     print("  chain_right = %s" % json.dumps(mr, ensure_ascii=False))
     if write:

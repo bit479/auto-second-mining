@@ -1,0 +1,67 @@
+{
+  "extrude_m": 3.0,
+  "zone_link_m": 15.0,
+  "min_fragment_m2": 40.0,
+  "merge_gap_m": 8.0,
+  "grid_res_m": 1.0,
+  "simplify_m": 0.8,
+  "ring_alpha_k": 0.0,
+  "isolated_min_holes": 3,
+  "chain_left": [],
+  "chain_right": [],
+  "chain_exclude": [],
+  "chain_smooth_m": 0.0,
+  "repair_tip_m": 0.8,
+  "block_merge_gap": 0.0,
+  "same_block": [],
+  "density_waste": 2.65,
+  "density_ore": 2.7,
+  "platforms": {
+    "1003": {
+      "extrude_m": 2.5,
+      "chain_left": [
+        "P2",
+        "P3"
+      ],
+      "chain_right": [
+        "P12",
+        "P13",
+        "P16",
+        "P17",
+        "P19",
+        "P21",
+        "P23",
+        "P25"
+      ]
+    },
+    "1004": {
+      "ring_alpha_k": 1.5,
+      "chain_right": [
+        "P8",
+        "P11"
+      ],
+      "same_block": [
+        [
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P6"
+        ]
+      ]
+    },
+    "0915": {
+      "chain_right": [
+        "P8",
+        "P10"
+      ],
+      "repair_tip_m": -1
+    },
+    "0922": {
+      "extrude_m": 9.0,
+      "repair_tip_m": -1,
+      "chain_left": [],
+      "chain_right": []
+    }
+  }
+}
