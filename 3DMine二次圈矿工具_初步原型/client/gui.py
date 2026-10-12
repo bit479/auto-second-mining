@@ -25,6 +25,7 @@ CLIENT = Path(__file__).resolve().parent
 CORE = ROOT / "core"
 RUN_STRIP = CORE / "run_strip.py"
 DXF2DWG = CORE / "dxf2dwg.py"
+RUN_BATCH = CORE / "run_batch.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -91,6 +92,9 @@ class App:
         self.btn_open = tk.Button(btn, text="打开输出文件夹", command=self.open_out,
                                   state="disabled", padx=10)
         self.btn_open.pack(side="left", padx=8)
+        self.btn_batch = tk.Button(btn, text="批量跑整个目录…", command=self.start_batch,
+                                   padx=10)
+        self.btn_batch.pack(side="left", padx=8)
         self.var_dwg = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="转 DWG 2010（需本机 AutoCAD；失败就留 DXF）",
                        variable=self.var_dwg).pack(side="left", padx=12)
@@ -158,8 +162,61 @@ class App:
     def set_busy(self, busy):
         self.busy = busy
         self.btn_start.config(state="disabled" if busy else "normal")
+        self.btn_batch.config(state="disabled" if busy else "normal")
 
     # ---------- 主流程 ----------
+    def start_batch(self):
+        """选一个"装着多个单日炮区"的父目录，一次跑完并出横向汇总。"""
+        if self.busy:
+            return
+        parent = filedialog.askdirectory(
+            title="选择父目录（里面每个子目录是一天的炮区）")
+        if not parent:
+            return
+        comp = self.var_comp.get().strip()
+        if not comp or not Path(comp).exists():
+            comp = filedialog.askopenfilename(
+                title="选择该平台的综合图 DWG", filetypes=[("DWG", "*.dwg")])
+            if not comp:
+                return
+            self.var_comp.set(comp)
+        out = str(Path(parent) / "_批量汇总")
+        self.var_out.set(out)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        self.set_busy(True)
+        self.log.delete("1.0", "end")
+        self.log_line("批量模式：父目录 %s" % parent)
+        self.log_line("综合图：%s" % comp)
+        self.log_line("-" * 68)
+
+        def job():
+            ok = True
+            self.log_line("== 批量圈矿 ==")
+            try:
+                p = subprocess.Popen([PY, "-X", "utf8", str(RUN_BATCH), parent, comp, out],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_NO_WINDOW)
+                for line in p.stdout:
+                    self.log_line(line.rstrip())
+                p.wait(timeout=3600)
+                ok = p.returncode == 0
+            except Exception as ex:
+                self.log_line("[异常] %s" % ex)
+                ok = False
+            self.log_line("-" * 68)
+            if ok:
+                self.var_res.set(
+                    "批量汇总：%s\n%s\n%s"
+                    % (Path(out) / "批量汇总.xlsx", Path(out) / "批量汇总.png",
+                       Path(out) / "批量总览.png"))
+                self.btn_open.config(state="normal")
+            else:
+                self.var_res.set("（批量流程未成功，详见日志）")
+            self.set_busy(False)
+
+        threading.Thread(target=job, daemon=True).start()
+
     def start(self):
         if self.busy:
             return
