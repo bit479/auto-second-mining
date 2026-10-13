@@ -16,7 +16,7 @@ import math
 
 import numpy as np
 from shapely.geometry import Polygon
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, MultiPoint, Point
 from shapely.ops import nearest_points
 from shapely.ops import unary_union
 from scipy.spatial import Delaunay, Voronoi
@@ -344,6 +344,35 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
         if math.hypot(p[0] - out[-1][0], p[1] - out[-1][1]) > 1e-6:
             out.append(p)
     return out, best
+
+
+def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
+    """孤立小组的矿界（规则）：
+
+      「该组的孔在**全场** Voronoi 里的领地，上限是"该组凸包外扩 extrude"」。
+
+    好处：邻孔的分界线天然把领地挡住，所以块里不会圈进邻孔（哪怕它离得近）；
+    没有邻孔的方向则一直扩到"凸包外扩 extrude"。
+    实证（0922 的 4 孔组，extrude=9 m）：环 372.7 m²（人工 334.3）、体积 3934
+    （人工 3503）、**品位 0.8237（人工 0.824）**、**重量/体积 2.7000（人工 2.7000）**、
+    块内孔心只有该组 4 个孔——人工那块也是这个特征。
+    """
+    if len(zone) < 2:
+        return None
+    hull = MultiPoint([(h.x, h.y) for h in zone]).convex_hull
+    cap = hull.buffer(float(extrude), join_style="mitre")
+    cellmap = _cells_within(all_holes, cap)
+    parts = [cellmap[h.hid] for h in zone if h.hid in cellmap]
+    if not parts:
+        return None
+    poly = unary_union(parts).buffer(0)
+    simp = SIMPLIFY_M if simplify is None else float(simplify)
+    if simp > 0:
+        sp = poly.simplify(simp, preserve_topology=True)
+        if not sp.is_empty and sp.area > 0.5 * poly.area:
+            poly = sp
+    LAST_RING["warn"] = []
+    return poly
 
 
 def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
@@ -715,38 +744,48 @@ def average_blocks(ore, outline, density: float,
                                / len(groups[base]["holes"]))
 
     out = []
+    # 全场 Voronoi（含废孔）裁到矿界：3DMine 是"整爆区做 voronoi，再拿块的多边形去裁"
+    _allcells = _cells_within(all_holes, outline) if all_holes else {}
     for g in groups:
         grp = sorted(g["holes"], key=lambda h: -h.grade_disp)
         lid, label = level_of(g["avg"])
         if lid is None:
             continue
         region = unary_union([cells[h.hid] for h in grp])
-        # ---- 块内算量：有品位孔定块，但**落在块内的无品位孔**也要一起算 ----
-        # 用户口径：<0.5 废孔不圈矿，但参与块内算量（体积、按 2.65 取容重、参与品位加权）。
-        # 人工 1004 那块 725 m² 的多边形里就有 8 个废孔：加权品位 0.684 ≈ 报告 0.6919，
-        # 重量/体积 = 2.685（= 2.7 与 2.65 混出来的），两条都对得上。
+        # ---- 块内算量（用户口径：<0.5 废孔不圈矿，但参与块内算量）----
+        # 体积/重量：拿**全场**孔的 Voronoi 单元去裁块范围——邻孔单元被裁进来的那一块
+        #   也算（3DMine 就是这么算的），容重按该单元那个孔的档取（<0.5 → 2.65）。
+        # 品位：只按**孔心落在块内**的孔做长度加权。
+        #   实证：1004 那块 725 m² 含 8 个废孔心 → 0.684 ≈ 报告 0.6919；
+        #         0922 孤立 4 孔组的废孔心在块外 → 0.824 ≈ 报告 0.824。
+        if _allcells:
+            cs = []
+            for h in all_holes:
+                c = _allcells.get(h.hid)
+                if c is None:
+                    continue
+                part = c.intersection(region)
+                if part.is_empty or part.area <= 1e-9:
+                    continue
+                cs.append(Cell(hid=h.hid, hole=h, polygon=part, area_m2=part.area))
+        else:
+            cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
+                       area_m2=cells[h.hid].area) for h in grp]
         pts = [h for h in (all_holes or grp)
                if region.buffer(1e-9).contains(Point(h.x, h.y))]
         for h in grp:
             if h not in pts:
                 pts.append(h)
-        cellmap = _cells_within(pts, region) if pts else {}
-        if cellmap:
-            cs = [Cell(hid=h.hid, hole=h, polygon=cellmap[h.hid],
-                       area_m2=cellmap[h.hid].area) for h in pts if h.hid in cellmap]
-        else:
-            cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
-                       area_m2=cells[h.hid].area) for h in grp]
         b = Block(level_id=lid, label=label, holes=grp, cells=cs)
         b.compute(density)
-        if len(cs) > len(grp):
+        if len(cs) != len(grp) or len(pts) != len(grp):
             # 含废孔：体积/重量/品位按"所有孔"重算
             vol = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
             ton = sum(c.area_m2 * c.hole.grade_lenght *
                       (density_waste if c.hole.grade < 0.5 else density_ore)
                       for c in cs)
-            lsum = sum(c.hole.grade_lenght for c in cs)
-            grade = (sum(c.hole.grade_lenght * c.hole.grade_disp for c in cs) / lsum
+            lsum = sum(h.grade_lenght for h in pts)
+            grade = (sum(h.grade_lenght * h.grade_disp for h in pts) / lsum
                      if lsum else 0.0)
             b.area_m2 = sum(c.area_m2 for c in cs)
             b.volume_m3 = vol
