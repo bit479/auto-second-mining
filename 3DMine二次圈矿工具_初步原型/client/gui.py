@@ -28,6 +28,7 @@ DXF2DWG = CORE / "dxf2dwg.py"
 RUN_BATCH = CORE / "run_batch.py"
 MERGE_COMP = CORE / "merge_to_composite.py"
 CALIBRATE = CORE / "calibrate.py"
+APPLY_MERGE = CORE / "apply_merge.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -121,6 +122,9 @@ class App:
         self.btn_cal = tk.Button(btn, text="用人工图标定本炮区…", command=self.start_calibrate,
                                  padx=10)
         self.btn_cal.pack(side="left", padx=8)
+        self.btn_apply = tk.Button(btn, text="确认替换综合图原件…", command=self.start_apply,
+                                   padx=10)
+        self.btn_apply.pack(side="left", padx=8)
         self.var_dwg = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="转 DWG 2010（需本机 AutoCAD；失败就留 DXF）",
                        variable=self.var_dwg).pack(side="left", padx=12)
@@ -237,8 +241,54 @@ class App:
         self.btn_batch.config(state="disabled" if busy else "normal")
         self.btn_merge.config(state="disabled" if busy else "normal")
         self.btn_cal.config(state="disabled" if busy else "normal")
+        self.btn_apply.config(state="disabled" if busy else "normal")
 
     # ---------- 主流程 ----------
+    def start_apply(self):
+        """把"并入后的副本"正式替换原件——**先自动备份**，并弹窗确认要改哪些文件。"""
+        if self.busy:
+            return
+        comp = self.var_comp.get().strip()
+        init = str(Path(comp).parent) if comp else None
+        merged = filedialog.askopenfilename(
+            title="选择要启用的「并入后的副本」DWG（文件名形如 …_并入1008.dwg）",
+            initialdir=init, filetypes=[("DWG", "*.dwg")])
+        if not merged:
+            return
+        if not messagebox.askyesno(
+                "确认替换原件",
+                "将执行：\n"
+                "① 原综合图改名备份为 «原名_原版_时间戳.dwg»（不删除）\n"
+                "② 把\n  %s\n复制成原综合图的名字\n"
+                "③ 出问题可把备份改回原名即可回退\n\n"
+                "确认继续？" % Path(merged).name):
+            self.log_line("已取消替换。")
+            return
+        self.set_busy(True)
+        self.log.delete("1.0", "end")
+        self.log_line("替换原件：%s" % merged)
+        self.log_line("-" * 68)
+
+        def job():
+            ok = True
+            try:
+                p = subprocess.Popen([PY, "-X", "utf8", str(APPLY_MERGE), merged],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_NO_WINDOW)
+                for line in p.stdout:
+                    self.log_line(line.rstrip())
+                p.wait(timeout=600)
+                ok = p.returncode == 0
+            except Exception as ex:
+                self.log_line("[异常] %s" % ex)
+                ok = False
+            self.log_line("-" * 68)
+            self.var_res.set("已替换原件（备份见日志）" if ok else "（替换未完成，详见日志）")
+            self.set_busy(False)
+
+        threading.Thread(target=job, daemon=True).start()
+
     def start_calibrate(self):
         """拿一张人工圈矿图，自动标出该炮区的"外推距离 + 左右链"并写进参数。"""
         if self.busy:
