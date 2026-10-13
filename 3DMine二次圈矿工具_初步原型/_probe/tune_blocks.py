@@ -29,7 +29,8 @@ DATES = ["0915", "0922", "1003", "1004", "1008"]
 
 
 def manual_group(date, allh):
-    j = json.loads((PROBE / ("manual_%s_c.json" % date)).read_text(encoding="utf-8"))
+    import baseline as _bl
+    j = json.loads(_bl.scan_path("3940", date).read_text(encoding="utf-8"))
     blocks = []
     for p in j["polylines"]:
         if p["layer"] in SKIP or len(p["pts"]) < 3:

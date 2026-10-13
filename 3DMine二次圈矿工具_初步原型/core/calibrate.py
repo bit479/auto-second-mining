@@ -2,7 +2,8 @@
 """一键标定：把人工圈矿图读进来，自动标出该炮区的"外推距离 + 左右链"。
 
 用法:
-  python calibrate.py <炮区号> <人工圈矿图.dwg> [--extrude 3 4 5] [--write]
+  python calibrate.py <炮区号> <人工圈矿图.dwg> [--platform 3940]
+                      [--extrude 3 4 5] [--write] [--by-volume]
 
   --extrude  要联搜的外推距离(m)，不填就只用当前参数里的值
   --write    把标定结果写进 圈矿参数.json（不填只打印建议）
@@ -20,6 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
+sys.path.insert(0, str(ROOT / "_probe"))
 
 from shapely.geometry import Polygon                             # noqa: E402
 from shapely.ops import unary_union                             # noqa: E402
@@ -31,10 +33,16 @@ from composite import load_composite_blocks                     # noqa: E402
 import params as _params                                        # noqa: E402
 
 PROBE = ROOT / "_probe"
+PLATFORM_DIRS = {"3940": ROOT.parent / "北部山头3940平台2026",
+                 "3960": ROOT.parent / "北部山头3960平台2026"}
 SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
-# 人工报告里的合计体积（用来算体积差；没有的炮区就不做体积优选）
-MANUAL_VOL = {"0915": 13497.316, "0922": 7075.279, "1003": 9435.031,
-              "1004": 9846.363, "1008": 3951.494}
+def manual_volume(platform: str, date: str):
+    """人工报告里的合计体积（用来算体积差；没登记的炮区就不做体积优选）。"""
+    try:
+        import baseline as _bl
+        return _bl.manual_volume(platform, date)
+    except Exception:
+        return None
 
 
 def scan_manual(dwg: Path, out_json: Path, tries: int = 5) -> bool:
@@ -99,6 +107,9 @@ def main() -> None:
         print(__doc__)
         return
     date, dwg = sys.argv[1], Path(sys.argv[2])
+    platform = "3940"
+    if "--platform" in sys.argv:
+        platform = sys.argv[sys.argv.index("--platform") + 1]
     grid = None
     if "--extrude" in sys.argv:
         i = sys.argv.index("--extrude")
@@ -107,14 +118,9 @@ def main() -> None:
     by_volume = "--by-volume" in sys.argv
 
     # 找该炮区的数据库与综合图（同目录/上级目录里带"综合"的 dwg）
-    day = None
-    for cand in ROOT.parent.glob("*平台*"):
-        if cand.is_dir():
-            day = cand
-            break
+    day = PLATFORM_DIRS.get(platform)
     data_dir = (day / "7、单日数据") if day else dwg.parent
-    folder = data_dir / ("北部山头%s平台-%s" % (_params.for_blast(date).get("platform", "")
-                                               or "3940", date))
+    folder = data_dir / ("北部山头%s平台-%s" % (platform, date))
     if not folder.exists():
         cands = [d for d in data_dir.glob("*-%s" % date)]
         folder = cands[0] if cands else dwg.parent
@@ -131,7 +137,7 @@ def main() -> None:
     print("数据库：%s" % xls[0].name)
     print("综合图：%s" % (comp_dwg.name if comp_dwg else "（无）"))
 
-    scan_json = PROBE / ("manual_%s_c.json" % date)
+    scan_json = PROBE / ("manual_%s-%s_c.json" % (platform, date))
     if not scan_json.exists() or "--rescan" in sys.argv:
         if not scan_manual(dwg, scan_json):
             print("扫描失败")
@@ -143,7 +149,7 @@ def main() -> None:
 
     holes = load_holes_xls(xls[0])
     allh = list(holes.values())
-    P0 = _params.for_blast(date)
+    P0 = _params.for_blast(date, platform=platform)
     ore, _ = pick_zone(holes, adjacent_max=P0["zone_link_m"])
     cands = []
     for ex in (grid or [P0["extrude_m"]]):
@@ -175,7 +181,7 @@ def main() -> None:
     if not cands:
         print("没算出来")
         return
-    mv = MANUAL_VOL.get(date)
+    mv = manual_volume(platform, date)
     if by_volume and mv:
         # 先按"块数要与人工图一致 + IoU 在最佳附近"筛，再取体积差最小的
         n_man = manual_block_count(scan_json)

@@ -68,7 +68,14 @@ def load_composite_blocks(dwg, cache_dir=None):
         data = json.loads(cache.read_text(encoding="utf-8"))
     else:
         print("[综合图] 扫描 %s ..." % dwg.name)
-        data = _scan_with_autocad(dwg, cache)
+        try:
+            data = _scan_with_autocad(dwg, cache)
+        except Exception as exc:
+            # 最常见原因：AutoCAD 没开、或者正忙（弹着对话框/正在命令中），COM 会拒绝呼叫。
+            print("[综合图] 扫描失败：%s" % exc)
+            print("         （不影响出成果——这一步只是「与综合图合并」，本次会跳过；"
+                  "把 AutoCAD 打开/切到空闲后重跑即可生成缓存）")
+            return []
     out = []
     for p in data.get("polylines", []):
         pts = p["pts"]

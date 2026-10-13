@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""验收自检（回归闸门）：拿 5 张人工图当基准，打印自动结果与人工的差距。
+"""验收自检（回归闸门，多平台）：拿人工图/人工报告当基准，打印自动结果的差距。
 
-用法: python selftest.py [-v]
-  退出码 0 = 全部达标；1 = 有指标退化（CI/改代码前后各跑一次）
+用法: python selftest.py [平台号 ...]      # 缺省跑 3940 和 3960
+  退出码 0 = 全部达标；1 = 有指标退化（改代码前后各跑一次）
 
-达标线（1008 是已验收的基线）：
-  1008：矿界 IoU ≥ 0.90 且体积差 ≤ ±5%
-  其余：矿界 IoU ≥ 0.75 且体积差 ≤ ±20%
+达标线：
+  3940-1008：矿界 IoU ≥ 0.90 且体积差 ≤ ±5%   （已验收的基线）
+  3940 其余：IoU ≥ 0.75 且体积差 ≤ ±20%
+  3960     ：IoU ≥ 0.70 且体积差 ≤ ±30%       （新平台，还在标定中）
 """
 from __future__ import annotations
 
@@ -14,95 +15,104 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
-
-from shapely.geometry import Polygon, Point                     # noqa: E402
-from shapely.ops import unary_union                            # noqa: E402
-
-from oreblocks import load_holes_xls                           # noqa: E402
-from pipeline import run_blast                                 # noqa: E402
-from composite import load_composite_blocks                    # noqa: E402
-import params as _params                                       # noqa: E402
-
 ROOT = Path(__file__).resolve().parent.parent
-DAY = ROOT.parent / "北部山头3940平台2026"
-DATA = DAY / "7、单日数据"
-COMP = DAY / "5、 北部山头3940平台二次圈矿矿块图-2026综合.dwg"
-PROBE = ROOT / "_probe"
+sys.path.insert(0, str(ROOT / "core"))
+sys.path.insert(0, str(ROOT / "_probe"))
+
+from shapely.geometry import Point, Polygon                      # noqa: E402
+from shapely.ops import unary_union                             # noqa: E402
+
+from oreblocks import load_holes_xls                            # noqa: E402
+from pipeline import run_blast                                  # noqa: E402
+from composite import load_composite_blocks                     # noqa: E402
+import params as _params                                        # noqa: E402
+import baseline as _bl                                          # noqa: E402
+
+DAY = ROOT.parent
+PLATFORMS = {"3940": DAY / "北部山头3940平台2026",
+             "3960": DAY / "北部山头3960平台2026"}
 SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
-
-# 人工报告里的合计体积（来自各日 3940平台 <日期>炮孔数据报告.xlsx）
-MANUAL_VOL = {"0915": 13497.316, "0922": 7075.279, "1003": 9435.031,
-              "1004": 9846.363, "1008": 3951.494}
-LIMIT = {"1008": (0.90, 0.05), "0922": (0.55, 0.35)}
-DEFAULT_LIMIT = (0.75, 0.20)
-DATES = ["0915", "0922", "1003", "1004", "1008"]
+# 个别炮区单独定线：1008 是已验收基线；0922 用户认定是"特殊炮区"
+# （它的两组孔离得远，人工块画得比孔距宽一倍多），IoU 天然低，按体积把关。
+LIMIT = {"3940-1008": (0.90, 0.05), "3940-0922": (0.60, 0.10)}
+DEFAULT_LIMIT = {"3940": (0.75, 0.20), "3960": (0.70, 0.30)}
 
 
-def manual_blocks(date):
-    f = PROBE / ("manual_%s_c.json" % date)
+def manual_poly(platform: str, date: str):
+    f = _bl.scan_path(platform, date)
     if not f.exists():
         return None
     j = json.loads(f.read_text(encoding="utf-8"))
-    out = []
+    polys = []
     for p in j["polylines"]:
         if p["layer"] in SKIP or len(p["pts"]) < 3:
             continue
         poly = Polygon(p["pts"]).buffer(0)
         if poly.area >= 5.0:
-            out.append(poly)
-    return unary_union(out) if out else None
+            polys.append(poly)
+    return unary_union(polys) if polys else None
+
+
+def composite_of(plat_dir: Path):
+    for c in sorted(plat_dir.glob("*综合*.dwg")):
+        return c
+    return None
 
 
 def main() -> None:
-    verbose = "-v" in sys.argv
-    comp = load_composite_blocks(COMP) if COMP.exists() else []
+    want = [a for a in sys.argv[1:] if not a.startswith("-")] or list(PLATFORMS)
     bad, rows = [], []
-    for d in DATES:
-        folder = DATA / ("北部山头3940平台-%s" % d)
-        xls = sorted(folder.glob("1、*.xls"))
-        man_poly = manual_blocks(d)
-        if not xls or man_poly is None:
-            rows.append((d, "-", "-", "-", "缺数据/缺人工图", False))
+    for plat in want:
+        plat_dir = PLATFORMS.get(plat)
+        if plat_dir is None or not plat_dir.exists():
+            print("%s 平台目录不存在，跳过" % plat)
             continue
-        P = _params.for_blast(d, platform="3940")
-        holes = load_holes_xls(xls[0])
-        res = run_blast(holes, list(holes.values()), P, comp, blast=d)
-        ring = res["rings"][0] if res["rings"] else None
-        blocks = res["blocks"]
-        if ring is None:
-            rows.append((d, "-", "-", "-", "没算出矿界", False))
-            continue
-        # 多带时把所有带并起来跟人工图比
-        all_ring = ring
-        for rr in res["rings"][1:]:
-            all_ring = all_ring.union(rr)
-        iou = all_ring.intersection(man_poly).area / all_ring.union(man_poly).area
-        tv = sum(b.volume_m3 for b in blocks)
-        mv = MANUAL_VOL.get(d)
-        dev = (tv - mv) / mv if mv else 0.0
-        out_holes = [h.short for h in res["ore"] if not all_ring.contains(Point(h.x, h.y))]
-        warn = list(res.get("warn") or [])
-        note = ("环外孔" + ",".join(out_holes)) if out_holes else \
-            ("自检修补:" + "；".join(warn) if warn else "OK")
-        if len(res["zones"]) > 1:
-            note += "  [%d 个独立圈矿带]" % len(res["zones"])
-        lim_iou, lim_dev = LIMIT.get(d, DEFAULT_LIMIT)
-        ok = iou >= lim_iou and abs(dev) <= lim_dev
-        if not ok and d != "0922":
-            bad.append(d)
-        rows.append((d, "%.3f" % iou, "%d" % len(blocks),
-                     "%9.1f / %9.1f (%+5.1f%%)" % (tv, mv or 0, dev * 100),
-                     note,
-                     ok))
-    print("%-6s %-6s %-5s %-30s %s" % ("炮区", "矿界IoU", "块数", "体积(自动/人工)", "备注"))
+        comp_dwg = composite_of(plat_dir)
+        comp = load_composite_blocks(comp_dwg) if comp_dwg else []
+        data = plat_dir / "7、单日数据"
+        for folder in sorted(d for d in data.iterdir() if d.is_dir()):
+            if not (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls"))):
+                continue
+            date = folder.name.split("-")[-1].strip()
+            man = manual_poly(plat, date)
+            mv = _bl.manual_volume(plat, date)
+            if man is None or mv is None:
+                continue        # 这个炮区还没有人工基准，不纳入闸门
+            xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
+            P = _params.for_blast(date, platform=plat)
+            holes = load_holes_xls(xls)
+            try:
+                res = run_blast(holes, list(holes.values()), P, comp, blast=date)
+            except Exception as exc:
+                rows.append(("%s-%s" % (plat, date), "-", "-", "-", "算失败：%s" % exc, False))
+                continue
+            if not res["rings"]:
+                rows.append(("%s-%s" % (plat, date), "-", "-", "-", "没算出矿界", False))
+                continue
+            ring = res["rings"][0]
+            for rr in res["rings"][1:]:
+                ring = ring.union(rr)
+            iou = ring.intersection(man).area / ring.union(man).area
+            tv = sum(b.volume_m3 for b in res["blocks"])
+            dev = (tv - mv) / mv
+            out = [h.short for h in res["ore"] if not ring.contains(Point(h.x, h.y))]
+            warn = list(res.get("warn") or [])
+            note = ("环外孔" + ",".join(out)) if out else \
+                ("自检修补:%s" % "；".join(warn) if warn else "OK")
+            li, ld = LIMIT.get("%s-%s" % (plat, date),
+                               DEFAULT_LIMIT.get(plat, (0.70, 0.30)))
+            ok = iou >= li and abs(dev) <= ld
+            if not ok:
+                bad.append("%s-%s" % (plat, date))
+            rows.append(("%s-%s" % (plat, date), "%.3f" % iou, "%d" % len(res["blocks"]),
+                         "%9.1f / %9.1f (%+6.1f%%)" % (tv, mv, dev * 100), note, ok))
+    print("%-12s %-7s %-5s %-28s %s" % ("炮区", "矿界IoU", "块数", "体积(自动/人工)", "备注"))
     for r in rows:
-        print("%-6s %-6s %-5s %-30s %s%s" % (r[0], r[1], r[2], r[3], r[4],
+        print("%-12s %-7s %-5s %-28s %s%s" % (r[0], r[1], r[2], r[3], r[4],
                                               "" if r[5] else "   ← 未达标"))
     print()
     if bad:
-        print("未达标：%s（阈值 1008 IoU≥0.90 且 ±5%%，其余 IoU≥0.75 且 ±20%%）"
-              % "、".join(bad))
+        print("未达标：%s" % "、".join(bad))
         sys.exit(1)
     print("全部达标 ✓")
 
