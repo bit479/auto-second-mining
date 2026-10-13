@@ -376,7 +376,7 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
 
 
 def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
-                   same=None, solo=None, exclude=None):
+                   same=None, solo=None, exclude=None, exact=None):
     """把矿孔按"品位档 + 单元相接"分成簇（**每簇一块**，簇之间留空白）。
 
     3960 平台的人工图就是这么画的：块是一段段互不相连的**窄条带**
@@ -391,6 +391,16 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
     ore = [h for h in ore if h.short not in ex]
     if not ore:
         return []
+    # exact：这些孔**精确地**构成一个簇（先按它切出来，剩下的再自动分簇）
+    fixed = []
+    for names in (exact or []):
+        want = {str(n) for n in names}
+        got = [h for h in ore if h.short in want]
+        if len(got) >= 1:
+            fixed.append(got)
+            ore = [h for h in ore if h.short not in want]
+    if not ore:
+        return fixed
     box = MultiPoint([(h.x, h.y) for h in ore]).convex_hull.buffer(60.0)
     cells = _cells_within(all_holes or ore, box)
     groups = []
@@ -451,7 +461,7 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
         for k in sorted(hit[1:], reverse=True):
             groups[base] = groups[base] + groups[k]
             groups.pop(k)
-    return groups
+    return fixed + groups
 
 
 def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,

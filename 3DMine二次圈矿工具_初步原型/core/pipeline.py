@@ -71,7 +71,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                       min_fragment=float(P.get("cluster_merge_m2", 0.0) or 0),
                                       same=P.get("cluster_same"),
                                       solo=P.get("cluster_solo"),
-                                      exclude=P.get("cluster_exclude")):
+                                      exclude=P.get("cluster_exclude"),
+                                      exact=P.get("cluster_exact")):
                 ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"])
                 if P.get("cluster_strip_mode") == "hull":
                     ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"],
