@@ -19,7 +19,9 @@
   "platforms": {
     "3960": {
       "extrude_m": 2.0,
-      "_说明": "3960 人工图外推量到 ~1.9-2.2 m（3940 是 2.9-3.0 m），整平台先设 2.0"
+      "ring_mode": "clusters",
+      "cluster_merge_m2": 0.0,
+      "_说明": "3960 人工图外推量到 ~1.9-2.2 m（3940 是 2.9-3.0 m）；而且它的块是一段段互不相连的窄条带（一块只装 1~3 个孔，条带之间留空白），所以用 ring_mode=clusters：每个'同档+相邻'孔簇各取领地当矿界，小簇不并（cluster_merge_m2=0）"
     }
   },
   "blasts": {
@@ -66,25 +68,29 @@
         "P43"
       ],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0919）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
     },
     "3960-0902": {
       "extrude_m": 3.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0902）"
+      "_说明": "clusters 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "clusters"
     },
     "3960-0904": {
       "extrude_m": 2.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0904）"
+      "_说明": "clusters 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "clusters"
     },
     "3960-1007": {
       "extrude_m": 4.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 1007）"
+      "_说明": "clusters 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "clusters"
     },
     "3960-0825": {
       "extrude_m": 2.0,
@@ -101,7 +107,8 @@
         "P48",
         "P53"
       ],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0825）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
     },
     "3960-0830": {
       "extrude_m": 2.0,
@@ -116,7 +123,8 @@
         "FP31",
         "FP32"
       ],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0830）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
     },
     "3960-0922": {
       "extrude_m": 3.0,
@@ -124,7 +132,8 @@
         "P52"
       ],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 0922）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
     },
     "3960-1008": {
       "extrude_m": 4.0,
@@ -141,13 +150,23 @@
         "P18",
         "P31"
       ],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 1008）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
     },
     "3960-1009": {
       "extrude_m": 3.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "由 calibrate.py 自动标定（平台 3960，炮区 1009）"
+      "_说明": "chain 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）",
+      "ring_mode": "chain"
+    },
+    "3960-0908": {
+      "ring_mode": "clusters",
+      "_说明": "clusters 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）"
+    },
+    "3960-0914": {
+      "ring_mode": "clusters",
+      "_说明": "clusters 模式（用人工图比对 IoU 选出来的，见 _probe 对照图）"
     }
   }
 }

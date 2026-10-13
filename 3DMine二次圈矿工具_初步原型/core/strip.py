@@ -375,6 +375,53 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
     return out, best
 
 
+def class_clusters(ore, all_holes=None, min_fragment: float = 0.0):
+    """把矿孔按"品位档 + 单元相接"分成簇（**每簇一块**，簇之间留空白）。
+
+    3960 平台的人工图就是这么画的：块是一段段互不相连的**窄条带**
+    （一块只装 1~3 个孔，条带之间是未圈闭的空白），而不是"整条矿化带外扩一大块"。
+    做法：全场孔做 Voronoi（含废孔——邻孔的分界线能把领地挡住），
+    同档且单元相接的孔并成一簇。
+    """
+    from oreblocks import level_of
+    if not ore:
+        return []
+    box = MultiPoint([(h.x, h.y) for h in ore]).convex_hull.buffer(60.0)
+    cells = _cells_within(all_holes or ore, box)
+    groups = []
+    for lid in ("L4", "L3", "L2", "L1"):
+        sub = [h for h in ore if level_of(h.grade)[0] == lid and h.hid in cells]
+        for grp in _components_of(cells, sub):
+            groups.append(list(grp))
+    if min_fragment and min_fragment > 0:
+        def area_of(g):
+            return sum(cells[h.hid].area for h in g)
+
+        def nb(a, b):
+            return any(cells[x.hid].distance(cells[y.hid]) < 1e-6
+                       for x in a for y in b)
+
+        def avg(g):
+            return sum(h.grade_disp for h in g) / len(g)
+
+        locked = set()
+        while True:
+            cand = [i for i, g in enumerate(groups)
+                    if i not in locked and area_of(g) < min_fragment]
+            if not cand:
+                break
+            i = min(cand, key=lambda k: area_of(groups[k]))
+            near = [k for k in range(len(groups)) if k != i and nb(groups[i], groups[k])]
+            if not near:
+                locked.add(i)
+                continue
+            k = min(near, key=lambda t: abs(avg(groups[t]) - avg(groups[i])))
+            groups[k] = groups[k] + groups[i]
+            groups.pop(i)
+            locked = {t if t < i else t - 1 for t in locked if t != i}
+    return groups
+
+
 def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
     """孤立小组的矿界（规则）：
 
@@ -386,7 +433,7 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
     （人工 3503）、**品位 0.8237（人工 0.824）**、**重量/体积 2.7000（人工 2.7000）**、
     块内孔心只有该组 4 个孔——人工那块也是这个特征。
     """
-    if len(zone) < 2:
+    if not zone:
         return None
     hull = MultiPoint([(h.x, h.y) for h in zone]).convex_hull
     cap = hull.buffer(float(extrude), join_style="mitre")

@@ -15,7 +15,8 @@ from __future__ import annotations
 import math
 
 from oreblocks import load_holes_xls
-from strip import LAST_RING, average_blocks, isolated_ring, zone_outline
+from strip import (LAST_RING, average_blocks, class_clusters, isolated_ring,
+                   zone_outline)
 
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
@@ -60,6 +61,29 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
             pending.append(g)
 
     blocks, rings, warns = [], [], []
+    # ---- 分块模式 ----
+    # "clusters"（3960 用）：**每个"同档+相邻"的孔簇各取自己的领地当矿界**，
+    #   簇与簇之间留空白——3960 人工图就是这种一段段互不相连的窄条带。
+    # "chain"（3940 用，缺省）：整条矿化带生成一条外围矿界，界内再分块。
+    if P.get("ring_mode") == "clusters":
+        for zn in zones:
+            for grp in class_clusters(zn, allh,
+                                      min_fragment=float(P.get("cluster_merge_m2", 0.0) or 0)):
+                ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"])
+                if ring is None or ring.is_empty:
+                    continue
+                rings.append(ring)
+                warns += list(LAST_RING.get("warn") or [])
+                blocks += average_blocks(grp, ring, P.get("density_ore", 2.7),
+                                         min_fragment=0.0, all_holes=allh,
+                                         density_waste=P.get("density_waste", 2.65),
+                                         density_ore=P.get("density_ore", 2.7))
+        order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
+        blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
+        for i, b in enumerate(blocks, 1):
+            b.no = i
+        return {"ore": ore, "pending": pending, "zones": zones, "rings": rings,
+                "blocks": blocks, "warn": warns, "holes": allh}
     for zi, zn in enumerate(zones):
         if zi > 0:
             # 孤立小组：用"领地 + 凸包外扩上限"这条规则（邻孔分界线天然挡住）
