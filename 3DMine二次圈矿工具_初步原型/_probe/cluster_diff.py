@@ -57,7 +57,7 @@ def main() -> None:
             if p["layer"] in SKIP or len(p["pts"]) < 3:
                 continue
             poly = Polygon(p["pts"]).buffer(0)
-            if poly.area >= 5.0:
+            if _bl.is_block(poly, p["layer"], allh):
                 ins = sorted({h.short for h in allh if poly.contains(Point(h.x, h.y))},
                              key=key)
                 man.append((poly.area, ins))
