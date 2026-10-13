@@ -93,8 +93,10 @@ def for_blast(date: str, platform: str = None, cfg: dict = None) -> dict:
     cfg = cfg or load()
     out = {k: v for k, v in cfg.items() if k not in ("platforms", "blasts")}
     for src in ("platforms", "blasts"):
+        # 炮区层：给了平台就只认 "<平台>-<日期>"，**不回退**到只有日期的键
+        # （否则 3940-0922 的参数会串到 3960-0922 上——2026-10-13 踩过）
         keys = [str(platform)] if src == "platforms" else \
-            ([("%s-%s" % (platform, date))] if platform else []) + [str(date)]
+            [("%s-%s" % (platform, date))] if platform else [str(date)]
         for key in keys:
             for k, v in ((cfg.get(src, {}) or {}).get(key, {}) or {}).items():
                 out[k] = v

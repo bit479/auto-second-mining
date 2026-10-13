@@ -25,43 +25,6 @@
     }
   },
   "blasts": {
-    "1003": {
-      "extrude_m": 2.5,
-      "chain_left": [
-        "P2",
-        "P3"
-      ],
-      "chain_right": [
-        "P12",
-        "P13",
-        "P16",
-        "P17",
-        "P19",
-        "P21",
-        "P23",
-        "P25"
-      ]
-    },
-    "1004": {
-      "ring_alpha_k": 1.5,
-      "chain_right": [
-        "P8",
-        "P11"
-      ]
-    },
-    "0915": {
-      "chain_right": [
-        "P8",
-        "P10"
-      ],
-      "repair_tip_m": -1
-    },
-    "0922": {
-      "extrude_m": 9.0,
-      "repair_tip_m": -1,
-      "chain_left": [],
-      "chain_right": []
-    },
     "3960-0919": {
       "extrude_m": 7.0,
       "chain_left": [
@@ -169,6 +132,43 @@
       "ring_mode": "clusters",
       "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
       "extrude_m": 3.0
+    },
+    "3940-1003": {
+      "extrude_m": 2.5,
+      "chain_left": [
+        "P2",
+        "P3"
+      ],
+      "chain_right": [
+        "P12",
+        "P13",
+        "P16",
+        "P17",
+        "P19",
+        "P21",
+        "P23",
+        "P25"
+      ]
+    },
+    "3940-1004": {
+      "ring_alpha_k": 1.5,
+      "chain_right": [
+        "P8",
+        "P11"
+      ]
+    },
+    "3940-0915": {
+      "chain_right": [
+        "P8",
+        "P10"
+      ],
+      "repair_tip_m": -1
+    },
+    "3940-0922": {
+      "extrude_m": 9.0,
+      "repair_tip_m": -1,
+      "chain_left": [],
+      "chain_right": []
     }
   }
 }
