@@ -93,9 +93,11 @@ def for_blast(date: str, platform: str = None, cfg: dict = None) -> dict:
     cfg = cfg or load()
     out = {k: v for k, v in cfg.items() if k not in ("platforms", "blasts")}
     for src in ("platforms", "blasts"):
-        key = str(platform) if src == "platforms" else str(date)
-        for k, v in ((cfg.get(src, {}) or {}).get(key, {}) or {}).items():
-            out[k] = v
+        keys = [str(platform)] if src == "platforms" else \
+            ([("%s-%s" % (platform, date))] if platform else []) + [str(date)]
+        for key in keys:
+            for k, v in ((cfg.get(src, {}) or {}).get(key, {}) or {}).items():
+                out[k] = v
     out["platform"] = str(platform or "")
     out["blast"] = str(date)
     return out

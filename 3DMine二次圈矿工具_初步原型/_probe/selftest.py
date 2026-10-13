@@ -75,9 +75,8 @@ def main() -> None:
                 continue
             date = folder.name.split("-")[-1].strip()
             man = manual_poly(plat, date)
-            mv = _bl.manual_volume(plat, date)
-            if man is None or mv is None:
-                continue        # 这个炮区还没有人工基准，不纳入闸门
+            if man is None:
+                continue        # 这个炮区还没有人工图扫描，不纳入闸门
             xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
             P = _params.for_blast(date, platform=plat)
             holes = load_holes_xls(xls)
@@ -94,11 +93,15 @@ def main() -> None:
                 ring = ring.union(rr)
             iou = ring.intersection(man).area / ring.union(man).area
             tv = sum(b.volume_m3 for b in res["blocks"])
+            mv, src = _bl.volume_for_gate(plat, date, man, res["ore"])
+            if mv is None:
+                continue
             dev = (tv - mv) / mv
             out = [h.short for h in res["ore"] if not ring.contains(Point(h.x, h.y))]
             warn = list(res.get("warn") or [])
-            note = ("环外孔" + ",".join(out)) if out else \
+            note = ("基准:%s  " % src) + (("环外孔" + ",".join(out)) if out else \
                 ("自检修补:%s" % "；".join(warn) if warn else "OK")
+                )
             li, ld = LIMIT.get("%s-%s" % (plat, date),
                                DEFAULT_LIMIT.get(plat, (0.70, 0.30)))
             ok = iou >= li and abs(dev) <= ld

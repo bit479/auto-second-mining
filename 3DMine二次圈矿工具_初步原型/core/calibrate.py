@@ -36,13 +36,27 @@ PROBE = ROOT / "_probe"
 PLATFORM_DIRS = {"3940": ROOT.parent / "北部山头3940平台2026",
                  "3960": ROOT.parent / "北部山头3960平台2026"}
 SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
-def manual_volume(platform: str, date: str):
-    """人工报告里的合计体积（用来算体积差；没登记的炮区就不做体积优选）。"""
+def manual_volume(platform: str, date: str, man_poly=None, ore=None):
+    """基准体积（用来算体积差；没基准的炮区就不做体积优选）。
+
+    走 `_probe/baseline.volume_for_gate`：报告与"图面积×平均孔长"对不上时用图推算。
+    """
     try:
         import baseline as _bl
+        if man_poly is not None:
+            return _bl.volume_for_gate(platform, date, man_poly, ore)[0]
         return _bl.manual_volume(platform, date)
     except Exception:
         return None
+
+
+def _bl_vol(platform: str, date: str, man_poly, ore):
+    """(基准体积, 来源) —— 报告与图对不上时按图推算（见 _probe/baseline.py）。"""
+    try:
+        import baseline as _bl
+        return _bl.volume_for_gate(platform, date, man_poly, ore)
+    except Exception:
+        return None, ""
 
 
 def scan_manual(dwg: Path, out_json: Path, tries: int = 5) -> bool:
@@ -181,7 +195,7 @@ def main() -> None:
     if not cands:
         print("没算出来")
         return
-    mv = manual_volume(platform, date)
+    mv, _src = (None, "") if man is None else _bl_vol(platform, date, man, ore)
     if by_volume and mv:
         # 先按"块数要与人工图一致 + IoU 在最佳附近"筛，再取体积差最小的
         n_man = manual_block_count(scan_json)
@@ -200,9 +214,11 @@ def main() -> None:
     print("  chain_right = %s" % json.dumps(mr, ensure_ascii=False))
     if write:
         cfg = _params.load()
-        pl = cfg.setdefault("platforms", {}).setdefault(str(date), {})
+        key = "%s-%s" % (platform, date)      # 带平台号，避免 3940/3960 同一天撞车
+        pl = cfg.setdefault("blasts", {}).setdefault(key, {})
         pl["extrude_m"] = ex
         pl["chain_left"], pl["chain_right"] = ml, mr
+        pl["_说明"] = "由 calibrate.py 自动标定（平台 %s，炮区 %s）" % (platform, date)
         path = _params.save(cfg)
         print("已写入：", path)
     else:

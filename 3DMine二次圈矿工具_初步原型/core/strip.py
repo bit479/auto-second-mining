@@ -66,6 +66,35 @@ def _rows(s, gap):
     return rows
 
 
+def _safe_union(geoms):
+    """合并几何，遇到自相交等非法输入不让它崩（先修一下再并）。
+
+    shapely 的 unary_union 碰到自相交/带洞错位的多边形会抛 GEOSException
+    （3960-0908/0914 就撞上了），这里兜底成"逐个 buffer(0) 修复后再并"。
+    """
+    geoms = [g for g in geoms if g is not None and not g.is_empty]
+    if not geoms:
+        return None
+    if len(geoms) == 1:
+        return geoms[0]
+    try:
+        return unary_union(geoms)
+    except Exception:
+        fixed = []
+        for g in geoms:
+            try:
+                fixed.append(g.buffer(0))
+            except Exception:
+                try:
+                    fixed.append(g.buffer(0.01).buffer(-0.01))
+                except Exception:
+                    pass
+        try:
+            return unary_union(fixed)
+        except Exception:
+            return max(fixed, key=lambda g: g.area) if fixed else None
+
+
 def _alpha_shape(xy, k: float):
     """凹包：Delaunay 三角网保留"最长边 < k × 最近邻距离中位数"的三角形。
 
@@ -365,7 +394,7 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
     parts = [cellmap[h.hid] for h in zone if h.hid in cellmap]
     if not parts:
         return None
-    poly = unary_union(parts).buffer(0)
+    poly = _safe_union(parts).buffer(0)
     simp = SIMPLIFY_M if simplify is None else float(simplify)
     if simp > 0:
         sp = poly.simplify(simp, preserve_topology=True)
@@ -386,7 +415,7 @@ def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
     warn = []
     if poly.geom_type == "MultiPolygon":
         warn.append("矿界原本碎成 %d 片" % len(poly.geoms))
-        poly = unary_union(list(poly.geoms))
+        poly = _safe_union(list(poly.geoms))
     out = [h for h in ore if not poly.contains(Point(h.x, h.y))]
     if out:
         warn.append("%d 个矿孔原本落在矿界外（%s）"
@@ -414,7 +443,7 @@ def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
             else:
                 tip_ext = float(repair_tip)
             tip = (h.x + d[0] * tip_ext, h.y + d[1] * tip_ext)
-            poly = unary_union([poly, LineString([near, tip]).buffer(
+            poly = _safe_union([poly, LineString([near, tip]).buffer(
                 half, join_style="mitre", cap_style="flat")])
             poly = poly.buffer(0.1, join_style="mitre").buffer(
                 -0.1, join_style="mitre")
@@ -469,7 +498,7 @@ def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
     if not north:
         north = end_mids(True)
     if north and len(north) >= 2:
-        poly = unary_union([poly, LineString([tuple(p) for p in north]).buffer(
+        poly = _safe_union([poly, LineString([tuple(p) for p in north]).buffer(
             max(1.5, extrude * 0.8), join_style="mitre")]).buffer(0)
 
     left, right, c2, u2, v2 = zone_chains(ore, all_holes)
@@ -481,7 +510,7 @@ def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
         south, merged_block = south_closure(le, re_, comp_blocks, merge_gap)
         LAST_RING["merged_block"] = merged_block
         if south and len(south) >= 2:
-            poly = unary_union([poly, LineString([tuple(p) for p in south]).buffer(
+            poly = _safe_union([poly, LineString([tuple(p) for p in south]).buffer(
                 max(1.5, extrude * 0.8), join_style="mitre")]).buffer(0)
     return poly
 
@@ -586,7 +615,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         # 宽/弯矿化带的兜底：并上"矿孔外轮廓 + extrude"的外推环
         sh = _alpha_shape(xy, float(alpha_k))
         if sh is not None and not sh.is_empty:
-            poly = unary_union([poly, sh.buffer(extrude, join_style="mitre")]).buffer(0)
+            poly = _safe_union([poly, sh.buffer(extrude, join_style="mitre")]).buffer(0)
     LAST_RING["merged_block"] = merged_block
     LAST_RING["ring"] = ring
     return _finish_ring(poly, ore, extrude, simplify, repair_tip_m)
@@ -751,7 +780,7 @@ def average_blocks(ore, outline, density: float,
         lid, label = level_of(g["avg"])
         if lid is None:
             continue
-        region = unary_union([cells[h.hid] for h in grp])
+        region = _safe_union([cells[h.hid] for h in grp])
         # ---- 块内算量（用户口径：<0.5 废孔不圈矿，但参与块内算量）----
         # 体积/重量：拿**全场**孔的 Voronoi 单元去裁块范围——邻孔单元被裁进来的那一块
         #   也算（3DMine 就是这么算的），容重按该单元那个孔的档取（<0.5 → 2.65）。
