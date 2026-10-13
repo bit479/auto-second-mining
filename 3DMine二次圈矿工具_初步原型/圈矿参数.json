@@ -256,11 +256,33 @@
       ]
     },
     "3960-1009": {
-      "extrude_m": 4.0,
+      "extrude_m": 3.5,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "ring_mode": "chain"
+      "_说明": "按人工图指定的 4 个簇（我们原来把 P5/P6 拆成两块了）",
+      "ring_mode": "clusters",
+      "cluster_exact": [
+        [
+          "P38",
+          "P39",
+          "P40",
+          "P41",
+          "P42",
+          "P45"
+        ],
+        [
+          "P3",
+          "P4"
+        ],
+        [
+          "P5",
+          "P6"
+        ],
+        [
+          "P7",
+          "P8"
+        ]
+      ]
     },
     "3960-0908": {
       "ring_mode": "clusters",
