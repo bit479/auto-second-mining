@@ -53,8 +53,18 @@
       "extrude_m": 4.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "ring_mode": "clusters"
+      "_说明": "人工图是 1 块（6 孔），按指定并成一簇",
+      "ring_mode": "clusters",
+      "cluster_same": [
+        [
+          "P1",
+          "P2",
+          "P6",
+          "P11",
+          "P12",
+          "P16"
+        ]
+      ]
     },
     "3960-0825": {
       "extrude_m": 5.0,
@@ -75,7 +85,7 @@
       "ring_mode": "chain"
     },
     "3960-0830": {
-      "extrude_m": 2.0,
+      "extrude_m": 3.5,
       "chain_left": [
         "FP18",
         "FP23"
@@ -87,8 +97,55 @@
         "FP31",
         "FP32"
       ],
-      "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "ring_mode": "chain"
+      "_说明": "按人工图指定的分簇（9 块）；外推 3 m、clusters 模式",
+      "ring_mode": "clusters",
+      "cluster_same": [
+        [
+          "FP6",
+          "FP7",
+          "FP12",
+          "FP13",
+          "FP14",
+          "FP15",
+          "FP18",
+          "FP20",
+          "FP21",
+          "FP23",
+          "FP24",
+          "FP27"
+        ],
+        [
+          "FP1",
+          "FP2",
+          "FP9",
+          "FP10",
+          "FP11"
+        ],
+        [
+          "FP31",
+          "FP33"
+        ],
+        [
+          "FP32",
+          "FP35",
+          "FP40"
+        ],
+        [
+          "FP4",
+          "FP5"
+        ]
+      ],
+      "cluster_solo": [
+        [
+          "FP3"
+        ],
+        [
+          "FP16"
+        ]
+      ],
+      "cluster_exclude": [
+        "FP17"
+      ]
     },
     "3960-0922": {
       "extrude_m": 4.0,
