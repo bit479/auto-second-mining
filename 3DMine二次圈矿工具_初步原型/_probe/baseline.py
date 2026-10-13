@@ -26,6 +26,21 @@ def scan_path(platform: str, date: str) -> Path:
     return PROBE / ("manual_%s-%s_c.json" % (platform, date))
 
 
+def is_block(poly, layer: str) -> bool:
+    """人工图里哪些折线算"矿块"。
+
+    * 面积 ≥10 m²：算（人工最小的块也就 10~13 m²）；
+    * 面积 5~10 m²：**只在品位图层上**才算——图层 `0` 上一堆 4.8~5.1 m² 的小图形
+      是符号/小填充块，不是矿块（3960-0825 上就有 84 条，混进来会把 IoU 压低）。
+    """
+    a = poly.area
+    if a >= 10.0:
+        return True
+    if a >= 5.0 and str(layer) not in ("0", ""):
+        return True
+    return False
+
+
 def manual_volumes() -> dict:
     if VOLUMES.exists():
         try:
