@@ -375,7 +375,8 @@ def south_closure(le, re, comp_blocks, gap: float = SOUTH_MERGE_GAP):
     return out, best
 
 
-def class_clusters(ore, all_holes=None, min_fragment: float = 0.0):
+def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
+                   same=None, solo=None, exclude=None):
     """把矿孔按"品位档 + 单元相接"分成簇（**每簇一块**，簇之间留空白）。
 
     3960 平台的人工图就是这么画的：块是一段段互不相连的**窄条带**
@@ -384,6 +385,10 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0):
     同档且单元相接的孔并成一簇。
     """
     from oreblocks import level_of
+    ex = set()
+    for x in (exclude or []):
+        ex.add(str(x))
+    ore = [h for h in ore if h.short not in ex]
     if not ore:
         return []
     box = MultiPoint([(h.x, h.y) for h in ore]).convex_hull.buffer(60.0)
@@ -419,7 +424,70 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0):
             groups[k] = groups[k] + groups[i]
             groups.pop(i)
             locked = {t if t < i else t - 1 for t in locked if t != i}
+    # ---- 人工指定（验收时逐个炮区点一下）----
+    # solo：这些孔各自单独成簇（从原来的簇里拆出来）
+    for names in (solo or []):
+        want = {str(n) for n in (names if isinstance(names, (list, tuple)) else [names])}
+        got = []
+        rest = []
+        for g in groups:
+            hit = [h for h in g if h.short in want]
+            if hit:
+                got += hit
+                if len(hit) < len(g):
+                    rest.append([h for h in g if h.short not in want])
+            else:
+                rest.append(g)
+        if got:
+            rest.append(got)
+        groups = rest
+    # same：这些孔算同一簇（把它们所在的簇并起来）
+    for names in (same or []):
+        want = {str(n) for n in names}
+        hit = [k for k, g in enumerate(groups) if any(h.short in want for h in g)]
+        if len(hit) < 2:
+            continue
+        base = hit[0]
+        for k in sorted(hit[1:], reverse=True):
+            groups[base] = groups[base] + groups[k]
+            groups.pop(k)
     return groups
+
+
+def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
+                     density_ore: float = 2.7):
+    """clusters 模式用：**一个孔簇 = 一块**（不再簇内二次分组）。
+
+    块范围 = 该簇的矿界；块内所有孔的单元（含圈进来的废孔）按用户口径算量：
+    体积 = Σ(单元面积×孔长)；重量 = Σ(单元面积×孔长×容重[该孔所在档])；
+    品位 = 按**孔心落在块内**的孔做长度加权（<0.5 废孔也参与）。
+    """
+    from oreblocks import Block, Cell, level_of
+    if not grp or ring is None or ring.is_empty:
+        return None
+    cellmap = _cells_within(all_holes, ring)
+    hs = [h for h in all_holes if h.hid in cellmap and ring.buffer(1e-9).contains(Point(h.x, h.y))]
+    for h in grp:
+        if h not in hs:
+            hs.append(h)
+    cs = [Cell(hid=h.hid, hole=h, polygon=cellmap[h.hid], area_m2=cellmap[h.hid].area)
+          for h in hs if h.hid in cellmap]
+    if not cs:
+        return None
+    lsum = sum(h.grade_lenght for h in hs)
+    grade = (sum(h.grade_lenght * h.grade_disp for h in hs) / lsum) if lsum else 0.0
+    lid, label = level_of(grade)
+    if lid is None:
+        return None
+    b = Block(level_id=lid, label=label, holes=list(grp), cells=cs)
+    b.area_m2 = sum(c.area_m2 for c in cs)
+    b.volume_m3 = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
+    b.tonnage_t = sum(c.area_m2 * c.hole.grade_lenght *
+                      (density_waste if c.hole.grade < 0.5 else density_ore) for c in cs)
+    b.grade = grade
+    b.metal_hg = b.tonnage_t * grade / 100.0
+    b.polygon = _safe_union([c.polygon for c in cs])
+    return b
 
 
 def isolated_ring(zone, all_holes, extrude: float, simplify: float = None,

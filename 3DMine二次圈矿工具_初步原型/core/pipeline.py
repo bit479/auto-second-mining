@@ -15,8 +15,8 @@ from __future__ import annotations
 import math
 
 from oreblocks import load_holes_xls
-from strip import (LAST_RING, average_blocks, class_clusters, isolated_ring,
-                   zone_outline)
+from strip import (LAST_RING, average_blocks, block_of_cluster, class_clusters,
+                   isolated_ring, zone_outline)
 
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
@@ -68,7 +68,10 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
     if P.get("ring_mode") == "clusters":
         for zn in zones:
             for grp in class_clusters(zn, allh,
-                                      min_fragment=float(P.get("cluster_merge_m2", 0.0) or 0)):
+                                      min_fragment=float(P.get("cluster_merge_m2", 0.0) or 0),
+                                      same=P.get("cluster_same"),
+                                      solo=P.get("cluster_solo"),
+                                      exclude=P.get("cluster_exclude")):
                 ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"])
                 if P.get("cluster_strip_mode") == "hull":
                     ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"],
@@ -77,10 +80,12 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                     continue
                 rings.append(ring)
                 warns += list(LAST_RING.get("warn") or [])
-                blocks += average_blocks(grp, ring, P.get("density_ore", 2.7),
-                                         min_fragment=0.0, all_holes=allh,
-                                         density_waste=P.get("density_waste", 2.65),
-                                         density_ore=P.get("density_ore", 2.7))
+                # 一个簇 = 一块（不再簇内二次分组）
+                b1 = block_of_cluster(grp, ring, allh,
+                                      density_waste=P.get("density_waste", 2.65),
+                                      density_ore=P.get("density_ore", 2.7))
+                if b1 is not None:
+                    blocks.append(b1)
         order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
         blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
         for i, b in enumerate(blocks, 1):

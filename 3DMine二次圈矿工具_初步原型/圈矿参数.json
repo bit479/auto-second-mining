@@ -132,7 +132,27 @@
     "3960-0914": {
       "ring_mode": "clusters",
       "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "extrude_m": 3.0
+      "extrude_m": 3.0,
+      "cluster_same": [
+        [
+          "BL1",
+          "P26",
+          "P27",
+          "P30",
+          "P33",
+          "P34",
+          "P39",
+          "P41"
+        ]
+      ],
+      "cluster_solo": [
+        [
+          "P43"
+        ]
+      ],
+      "cluster_exclude": [
+        "P13"
+      ]
     },
     "3940-1003": {
       "extrude_m": 2.5,
