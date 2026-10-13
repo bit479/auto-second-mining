@@ -614,7 +614,8 @@ def _components_of(cellmap, hs):
 def average_blocks(ore, outline, density: float,
                    min_fragment: float = MIN_FRAGMENT_M2,
                    merge_target: str = "avg", merge_gap: float = 0.0,
-                   same_block=None):
+                   same_block=None, all_holes=None,
+                   density_waste: float = 2.65, density_ore: float = 2.7):
     """分块定档（人工口径）：
 
       ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
@@ -719,10 +720,40 @@ def average_blocks(ore, outline, density: float,
         lid, label = level_of(g["avg"])
         if lid is None:
             continue
-        cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
-                   area_m2=cells[h.hid].area) for h in grp]
+        region = unary_union([cells[h.hid] for h in grp])
+        # ---- 块内算量：有品位孔定块，但**落在块内的无品位孔**也要一起算 ----
+        # 用户口径：<0.5 废孔不圈矿，但参与块内算量（体积、按 2.65 取容重、参与品位加权）。
+        # 人工 1004 那块 725 m² 的多边形里就有 8 个废孔：加权品位 0.684 ≈ 报告 0.6919，
+        # 重量/体积 = 2.685（= 2.7 与 2.65 混出来的），两条都对得上。
+        pts = [h for h in (all_holes or grp)
+               if region.buffer(1e-9).contains(Point(h.x, h.y))]
+        for h in grp:
+            if h not in pts:
+                pts.append(h)
+        cellmap = _cells_within(pts, region) if pts else {}
+        if cellmap:
+            cs = [Cell(hid=h.hid, hole=h, polygon=cellmap[h.hid],
+                       area_m2=cellmap[h.hid].area) for h in pts if h.hid in cellmap]
+        else:
+            cs = [Cell(hid=h.hid, hole=h, polygon=cells[h.hid],
+                       area_m2=cells[h.hid].area) for h in grp]
         b = Block(level_id=lid, label=label, holes=grp, cells=cs)
         b.compute(density)
+        if len(cs) > len(grp):
+            # 含废孔：体积/重量/品位按"所有孔"重算
+            vol = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
+            ton = sum(c.area_m2 * c.hole.grade_lenght *
+                      (density_waste if c.hole.grade < 0.5 else density_ore)
+                      for c in cs)
+            lsum = sum(c.hole.grade_lenght for c in cs)
+            grade = (sum(c.hole.grade_lenght * c.hole.grade_disp for c in cs) / lsum
+                     if lsum else 0.0)
+            b.area_m2 = sum(c.area_m2 for c in cs)
+            b.volume_m3 = vol
+            b.tonnage_t = ton
+            b.grade = grade
+            b.metal_hg = ton * grade / 100.0
+            b.acct_holes = [c.hole for c in cs]
         out.append(b)
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     out.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
