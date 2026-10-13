@@ -63,7 +63,7 @@ def run_day(folder: Path, comp):
     return res
 
 
-def write_summary_xlsx(out: Path, results) -> None:
+def write_summary_xlsx(out: Path, results, comp=None) -> None:
     import openpyxl
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -90,6 +90,24 @@ def write_summary_xlsx(out: Path, results) -> None:
         ws3.append([r["date"], P.get("extrude_m"), P.get("zone_link_m"),
                     P.get("min_fragment_m2"), P.get("merge_gap_m"),
                     "；".join(r.get("warn") or []) or "OK"])
+    # 是否已并入综合图（按几何重合度判，见 core/merge_status.py）
+    if comp:
+        ws4 = wb.create_sheet("并图状态")
+        ws4.append(["日期", "已并入块数", "总块数", "各块与综合图的最大重叠率"])
+        for r in results:
+            hit = 0
+            det = []
+            for b in r["blocks"]:
+                best = 0.0
+                if b.polygon is not None and not b.polygon.is_empty:
+                    for layer, _c, poly in comp:
+                        if poly is None or poly.is_empty or not poly.intersects(b.polygon):
+                            continue
+                        best = max(best, poly.intersection(b.polygon).area
+                                   / max(b.polygon.area, 1e-9))
+                hit += int(best >= 0.80)
+                det.append("%d号%.0f%%" % (b.no, best * 100))
+            ws4.append([r["date"], hit, len(r["blocks"]), " ".join(det)])
     xlsx = out / "批量汇总.xlsx"
     wb.save(xlsx)
     print("汇总表 ->", xlsx)
@@ -189,7 +207,7 @@ def main() -> None:
         print("没找到任何单日炮区（子目录里要有 1、*.xls）")
         return
 
-    write_summary_xlsx(out, results)
+    write_summary_xlsx(out, results, comp=comp)
     write_summary_png(out, results)
     write_overview_png(out, results)
 

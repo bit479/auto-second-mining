@@ -124,6 +124,9 @@ class App:
         self.var_dwg = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="转 DWG 2010（需本机 AutoCAD；失败就留 DXF）",
                        variable=self.var_dwg).pack(side="left", padx=12)
+        self.var_merge = tk.BooleanVar(value=True)
+        tk.Checkbutton(btn, text="圈完顺手并入综合图副本（出预览）",
+                       variable=self.var_merge).pack(side="left", padx=6)
 
         # ---- 日志 ----
         tk.Label(root, text="运行日志：", anchor="w").pack(fill="x", padx=10)
@@ -439,14 +442,25 @@ class App:
                        [PY, "-X", "utf8", str(DXF2DWG), str(dxf)]):
                 self.log_line("（DWG 转换没成功，DXF 已保留，可在 CAD 里手工另存 2010）")
 
+        tds = Path(out) / ("%s矿块边界线.3ds" % tag)
+        merged = None
+        if ok_all and self.var_merge.get() and tds.exists():
+            if run("第 3 步 并入综合图副本（原件不动）",
+                   [PY, "-X", "utf8", str(MERGE_COMP), comp, str(tds)]):
+                for line in str(self.log.get("1.0", "end")).splitlines():
+                    if "_并入" in line and ".dwg" in line:
+                        merged = line.strip().split("->")[-1].strip()
+                self.log_line("（副本可复核后再自己决定是否替换原件）")
+
         self.log_line("-" * 68)
         if ok_all:
             xlsx = Path(out) / ("%s炮孔数据报告.xlsx" % tag)
             png = Path(out) / ("%s炮孔数据报告.png" % tag)
-            tds = Path(out) / ("%s矿块边界线.3ds" % tag)
             lines = ["1) 报告：%s   （图片版 %s）" % (xlsx, png),
                      "2) 成果图：%s" % (dwg if dwg.exists() else dxf),
                      "3) 边界线 .3ds：%s" % tds]
+            if merged:
+                lines.append("4) 并入后的综合图副本：%s（预览见同名 _预览.png）" % merged)
             self.log_line("全部流程结束。")
             self.var_res.set("\n".join(lines))
             self.btn_open.config(state="normal")
