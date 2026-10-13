@@ -16,6 +16,11 @@ from pathlib import Path
 PROBE = Path(__file__).resolve().parent
 VOLUMES = PROBE / "manual_volumes.json"
 
+# 基准取哪个：`report` = 人工报告的合计（3940：用户 2026-10-13 定"1004 以报告为准"）；
+# `figure` = 按**图**算（人工块轮廓 × 全场孔 Voronoi 单元，跟我们算法同口径）——
+# 3960 用户 2026-10-13 定"以图为准"（1008/1009 的报告与图差 4~6 倍）。
+SOURCE = {"3940": "report", "3960": "figure"}
+
 
 def scan_path(platform: str, date: str) -> Path:
     return PROBE / ("manual_%s-%s_c.json" % (platform, date))
@@ -39,21 +44,23 @@ def manual_volume(platform: str, date: str):
 
 
 def volume_for_gate(platform: str, date: str, man_poly, ore):
-    """基准体积 = **人工报告的合计**（用户 2026-10-13 定的：以报告为准）。
-
-    若报告与"图面积×平均孔长"差得太远（<0.7 或 >1.3 倍），在说明里标出来，
-    提醒这份报告与图纸对不上（3960 的 1008 报 3287 而图面推算 ~19000、
-    1009 报 17581 而图面推算 ~4200，两份都得人工确认以哪份为准）。
-    返回 (体积, 说明)。
-    """
+    """基准体积：(体积, 说明)。按平台取"报告"或"按图算"，见 SOURCE。"""
+    src = SOURCE.get(str(platform), "report")
     rep = manual_volume(platform, date)
-    if not ore:
-        return rep, "报告"
-    mean_len = sum(h.grade_lenght for h in ore) / len(ore)
-    implied = man_poly.area * mean_len
+    if src == "figure":
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(PROBE.parent / "core"))
+            from strip import _cells_within
+            cells = _cells_within(ore, man_poly)
+            vol = sum(cells[h.hid].area * h.grade_lenght
+                      for h in ore if h.hid in cells)
+            note = "按图算"
+            if rep is not None and vol > 0 and (rep < 0.7 * vol or rep > 1.3 * vol):
+                note = "按图算（报告 %.0f 与图对不上，已按图）" % rep
+            return vol, note
+        except Exception as exc:
+            return rep, "报告（按图算失败：%s）" % exc
     if rep is None:
-        return implied, "按图推算（无报告数）"
-    note = "报告"
-    if implied > 0 and (rep < 0.7 * implied or rep > 1.3 * implied):
-        note = "报告（**与图对不上**：图面推算 %.0f）" % implied
-    return rep, note
+        return None, "无报告数"
+    return rep, "报告"

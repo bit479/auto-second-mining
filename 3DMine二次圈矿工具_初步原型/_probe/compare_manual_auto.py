@@ -33,11 +33,14 @@ PROBE = ROOT / "_probe"
 SKIP = {"爆区方格网", "钻孔", "点", "线条", "孔口文字"}
 COLORS = {"L4": "#f4b183", "L3": "#ffd966", "L2": "#b4a7d6", "L1": "#a9d6d0"}
 DATES = ["0915", "0922", "1003", "1004", "1008"]
+PLATFORM_DIRS = {"3940": DAY,
+                 "3960": DAY.parent / "北部山头3960平台2026"}
+PLATFORM = "3940"
 
 
 def manual_blocks(date):
     import baseline as _bl
-    j = json.loads(_bl.scan_path("3940", date).read_text(encoding="utf-8"))
+    j = json.loads(_bl.scan_path(PLATFORM, date).read_text(encoding="utf-8"))
     out = []
     for p in j["polylines"]:
         if p["layer"] in SKIP or len(p["pts"]) < 3:
@@ -50,11 +53,12 @@ def manual_blocks(date):
 
 
 def auto_blocks(date, comp):
-    folder = DATA / ("北部山头3940平台-%s" % date)
+    data = PLATFORM_DIRS[PLATFORM] / "7、单日数据"
+    folder = data / ("北部山头%s平台-%s" % (PLATFORM, date))
     xls = sorted(folder.glob("1、*.xls"))[0]
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    P = _params.for_blast(date, platform="3940")
+    P = _params.for_blast(date, platform=PLATFORM)
     res = run_blast(holes, allh, P, comp, blast=date)
     ring = res["rings"][0] if res["rings"] else None
     for rr in res["rings"][1:]:
@@ -95,9 +99,15 @@ def draw_auto(ax, allh, ring, blocks, title):
 
 
 def main() -> None:
-    comp = load_composite_blocks(COMP)
+    global PLATFORM
+    PLATFORM = sys.argv[1] if len(sys.argv) > 1 else "3940"
+    dates = sys.argv[2:] or (DATES if PLATFORM == "3940" else
+                             ["0830", "0904", "0914", "1008"])
+    comp_dwg = PLATFORM_DIRS[PLATFORM] / ("5、 北部山头%s平台二次圈矿矿块图-2026综合.dwg"
+                                          % PLATFORM)
+    comp = load_composite_blocks(comp_dwg)
     print("%-6s %-22s %-22s" % ("炮区", "人工块面积(m²)", "自动块面积(m²)"))
-    for d in DATES:
+    for d in dates:
         man = manual_blocks(d)
         allh, ore, ring, blocks = auto_blocks(d, comp)
         ma = "、".join("%.0f" % p.area for _, p in man)
@@ -111,7 +121,7 @@ def main() -> None:
                   "%s 自动（%d 块，合计 %.0f m³）"
                   % (d, len(blocks), sum(b.volume_m3 for b in blocks)))
         fig.tight_layout()
-        p = OUT / ("对照_%s.png" % d)
+        p = OUT / ("对照_%s%s.png" % (PLATFORM if PLATFORM != "3940" else "", d))
         fig.savefig(p)
         plt.close(fig)
         print("   ->", p)
