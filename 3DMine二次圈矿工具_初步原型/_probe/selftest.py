@@ -43,7 +43,7 @@ LIMIT = {"3940-1008": (0.90, 0.05), "3940-0922": (0.60, 0.10)}
 DEFAULT_LIMIT = {"3940": (0.75, 0.20), "3960": (0.35, 0.30)}
 
 
-def manual_poly(platform: str, date: str):
+def manual_poly(platform: str, date: str, holes=None):
     f = _bl.scan_path(platform, date)
     if not f.exists():
         return None
@@ -53,7 +53,7 @@ def manual_poly(platform: str, date: str):
         if p["layer"] in SKIP or len(p["pts"]) < 3:
             continue
         poly = Polygon(p["pts"]).buffer(0)
-        if _bl.is_block(poly, p["layer"]):
+        if _bl.is_block(poly, p["layer"], holes):
             polys.append(poly)
     return unary_union(polys) if polys else None
 
@@ -79,12 +79,12 @@ def main() -> None:
             if not (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls"))):
                 continue
             date = folder.name.split("-")[-1].strip()
-            man = manual_poly(plat, date)
+            xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
+            holes = load_holes_xls(xls)
+            man = manual_poly(plat, date, list(holes.values()))
             if man is None:
                 continue        # 这个炮区还没有人工图扫描，不纳入闸门
-            xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
             P = _params.for_blast(date, platform=plat)
-            holes = load_holes_xls(xls)
             try:
                 res = run_blast(holes, list(holes.values()), P, comp, blast=date)
             except Exception as exc:

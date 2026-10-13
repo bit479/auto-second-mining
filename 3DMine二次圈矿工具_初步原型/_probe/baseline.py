@@ -26,19 +26,22 @@ def scan_path(platform: str, date: str) -> Path:
     return PROBE / ("manual_%s-%s_c.json" % (platform, date))
 
 
-def is_block(poly, layer: str) -> bool:
+def is_block(poly, layer: str, holes=None) -> bool:
     """人工图里哪些折线算"矿块"。
 
     * 面积 ≥10 m²：算（人工最小的块也就 10~13 m²）；
     * 面积 5~10 m²：**只在品位图层上**才算——图层 `0` 上一堆 4.8~5.1 m² 的小图形
       是符号/小填充块，不是矿块（3960-0825 上就有 84 条，混进来会把 IoU 压低）。
+    * 给了 holes 时，**块里至少要有 1 个炮孔**——扫描出来的细三角片
+      （3960-0830 上 185 m²、13 m² 那两条，顶点都在整数坐标上）里一个孔都没有，
+      是构造线/填充被误当闭合折线的产物，不是矿块。
     """
     a = poly.area
-    if a >= 10.0:
-        return True
-    if a >= 5.0 and str(layer) not in ("0", ""):
-        return True
-    return False
+    ok = a >= 10.0 or (a >= 5.0 and str(layer) not in ("0", ""))
+    if ok and holes is not None:
+        from shapely.geometry import Point as _P
+        ok = any(poly.contains(_P(h.x, h.y)) for h in holes)
+    return ok
 
 
 def manual_volumes() -> dict:
