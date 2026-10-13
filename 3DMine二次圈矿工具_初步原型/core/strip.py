@@ -422,7 +422,8 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0):
     return groups
 
 
-def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
+def isolated_ring(zone, all_holes, extrude: float, simplify: float = None,
+                  method: str = "territory"):
     """孤立小组的矿界（规则）：
 
       「该组的孔在**全场** Voronoi 里的领地，上限是"该组凸包外扩 extrude"」。
@@ -436,6 +437,17 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None):
     if not zone:
         return None
     hull = MultiPoint([(h.x, h.y) for h in zone]).convex_hull
+    if method == "hull":
+        # 直边条带：直接用"孔簇凸包 + 外推"（人工图是一段段直边条带；
+        # Voronoi 领地那种锯齿边虽然能挡住邻孔，但形状不像）
+        poly = hull.buffer(float(extrude), join_style="mitre").buffer(0)
+        simp = SIMPLIFY_M if simplify is None else float(simplify)
+        if simp > 0:
+            sp = poly.simplify(simp, preserve_topology=True)
+            if not sp.is_empty and sp.area > 0.5 * poly.area:
+                poly = sp
+        LAST_RING["warn"] = []
+        return poly
     cap = hull.buffer(float(extrude), join_style="mitre")
     cellmap = _cells_within(all_holes, cap)
     parts = [cellmap[h.hid] for h in zone if h.hid in cellmap]

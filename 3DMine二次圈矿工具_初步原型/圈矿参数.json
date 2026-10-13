@@ -38,8 +38,9 @@
       "extrude_m": 2.0,
       "chain_left": [],
       "chain_right": [],
-      "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "ring_mode": "clusters"
+      "_说明": "clusters + 直边条带（hull）：IoU 0.679→0.768、体积 -26%→-14%",
+      "ring_mode": "clusters",
+      "cluster_strip_mode": "hull"
     },
     "3960-0904": {
       "extrude_m": 3.0,

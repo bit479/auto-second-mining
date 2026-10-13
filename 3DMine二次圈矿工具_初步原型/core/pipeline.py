@@ -70,6 +70,9 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
             for grp in class_clusters(zn, allh,
                                       min_fragment=float(P.get("cluster_merge_m2", 0.0) or 0)):
                 ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"])
+                if P.get("cluster_strip_mode") == "hull":
+                    ring = isolated_ring(grp, allh, P["extrude_m"], P["simplify_m"],
+                                         method="hull")
                 if ring is None or ring.is_empty:
                     continue
                 rings.append(ring)
