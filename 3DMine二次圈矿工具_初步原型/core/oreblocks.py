@@ -189,19 +189,53 @@ def read_3ds(path: Path):
 
 def load_holes_xls(path: Path):
     import xlrd
-    wb = xlrd.open_workbook(str(path))
+    path = Path(path)
+    try:
+        wb = xlrd.open_workbook(str(path))
+    except Exception as exc:
+        raise RuntimeError(
+            "打不开这个 Excel（%s）：%s。\n"
+            "        这一般是文件不是真正的 .xls/.xlsx、或被别的程序占用了。"
+            % (path.name, exc))
+    have = wb.sheet_names()
+    need = ["定位表", "pit_blast"]
+    missing = [s for s in need if s not in have]
+    if missing:
+        raise RuntimeError(
+            "数据库缺少工作表：%s。\n"
+            "        这个文件里现有：%s\n"
+            "        需要的：定位表（工程号/开孔坐标E/开孔坐标N/开孔坐标R/轨迹类型/最大孔深）"
+            "+ pit_blast（工程号/从/至/Au），另可选 测斜表。"
+            % ("、".join(missing), "、".join(have)))
     loc, bl = wb.sheet_by_name("定位表"), wb.sheet_by_name("pit_blast")
+    if loc.ncols < 6 or bl.ncols < 4:
+        raise RuntimeError(
+            "工作表列数不对：定位表 %d 列（需要 ≥6）、pit_blast %d 列（需要 ≥4）。"
+            % (loc.ncols, bl.ncols))
     holes = {}
-    for r in range(1, loc.nrows):
-        hid = str(loc.cell_value(r, 0)).strip()
-        holes[hid] = Hole(hid=hid, short=hid.split("-")[-1],
-                          x=loc.cell_value(r, 1), y=loc.cell_value(r, 2),
-                          z=loc.cell_value(r, 3), depth=loc.cell_value(r, 5),
-                          grade=0.0)
-    for r in range(1, bl.nrows):
-        hid = str(bl.cell_value(r, 0)).strip()
-        if hid in holes:
-            holes[hid].grade = float(bl.cell_value(r, 3))
+    try:
+        for r in range(1, loc.nrows):
+            hid = str(loc.cell_value(r, 0)).strip()
+            if not hid:
+                continue
+            holes[hid] = Hole(hid=hid, short=hid.split("-")[-1],
+                              x=float(loc.cell_value(r, 1)),
+                              y=float(loc.cell_value(r, 2)),
+                              z=float(loc.cell_value(r, 3)),
+                              depth=float(loc.cell_value(r, 5)),
+                              grade=0.0)
+    except Exception as exc:
+        raise RuntimeError("定位表第 %d 行读不动（%s）；请检查坐标/孔深是不是数字。"
+                           % (r + 1, exc))
+    try:
+        for r in range(1, bl.nrows):
+            hid = str(bl.cell_value(r, 0)).strip()
+            if hid in holes:
+                holes[hid].grade = float(bl.cell_value(r, 3))
+    except Exception as exc:
+        raise RuntimeError("pit_blast 第 %d 行的 Au 不是数字（%s）。" % (r + 1, exc))
+    if not holes:
+        raise RuntimeError("定位表里一行孔都没有。")
     return holes
 
 
