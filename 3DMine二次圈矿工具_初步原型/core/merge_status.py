@@ -32,7 +32,8 @@ def day_status(folder: Path, comp) -> tuple:
     if not date:
         plat, date = parse_folder(xls.name)
     holes = load_holes_xls(xls)
-    res = run_blast(holes, list(holes.values()), _params.for_blast(date), comp, blast=date)
+    res = run_blast(holes, list(holes.values()),
+                    _params.for_blast(date, platform=plat), comp, blast=date)
     done, detail = 0, []
     for b in res["blocks"]:
         if b.polygon is None or b.polygon.is_empty:

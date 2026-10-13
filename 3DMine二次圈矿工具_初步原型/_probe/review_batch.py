@@ -37,7 +37,7 @@ def run_one(date: str, comp):
     xls = next(iter(sorted(folder.glob("1、*.xls"))), None)
     if xls is None:
         return None
-    P = _params.for_blast(date)
+    P = _params.for_blast(date, platform="3940")
     holes = load_holes_xls(xls)
     allh = list(holes.values())
     ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])

@@ -65,7 +65,7 @@ def main() -> None:
         if not xls or man_poly is None:
             rows.append((d, "-", "-", "-", "缺数据/缺人工图", False))
             continue
-        P = _params.for_blast(d)
+        P = _params.for_blast(d, platform="3940")
         holes = load_holes_xls(xls[0])
         res = run_blast(holes, list(holes.values()), P, comp, blast=d)
         ring = res["rings"][0] if res["rings"] else None

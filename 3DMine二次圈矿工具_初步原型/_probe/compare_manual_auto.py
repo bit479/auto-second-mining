@@ -53,7 +53,7 @@ def auto_blocks(date, comp):
     xls = sorted(folder.glob("1、*.xls"))[0]
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    P = _params.for_blast(date)
+    P = _params.for_blast(date, platform="3940")
     res = run_blast(holes, allh, P, comp, blast=date)
     ring = res["rings"][0] if res["rings"] else None
     for rr in res["rings"][1:]:

@@ -54,7 +54,7 @@ def manual_blocks():
 
 def main() -> None:
     tag = sys.argv[1] if len(sys.argv) > 1 else "auto"
-    P = _params.for_blast("1008")
+    P = _params.for_blast("1008", platform="3940")
     holes = load_holes_xls(DB)
     allh = list(holes.values())
     ore, pending = pick_zone(holes, adjacent_max=P["zone_link_m"])

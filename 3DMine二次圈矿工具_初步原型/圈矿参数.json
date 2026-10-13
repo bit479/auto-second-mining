@@ -16,7 +16,7 @@
   "same_block": [],
   "density_waste": 2.65,
   "density_ore": 2.7,
-  "platforms": {
+  "blasts": {
     "1003": {
       "extrude_m": 2.5,
       "chain_left": [
@@ -54,5 +54,6 @@
       "chain_left": [],
       "chain_right": []
     }
-  }
+  },
+  "platforms": {}
 }

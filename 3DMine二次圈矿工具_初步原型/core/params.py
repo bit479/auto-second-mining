@@ -35,7 +35,12 @@ DEFAULTS = {
     "same_block": [],          # 人工指定这些孔算同一块，如 [["P1","P2","P3","P4","P6"]]
     "density_waste": 2.65,     # 0–0.5 档容重
     "density_ore": 2.7,        # 0.5 以上各档容重
-    "platforms": {             # 按平台覆盖（键 = 炮区号，如 "1003"）
+    # ---- 按平台覆盖（键 = 平台号，如 "3940" / "3970"）----
+    # 同一个平台的所有炮区共用这一层（外推距离、容重这类"矿体特性"通常整平台一致）
+    "platforms": {},
+    # ---- 按炮区覆盖（键 = 炮区号/日期，如 "1003"）----
+    # 只对个别炮区生效（链、外推微调这类"这一炮特殊"的东西放这里）
+    "blasts": {
         # 下面这些"链"是用人工图贪心标定出来的（_probe/tune_chains.py）：
         # 从自动分链出发，逐个试着把"没进链的孔"放进左/右链，取 IoU 最大的组合。
         # 1008 标定结果是"不用加"——说明自动判定在它上面本来就对。
@@ -68,8 +73,8 @@ def load(path: Path = None) -> dict:
         try:
             user = json.loads(path.read_text(encoding="utf-8"))
             for k, v in user.items():
-                if k == "platforms" and isinstance(v, dict):
-                    cfg["platforms"].update(v)
+                if k in ("platforms", "blasts") and isinstance(v, dict):
+                    cfg.setdefault(k, {}).update(v)
                 else:
                     cfg[k] = v
         except Exception as exc:
@@ -83,13 +88,26 @@ def save(cfg: dict, path: Path = None) -> Path:
     return path
 
 
-def for_blast(date: str, cfg: dict = None) -> dict:
-    """返回某个炮区实际生效的参数（平台覆盖 + 全局默认）。"""
+def for_blast(date: str, platform: str = None, cfg: dict = None) -> dict:
+    """返回某个炮区实际生效的参数：全局默认 → 平台覆盖 → 炮区覆盖。"""
     cfg = cfg or load()
-    out = {k: v for k, v in cfg.items() if k != "platforms"}
-    for k, v in (cfg.get("platforms", {}).get(str(date), {}) or {}).items():
+    out = {k: v for k, v in cfg.items() if k not in ("platforms", "blasts")}
+    for src in ("platforms", "blasts"):
+        key = str(platform) if src == "platforms" else str(date)
+        for k, v in ((cfg.get(src, {}) or {}).get(key, {}) or {}).items():
+            out[k] = v
+    out["platform"] = str(platform or "")
+    out["blast"] = str(date)
+    return out
+
+
+def for_platform(platform: str, cfg: dict = None) -> dict:
+    """只要平台这一层（不含具体炮区）。"""
+    cfg = cfg or load()
+    out = {k: v for k, v in cfg.items() if k not in ("platforms", "blasts")}
+    for k, v in ((cfg.get("platforms", {}) or {}).get(str(platform), {}) or {}).items():
         out[k] = v
-    out["platform_used"] = str(date)
+    out["platform"] = str(platform)
     return out
 
 

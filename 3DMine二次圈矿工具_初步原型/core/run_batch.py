@@ -52,7 +52,7 @@ def run_day(folder: Path, comp):
     if not date:
         plat2, date = parse_folder(xls.name)
         plat = plat or plat2
-    P = _params.for_blast(date)
+    P = _params.for_blast(date, platform=plat)
     holes = load_holes_xls(xls)
     res = run_blast(holes, list(holes.values()), P, comp, blast=date)
     if not res["blocks"]:

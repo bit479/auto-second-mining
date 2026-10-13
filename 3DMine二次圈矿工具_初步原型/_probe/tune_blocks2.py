@@ -83,7 +83,7 @@ def main() -> None:
             rates, hits, detail = [], 0, []
             for d in DATES:
                 holes, allh, gp, nb = cache[d]
-                P = dict(_params.for_blast(d))
+                P = dict(_params.for_blast(d, platform="3940"))
                 P["min_fragment_m2"] = float(frag)
                 P["block_merge_gap"] = float(gap)
                 res = run_blast(holes, allh, P, comp, blast=d)

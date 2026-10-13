@@ -71,7 +71,7 @@ def tune_one(date: str, comp, grid=None):
     xls = sorted((DATA / ("北部山头3940平台-%s" % date)).glob("1、*.xls"))[0]
     holes = load_holes_xls(xls)
     allh = list(holes.values())
-    P0 = _params.for_blast(date)
+    P0 = _params.for_blast(date, platform="3940")
     ore, _ = pick_zone(holes, adjacent_max=P0["zone_link_m"])
     man = manual_poly(date)
     best = None

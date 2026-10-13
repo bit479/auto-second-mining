@@ -76,7 +76,7 @@ def main() -> None:
         log.append(s)
 
     meta = {"platform": plat or "?", "date": date or "?", "density": DENSITY}
-    P = _params.for_blast(date)
+    P = _params.for_blast(date, platform=plat)
     note("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
          % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
 
