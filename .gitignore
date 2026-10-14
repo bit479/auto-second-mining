@@ -29,3 +29,6 @@ desktop.ini
 3DMine二次圈矿工具_初步原型/sample_data/output/GUI跑通_*/
 3DMine二次圈矿工具_初步原型/_probe/_gui_run.log
 3DMine二次圈矿工具_初步原型/_probe/__pycache__/
+
+# 发版用的打包产物（Release 资产，不进版本库）
+release_v1/

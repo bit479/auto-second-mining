@@ -13,6 +13,10 @@
 
 ## 现在什么状态（2026-10-14）
 
+**已发版**：[Release v1.0](https://github.com/bit479/auto-second-mining/releases/tag/v1.0)
+（发布说明 + 可直接下载的绿色包 `second-mining-tool-v1.0.zip`，约 4.9 MB）。
+重新发版的脚本：`python _probe\publish_release.py`（说明取自 `_probe\release_notes_v1.md`）。
+
 17 个炮区**验收全绿**，跑 `python _probe\accept_all.py` 一条命令可复现：
 
 | 平台 | 炮区 | 矿界 IoU | 体积差（自动/人工） | 块数 |
