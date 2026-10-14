@@ -7,7 +7,8 @@
 三件事：
   ① 圈矿验收闸门（`selftest.py`，两档：常规 / 严格）
   ② 报告口径回归（`report_check_all.py`，版式 + 每块自洽 + 合计对账）
-  ③ 精确模式自检（用人工导出的四段 .3ds 拼矿界，与人工 1008 图求 IoU）
+  ③ 成果图实体自检（`dxf_check.py`：十字/引线/工程号/品位/方格/矿块号/报告图 逐项验）
+  ④ 精确模式自检（用人工导出的四段 .3ds 拼矿界，与人工 1008 图求 IoU）
 
 退出码 0 = 全过；1 = 有退化。每一步的输出原样打出来（不吞日志）。
 """
@@ -75,18 +76,27 @@ def check_exact():
 run("① 圈矿验收闸门（selftest.py，两档）", [PROBE / "selftest.py"] + PLATS)
 if "3940" in PLATS:
     run("② 报告口径回归（report_check_all.py）", [PROBE / "report_check_all.py", "3940"])
+# ③ 成果图实体自检：各平台挑两个代表炮区（单块的和多块的）
+DXF_CASES = {"3940": ["1004", "0915"], "3960": ["0919", "0908"]}
+dxf_cases = [(p, d) for p in PLATS for d in DXF_CASES.get(p, [])]
+if dxf_cases:
+    for p, d in dxf_cases:
+        run("%s %s 成果图实体自检（dxf_check.py）" % (p, d),
+            [PROBE / "dxf_check.py", p, d, "--fresh"])
+    results.append(("③ 成果图实体自检（%d 个炮区）" % len(dxf_cases),
+                    all(ok for n, ok, _ in results if n.endswith("成果图实体自检（dxf_check.py）")), 0))
 print("")
 print("=" * 78)
-print("== ③ 精确模式自检（人工四段 .3ds 拼矿界）")
+print("== ④ 精确模式自检（人工四段 .3ds 拼矿界）")
 print("=" * 78)
 try:
     ok3, msg3 = check_exact()
     print(msg3)
     if ok3 is not None:
-        results.append(("③ 精确模式自检", ok3, 0 if ok3 else 1))
+        results.append(("④ 精确模式自检", ok3, 0 if ok3 else 1))
 except Exception as exc:
     print("自检异常：%s" % exc)
-    results.append(("③ 精确模式自检", False, 1))
+    results.append(("④ 精确模式自检", False, 1))
 
 print("")
 print("=" * 78)

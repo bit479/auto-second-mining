@@ -431,11 +431,24 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
             return False
 
         def inside_blocks(x0, y0, half_w, half_h):
-            """文字框是否压在任一矿块上（人工图把矿块号放在图外，不遮图面）。"""
+            """文字框是否压在"图上画出来的东西"上（人工图把矿块号放在图外，不遮图面）。
+
+            注意要连**合并后的轮廓**（画在图上的那条彩色闭合线，＝矿块 ∪ 接上的历史矿块）
+            一起避让——只避让"矿块本体"是不够的：1008 的 1 号块接了历史块之后轮廓变大，
+            号就压在那条线里面了（DXF 自检发现）。
+            """
             from shapely.geometry import box as _box
             r = _box(x0 - half_w, y0 - half_h, x0 + half_w, y0 + half_h)
-            return any(b.polygon is not None and not b.polygon.is_empty
-                       and b.polygon.intersects(r) for b in blocks)
+            for b in blocks:
+                if b.polygon is not None and not b.polygon.is_empty and b.polygon.intersects(r):
+                    return True
+            for mo in merged_outlines:
+                if mo is None or mo.is_empty:
+                    continue
+                for g in ([mo] if mo.geom_type == "Polygon" else list(mo.geoms)):
+                    if g.intersects(r):
+                        return True
+            return False
 
         allpts = [pt for b in blocks if b.polygon is not None
                   for pt in b.polygon.convex_hull.exterior.coords]
