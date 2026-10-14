@@ -14,7 +14,8 @@ __all__ = [
     "KIND_XLS", "KIND_MDB", "KIND_REPORT", "KINDS",
     "KIND_LABELS",
     "DB_TABLES", "DB_KEY_COLUMNS", "DB_TEXT_COLUMNS",
-    "REPORT_TOTAL_TOKEN", "REPORT_TYPE_COLUMN",
+    "REPORT_TOTAL_TOKEN", "REPORT_TOTAL_TOKENS", "REPORT_SUBTOTAL_TOKENS",
+    "REPORT_TYPE_COLUMN",
     "DAY_PATTERNS", "MASTER_PATTERNS", "SKIP_PREFIXES",
     "normalize_key", "key_of_row", "guess_day_code", "day_code_from_holes",
 ]
@@ -52,7 +53,9 @@ DB_TEXT_COLUMNS = {"工程号", "轨迹类型"}
 # --------------------------------------------------------------------------
 # 炮孔数据报告
 # --------------------------------------------------------------------------
-REPORT_TOTAL_TOKEN = "合计"      # 汇总块的结束行
+REPORT_TOTAL_TOKEN = "合计"      # 汇总块的结束行（新版报告用"合计"）
+REPORT_TOTAL_TOKENS = ("合计", "总计")   # 老版报告用"总计"，两种都当块尾
+REPORT_SUBTOTAL_TOKENS = ("小计",)
 REPORT_TYPE_COLUMN = "类型"      # 表头首列的标志文本
 
 # --------------------------------------------------------------------------

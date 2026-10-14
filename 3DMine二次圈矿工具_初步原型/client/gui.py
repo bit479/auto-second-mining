@@ -86,22 +86,36 @@ class App:
         tk.Button(row3, text="浏览...", command=self.browse_out).pack(side="left", padx=4)
 
         # ---- 参数区（按平台可覆盖，存 圈矿参数.json）----
-        pf = tk.LabelFrame(root, text="参数（留空=用默认；改完点“存为当前平台”）",
+        pf = tk.LabelFrame(root, text="参数（留空=用默认；改完点“存为该平台默认”或“存为该炮区”）",
                            padx=10, pady=6)
         pf.pack(fill="x", padx=10, pady=(0, 4))
         self.var_p = {}
-        for i, (key, label) in enumerate((("extrude_m", "外推(m)"),
-                                          ("zone_link_m", "连接半径(m)"),
-                                          ("min_fragment_m2", "最小块段(m²)"),
-                                          ("merge_gap_m", "接综合图(m)"))):
-            tk.Label(pf, text=label).grid(row=0, column=i * 2, sticky="e", padx=(6, 2))
+        NUMS = (("extrude_m", "外推(m)"), ("zone_link_m", "连接半径(m)"),
+                ("min_fragment_m2", "最小块段(m²)"), ("merge_gap_m", "接综合图(m)"),
+                ("seam_join_m", "贴合综合图(m)"), ("isolated_min_holes", "孤立组最少孔数"),
+                ("ring_alpha_k", "外轮廓兜底k"))
+        for i, (key, label) in enumerate(NUMS):
+            r, c = divmod(i, 4)
+            tk.Label(pf, text=label).grid(row=r * 2, column=c * 2, sticky="e", padx=(6, 2))
             v = tk.StringVar()
-            tk.Entry(pf, textvariable=v, width=7).grid(row=0, column=i * 2 + 1, sticky="w")
+            tk.Entry(pf, textvariable=v, width=7).grid(row=r * 2, column=c * 2 + 1, sticky="w")
             self.var_p[key] = v
-        tk.Button(pf, text="存为当前平台", command=self.save_params).grid(
+        tk.Label(pf, text="精确模式轮廓文件(.3ds，多个用分号隔开；填了就照人工画的矿界出图)",
+                 fg="#333").grid(row=4, column=0, columnspan=2, sticky="e", pady=(6, 0))
+        self.var_outline = tk.StringVar()
+        tk.Entry(pf, textvariable=self.var_outline).grid(
+            row=4, column=2, columnspan=6, sticky="we", pady=(6, 0))
+        tk.Button(pf, text="…", width=3,
+                  command=self.browse_outline).grid(row=4, column=8, padx=10)
+        tk.Button(pf, text="存为该平台默认", command=self.save_params).grid(
             row=0, column=8, padx=10)
-        tk.Label(pf, text="（外推 3.0 / 连接 15 / 最小块段 40 / 接图 8；1003 已单独设 2.5）",
-                 fg="#666").grid(row=1, column=0, columnspan=8, sticky="w", pady=(4, 0))
+        tk.Button(pf, text="存为该炮区", command=lambda: self.save_params(blast=True)).grid(
+            row=1, column=8, padx=10)
+        tk.Button(pf, text="刷新参数", command=self.refresh_params).grid(
+            row=2, column=8, padx=10)
+        tk.Label(pf, text="（默认 外推3.0 / 连接15 / 最小块段40 / 接图8 / 贴合0.5；"
+                          "1003 外推 2.5，各炮区另有个别覆盖）",
+                 fg="#666").grid(row=5, column=0, columnspan=8, sticky="w", pady=(4, 0))
 
         # ---- 按钮 ----
         btn = tk.Frame(root)
@@ -155,34 +169,62 @@ class App:
     def refresh_params(self):
         try:
             p = self._params_mod()
+            plat = self.var_platform.get().strip()
             date = self.var_date.get().strip() or ""
-            P = p.for_blast(date) if date else p.load()
+            if date and plat:
+                P = p.for_blast(date, platform=plat)
+            elif plat:
+                P = p.for_platform(plat)
+            else:
+                P = p.load()
             for k, v in self.var_p.items():
-                v.set("%g" % float(P.get(k, 0.0)))
+                val = P.get(k)
+                v.set("" if val is None else ("%g" % float(val)))
+            files = P.get("outline_files") or []
+            self.var_outline.set(";".join(str(x) for x in files))
         except Exception:
             pass
 
-    def save_params(self):
+    def save_params(self, blast: bool = False):
+        """把参数区写回 圈矿参数.json。
+
+        坑（2026-10-14 修）：原来一律写进 `platforms[<日期>]`（拿日期当平台号），
+        存完根本不生效（`for_blast` 查的是 `platforms[<平台号>]` 和 `blasts[<平台>-<日期>]`）。
+        现在：勾"存为该炮区"→ `blasts["<平台>-<日期>"]`；否则 → `platforms[<平台>]`；
+        没有平台号就写全局默认。
+        """
         try:
             p = self._params_mod()
             cfg = p.load()
+            plat = self.var_platform.get().strip()
             date = self.var_date.get().strip()
             vals = {}
             for k, v in self.var_p.items():
                 s = v.get().strip()
                 if s:
-                    vals[k] = float(s)
+                    vals[k] = (int(float(s)) if k == "isolated_min_holes"
+                               else float(s))
+            files = [x.strip() for x in self.var_outline.get().split(";") if x.strip()]
+            if files or self.var_outline.get().strip() != "":
+                vals["outline_files"] = files
             if not vals:
                 messagebox.showinfo("参数", "没有要保存的值。")
                 return
-            if date:
-                cfg.setdefault("platforms", {}).setdefault(date, {}).update(vals)
-                path = p.save(cfg)
-                messagebox.showinfo("参数", "已按平台 %s 保存到：\n%s" % (date, path))
+            if blast:
+                if not (plat and date):
+                    messagebox.showinfo("参数", "存为该炮区需要先填平台号和日期。")
+                    return
+                key = "%s-%s" % (plat, date)
+                cfg.setdefault("blasts", {}).setdefault(key, {}).update(vals)
+                where = "炮区 %s" % key
+            elif plat:
+                cfg.setdefault("platforms", {}).setdefault(plat, {}).update(vals)
+                where = "平台 %s" % plat
             else:
                 cfg.update(vals)
-                path = p.save(cfg)
-                messagebox.showinfo("参数", "已保存为全局默认：\n%s" % path)
+                where = "全局默认"
+            path = p.save(cfg)
+            messagebox.showinfo("参数", "已保存为%s：\n%s" % (where, path))
         except Exception as ex:
             messagebox.showerror("参数", "保存失败：%s" % ex)
 
@@ -216,6 +258,14 @@ class App:
             filetypes=[("DWG", "*.dwg"), ("所有文件", "*.*")])
         if f:
             self.var_comp.set(f)
+
+    def browse_outline(self):
+        """精确模式：挑人工从 3DMine 导出的矿界 .3ds（可多选，分号分隔）。"""
+        fs = filedialog.askopenfilenames(
+            title="选择人工导出的矿界 .3ds（可多选：左边界/与综合图边界/右边界/右上边界…）",
+            filetypes=[("3DMine 字符串", "*.3ds"), ("所有文件", "*.*")])
+        if fs:
+            self.var_outline.set(";".join(str(x) for x in fs))
 
     def browse_out(self):
         d = filedialog.askdirectory(title="选择输出目录")

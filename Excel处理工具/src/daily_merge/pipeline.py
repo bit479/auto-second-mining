@@ -112,6 +112,13 @@ def run(options: DailyMergeOptions) -> dict:
             report["errors"][kind] = "%s" % exc
     report["preview"] = preview
 
+    # 单日报告的"合计 = 各明细之和"自检（只报告，不改源数据）
+    if plan.src.get(KIND_REPORT):
+        try:
+            report["totals_check"] = report_xlsx.check_totals(plan.src[KIND_REPORT])
+        except Exception as exc:  # noqa: BLE001
+            report["totals_check"] = {"checked": False, "reason": "%s" % exc}
+
     if options.dry_run:
         report["results"] = preview
         return report
@@ -162,6 +169,8 @@ def _mdb_holes(path: str) -> list[str]:
 def _report_blocks(path: str) -> tuple[int, list[str]]:
     from openpyxl import load_workbook
 
+    from .schema import REPORT_TOTAL_TOKENS
+
     wb = load_workbook(path, data_only=False, read_only=True)
     try:
         ws = wb[wb.sheetnames[0]]
@@ -171,7 +180,7 @@ def _report_blocks(path: str) -> tuple[int, list[str]]:
             if value is None:
                 continue
             text = str(value).strip()
-            if text == "合计":
+            if text in REPORT_TOTAL_TOKENS:
                 totals += 1
             elif "炮孔数据报告" in text:
                 titles.append(text)
@@ -276,6 +285,18 @@ def summarize(report: dict) -> list[str]:
     if info and "error" not in info:
         lines.append("[复核] %s：%d 个日报告块，%d 个合计行"
                      % (KIND_LABELS[KIND_REPORT], info["blocks"], info["total_rows"]))
+
+    check = report.get("totals_check") or {}
+    if check.get("checked"):
+        if check["mismatches"]:
+            for item in check["mismatches"]:
+                lines.append("[警告] 单日报告的「%s」合计与各明细之和差 %s（明细 %s / 合计 %s）"
+                             "—— 源报告本身公式疑有误，已按原样并入，请人工核对。"
+                             % (item["column"], item["diff"], item["detail_sum"], item["total"]))
+        else:
+            lines.append("[校验] 单日报告合计与各明细之和一致 ✓")
+    elif check:
+        lines.append("[提示] 单日报告合计未校验：%s" % check.get("reason", ""))
 
     for warn in report.get("warnings", []):
         lines.append("[提示] %s" % warn)

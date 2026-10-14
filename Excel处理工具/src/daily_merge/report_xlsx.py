@@ -17,9 +17,10 @@ from typing import Any
 from openpyxl import load_workbook
 from openpyxl.formula.translate import Translator
 
-from .schema import KINDS, REPORT_TOTAL_TOKEN, REPORT_TYPE_COLUMN
+from .schema import (KINDS, REPORT_SUBTOTAL_TOKENS, REPORT_TOTAL_TOKEN,
+                     REPORT_TOTAL_TOKENS, REPORT_TYPE_COLUMN)
 
-__all__ = ["find_summary_block", "existing_titles", "merge_report"]
+__all__ = ["find_summary_block", "existing_titles", "check_totals", "merge_report"]
 
 _BLANK_SEPARATOR = 1
 
@@ -59,11 +60,12 @@ def find_summary_block(ws) -> tuple[int, int]:
         text = _text(row[0].value)
         if first is None and text:
             first = row[0].row
-        if text == REPORT_TOTAL_TOKEN:
+        if text in REPORT_TOTAL_TOKENS:
             total = row[0].row
             break
     if total is None:
-        raise ValueError("单日报告里没找到「%s」行，无法确定汇总块范围" % REPORT_TOTAL_TOKEN)
+        raise ValueError("单日报告里没找到「%s」行，无法确定汇总块范围"
+                         % "/".join(REPORT_TOTAL_TOKENS))
     if first is None:
         first = 1
     return first, total
@@ -77,6 +79,62 @@ def existing_titles(ws) -> list[str]:
         if isinstance(value, str) and "炮孔数据报告" in value:
             titles.append(_text(value))
     return titles
+
+
+# 合计行所在列：体积 / 重量 / 金属量（平均品位是推导列，不参与求和校验）
+_SUM_COLUMNS = ((3, "体积"), (4, "重量"), (6, "金属量"))
+
+
+def check_totals(src_path: str, tolerance: float = 0.05) -> dict:
+    """用文件里缓存的计算值，复核"合计 = 各明细行之和"。
+
+    只做比对并报告差异，绝不改动源数据 —— 源报告本身写错公式时，
+    这里会明确提示，避免错误被原样搬进总表。
+    """
+    wb = load_workbook(src_path, data_only=True)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        try:
+            r1, r2 = find_summary_block(ws)
+        except ValueError as exc:
+            return {"checked": False, "reason": str(exc)}
+
+        sums = {name: 0.0 for _col, name in _SUM_COLUMNS}
+        details = 0
+        for r in range(r1 + 1, r2):
+            label = _text(ws.cell(r, 1).value)
+            if not label or label in REPORT_TOTAL_TOKENS or label in REPORT_SUBTOTAL_TOKENS:
+                continue
+            details += 1
+            for col, name in _SUM_COLUMNS:
+                value = ws.cell(r, col).value
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    sums[name] += float(value)
+
+        total = {}
+        for col, name in _SUM_COLUMNS:
+            value = ws.cell(r2, col).value
+            total[name] = float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+        mismatches = []
+        for _col, name in _SUM_COLUMNS:
+            got = total[name]
+            if got is None:
+                continue
+            if abs(got - sums[name]) > tolerance:
+                mismatches.append({"column": name, "detail_sum": round(sums[name], 3),
+                                   "total": round(got, 3),
+                                   "diff": round(got - sums[name], 3)})
+        return {
+            "checked": True,
+            "detail_rows": details,
+            "total_label": _text(ws.cell(r2, 1).value),
+            "detail_sum": {k: round(v, 3) for k, v in sums.items()},
+            "total": {k: (round(v, 3) if v is not None else None) for k, v in total.items()},
+            "mismatches": mismatches,
+        }
+    finally:
+        wb.close()
 
 
 def _copy_style(src_cell, dst_cell) -> None:
