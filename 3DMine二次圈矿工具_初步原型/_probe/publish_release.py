@@ -65,8 +65,11 @@ def main() -> int:
                            capture_output=True, text=True)
         print("git push tag ->", (p.stdout + p.stderr).strip()[-160:])
 
+    title = {"v1.0": "v1.0 —— 二次圈矿工具（首个可用版）",
+             "v1.0.1": "v1.0.1 —— 修复：AutoCAD 没开时第2/3步失败",
+             "v1.1": "v1.1 —— 支持把文件拖进窗口"}.get(TAG, "%s —— 二次圈矿工具" % TAG)
     st, res = api("https://api.github.com/repos/%s/releases" % REPO, tok,
-                  {"tag_name": TAG, "name": "v1.0 —— 二次圈矿工具（首个可用版）",
+                  {"tag_name": TAG, "name": title,
                    "body": body, "draft": False, "prerelease": False},
                   method="POST")
     print("建 Release ->", st, res.get("html_url") or str(res.get("error", ""))[:300])
