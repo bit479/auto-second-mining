@@ -20,6 +20,15 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
 
+# 拖拽支持（可选）：装了 tkinterdnd2 就能把文件从资源管理器拖进来
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    DND_OK = True
+except Exception:                    # 没装也不影响其它功能，只是不能拖
+    DND_FILES = None
+    TkinterDnD = None
+    DND_OK = False
+
 ROOT = Path(__file__).resolve().parent.parent
 CLIENT = Path(__file__).resolve().parent
 CORE = ROOT / "core"
@@ -63,10 +72,19 @@ class App:
         root.title("二次圈矿工具客户端")
         root.geometry("940x740")
         root.minsize(760, 560)
+        self._manual_dwg = None      # 拖进来的"人工圈矿图"，给"标定本炮区"直接用
 
         # ---- 输入 ----
         frm = tk.LabelFrame(root, text="输入（两个都要给）", padx=10, pady=8)
         frm.pack(fill="x", padx=10, pady=6)
+
+        if DND_OK:
+            tk.Label(frm, text="（可以把文件从资源管理器直接拖进来："
+                              "数据库 Excel / 综合图 DWG / 人工圈矿图 DWG / 轮廓 .3ds / 输出文件夹）",
+                     fg="#0a6", anchor="w").pack(fill="x", pady=(0, 4))
+        else:
+            tk.Label(frm, text="（想支持「拖进来」就装一下：pip install tkinterdnd2）",
+                     fg="#a60", anchor="w").pack(fill="x", pady=(0, 4))
 
         row1 = tk.Frame(frm)
         row1.pack(fill="x")
@@ -187,6 +205,75 @@ class App:
 
         self.busy = False
         self.refresh_params()
+        if DND_OK:
+            self._setup_dnd()
+
+    # ---------- 拖拽（把文件从资源管理器拖进来）----------
+    def _setup_dnd(self):
+        """整个窗口和几个输入框都注册成拖放目标；松开鼠标就按扩展名/文件名分流。"""
+        targets = [self.root]
+        for w in self.root.winfo_children():
+            targets.append(w)
+        for t in targets:
+            for w in ([t] + list(t.winfo_children())):
+                try:
+                    w.drop_target_register(DND_FILES)
+                    w.dnd_bind("<<Drop>>", self.on_drop)
+                except Exception:
+                    pass
+
+    def on_drop(self, event):
+        """把拖进来的东西分流到对应的输入框。
+
+        * 文件夹            → 输出目录
+        * .xls/.xlsx        → 炮孔数据库（并自动识别平台/日期、自动找同目录的综合图、设输出目录）
+        * .dwg 名字带"综合"  → 综合图
+        * .dwg 其它          → 记成"人工圈矿图"，点「用人工图标定本炮区…」时直接用，不再弹选择框
+        * .3ds              → 精确模式轮廓文件（可一次拖好几个，分号分隔）
+        """
+        try:
+            paths = [Path(p) for p in self.root.tk.splitlist(event.data)]
+        except Exception:
+            paths = []
+        if not paths:
+            return
+        notes = []
+        outlines = []
+        for p in paths:
+            if p.is_dir():
+                self.var_out.set(str(p))
+                notes.append("输出目录 ← %s" % p.name)
+                continue
+            ext = p.suffix.lower()
+            if ext in (".xls", ".xlsx"):
+                self._set_xls(p)
+                notes.append("炮孔数据库 ← %s" % p.name)
+            elif ext == ".dwg":
+                if "综合" in p.name:
+                    self.var_comp.set(str(p))
+                    notes.append("综合图 ← %s" % p.name)
+                else:
+                    self._manual_dwg = p
+                    plat, date = parse_platform_date(p.name)
+                    if plat:
+                        self.var_platform.set(plat)
+                    if date:
+                        self.var_date.set(date)
+                    notes.append("人工圈矿图 ← %s（点「用人工图标定本炮区…」会直接用它）" % p.name)
+            elif ext == ".3ds":
+                outlines.append(str(p))
+            else:
+                notes.append("（没认出来，忽略）%s" % p.name)
+        if outlines:
+            notes.append("精确模式轮廓 ← %s" % "；".join(Path(x).name for x in outlines))
+        self.log.delete("1.0", "end")
+        # 注意顺序：refresh_params() 会按"平台+日期"重填轮廓框，所以拖进来的轮廓要**在它之后**写
+        self.refresh_params()
+        if outlines:
+            self.var_outline.set(";".join(outlines))
+        self.log_line("拖入 %d 个对象：" % len(paths))
+        for n in notes:
+            self.log_line("   " + n)
 
     # ---------- 参数 ----------
     def _params_mod(self):
@@ -264,6 +351,11 @@ class App:
             filetypes=[("Excel", "*.xls *.xlsx"), ("所有文件", "*.*")])
         if not f:
             return
+        self._set_xls(Path(f))
+
+    def _set_xls(self, f: Path):
+        """选/拖到一个数据库之后要做的事：填框、识平台日期、找综合图、设输出目录。"""
+        f = Path(f)
         self.var_xls.set(f)
         plat, date = parse_platform_date(Path(f).name)
         if plat:
@@ -433,10 +525,13 @@ class App:
         if not (plat and date):
             messagebox.showwarning("缺少参数", "平台号和日期都要填（如 3940 / 1008）。")
             return
-        dwg = filedialog.askopenfilename(
-            title="选择该炮区的人工圈矿图 DWG",
-            initialdir=str(Path(self.var_xls.get()).parent) if self.var_xls.get() else None,
-            filetypes=[("DWG", "*.dwg")])
+        if self._manual_dwg is not None and Path(self._manual_dwg).exists():
+            dwg = str(self._manual_dwg)          # 拖进来的那张，直接用
+        else:
+            dwg = filedialog.askopenfilename(
+                title="选择该炮区的人工圈矿图 DWG",
+                initialdir=str(Path(self.var_xls.get()).parent) if self.var_xls.get() else None,
+                filetypes=[("DWG", "*.dwg")])
         if not dwg:
             return
         self.set_busy(True)
@@ -674,7 +769,8 @@ def main():
         app_icon.set_app_user_model_id()
     except Exception:
         app_icon = None
-    root = tk.Tk()
+    # 支持拖拽就用 TkinterDnD 的根窗口（它继承自 tk.Tk，其余用法一样）
+    root = TkinterDnD.Tk() if DND_OK else tk.Tk()
     if app_icon is not None:
         try:
             app_icon.set_window_icon(root)

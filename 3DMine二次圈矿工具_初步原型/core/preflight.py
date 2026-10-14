@@ -54,7 +54,8 @@ print("\n2) 依赖包")
 need = [("numpy", 1), ("scipy", 1), ("shapely", 1), ("matplotlib", 1),
         ("ezdxf", 1), ("openpyxl", 1), ("xlrd", 1)]
 opt = [("win32com.client", "AutoCAD 只读扫描 / DXF→DWG2010（没有也能出 DXF）"),
-       ("pyodbc", "直读 .mdb 数据库（正常流程用导出的 Excel，不需要）")]
+       ("pyodbc", "直读 .mdb 数据库（正常流程用导出的 Excel，不需要）"),
+       ("tkinterdnd2", "把文件从资源管理器拖进界面（没有也能用「浏览…」按钮）")]
 for name, must in need:
     try:
         importlib.import_module(name)
