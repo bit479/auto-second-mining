@@ -37,10 +37,22 @@ LV_TXT = {"L4": "≥3", "L3": "1.5-3", "L2": "1-1.5", "L1": "0.5-1"}
 
 
 def parse_folder(name: str):
+    """从单日文件夹名里取 (平台号, 炮区号)。
+
+    坑（2026-10-14 修）：以前是 `re.search(r"(\\d{4})", name)` 兜底，
+    "北部山头3960平台-0922 - 2"（同一天的第二批）会被抓成"3960"；
+    现在从平台号后面找**日期**，并把末尾的 "- 2" 批次后缀并进炮区号 → "0922-2"
+    （与人工报告/人工图扫描文件的命名一致）。
+    """
     m = re.search(r"(\d{3,4})\s*平台", name)
     plat = m.group(1) if m else ""
-    d = re.search(r"-\s*(\d{4})\s*$", name) or re.search(r"(\d{4})", name)
-    return plat, (d.group(1) if d else "")
+    tail = name[m.end():] if m else name
+    ds = re.findall(r"(?<!\d)(\d{3,4})(?!\d)", tail)
+    date = ds[-1] if ds else ""
+    suf = re.search(r"-\s*(\d+)\s*$", tail)
+    if date and suf and not tail.strip().endswith(date):
+        date = "%s-%s" % (date, suf.group(1))
+    return plat, date
 
 
 def _n_ore(r: dict) -> int:

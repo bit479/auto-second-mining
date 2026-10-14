@@ -1,0 +1,282 @@
+"""单日数据并入总表 —— 编排层。
+
+一次调用完成三件事：
+
+1. 解析计划（自动探测单日 / 总表文件，支持显式覆盖）；
+2. 备份三份总表（``*_并入<日>.bak``，不覆盖旧备份）；
+3. 依次并入 xls / mdb / 报告，最后复核行数与判重结果。
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+from dataclasses import replace
+from typing import Any
+
+from . import db_mdb, db_xls, report_xlsx
+from .discover import (DailyMergeOptions, DailyMergePlan, find_master_files,
+                       resolve_plan)
+from .schema import (DB_KEY_COLUMNS, DB_TABLES, KIND_LABELS, KIND_MDB,
+                     KIND_REPORT, KIND_XLS, normalize_key)
+
+__all__ = ["DailyMergeOptions", "DailyMergePlan", "resolve_plan", "run",
+           "backup_file", "verify", "summarize", "restore"]
+
+
+def backup_file(path: str, day_code: str = "") -> str:
+    """把总表备份成 ``<原名>_并入<日>.bak``（已存在则加序号，绝不覆盖）。"""
+    stem, ext = os.path.splitext(path)
+    tag = "_并入%s" % day_code if day_code else "_备份"
+    candidate = "%s%s.bak" % (stem, tag)
+    index = 2
+    while os.path.exists(candidate):
+        candidate = "%s%s-%d.bak" % (stem, tag, index)
+        index += 1
+    shutil.copy2(path, candidate)
+    return candidate
+
+
+def restore(master_dir: str, day_code: str = None) -> dict:
+    """把三份总表还原到 ``*_并入<日>.bak`` 备份。
+
+    ``day_code`` 留空则取该总表最近的一个备份。
+    """
+    import glob
+    import time
+
+    if not master_dir or not os.path.isdir(master_dir):
+        raise FileNotFoundError("总表目录不存在：%s" % master_dir)
+
+    restored: dict[str, str] = {}
+    for kind, master in find_master_files(master_dir).items():
+        if not master or not os.path.isfile(master):
+            continue
+        stem, ext = os.path.splitext(master)
+        if day_code:
+            pattern = "%s_并入%s*.bak" % (stem, day_code)
+        else:
+            pattern = "%s_并入*.bak" % stem
+        candidates = sorted(glob.glob(pattern), key=os.path.getmtime)
+        if not candidates:
+            continue
+        source = candidates[-1]                       # 最近的备份
+        keep = "%s_还原前%s.bak" % (stem, time.strftime("%Y%m%d-%H%M%S"))
+        shutil.copy2(master, keep)
+        shutil.copy2(source, master)
+        restored[kind] = "%s  <-  %s" % (os.path.basename(master), os.path.basename(source))
+    return restored
+
+
+def _merge_one(kind: str, src: str, dst: str, options: DailyMergeOptions) -> dict:
+    if kind == KIND_XLS:
+        return db_xls.merge_xls(src, dst,
+                                skip_duplicates=options.skip_duplicates,
+                                dry_run=options.dry_run)
+    if kind == KIND_MDB:
+        return db_mdb.merge_mdb(src, dst,
+                                skip_duplicates=options.skip_duplicates,
+                                dry_run=options.dry_run)
+    if kind == KIND_REPORT:
+        return report_xlsx.merge_report(src, dst,
+                                        with_appendix=options.with_report_appendix,
+                                        skip_duplicates=options.skip_duplicates,
+                                        dry_run=options.dry_run)
+    raise ValueError("未知的数据类型：%s" % kind)
+
+
+def run(options: DailyMergeOptions) -> dict:
+    """执行并入，返回完整的过程与结果信息。"""
+    plan = resolve_plan(options)
+    if not plan.executable:
+        raise FileNotFoundError(
+            "没有可执行的文件对，请检查单日目录 / 总表目录：\n  " + "\n  ".join(plan.missing))
+
+    report: dict[str, Any] = {
+        "day_code": plan.day_code,
+        "dry_run": options.dry_run,
+        "plan": plan,
+        "backups": {},
+        "results": {},
+        "errors": {},
+        "warnings": list(plan.warnings),
+    }
+
+    # 1) 先全面预演一遍，确认哪些总表真的需要改动
+    preview_options = replace(options, dry_run=True)
+    preview: dict[str, dict] = {}
+    for kind, src, dst in plan.pairs:
+        try:
+            preview[kind] = _merge_one(kind, src, dst, preview_options)
+        except Exception as exc:  # noqa: BLE001 - 单类失败不阻断其余
+            report["errors"][kind] = "%s" % exc
+    report["preview"] = preview
+
+    if options.dry_run:
+        report["results"] = preview
+        return report
+
+    pending = [p for p in plan.pairs if preview.get(p[0], {}).get("added")]
+
+    # 2) 备份"确实会被改动"的总表（无改动就完全不落备份文件）
+    if options.backup:
+        for kind, _src, dst in pending:
+            report["backups"][kind] = backup_file(dst, plan.day_code)
+
+    # 3) 真正写盘；没有改动的直接沿用预演结果
+    changed = {p[0] for p in pending}
+    for kind, src, dst in plan.pairs:
+        if kind in report["errors"]:
+            continue
+        if kind not in changed:
+            report["results"][kind] = preview[kind]
+            continue
+        try:
+            report["results"][kind] = _merge_one(kind, src, dst, options)
+        except Exception as exc:  # noqa: BLE001
+            report["errors"][kind] = "%s" % exc
+
+    report["verify"] = verify(plan)
+    return report
+
+
+# --------------------------------------------------------------------------
+# 复核
+# --------------------------------------------------------------------------
+
+def _xls_holes(path: str) -> list[str]:
+    book = db_xls.read_xls_sheets(path)
+    info = book.get("定位表")
+    return [str(r.get("工程号")) for r in info["rows"]] if info else []
+
+
+def _mdb_holes(path: str) -> list[str]:
+    conn = db_mdb.connect(path, write=False)
+    try:
+        rows = db_mdb.read_table_rows(conn, "定位表", ["工程号"])
+        return [str(r.get("工程号")) for r in rows]
+    finally:
+        conn.close()
+
+
+def _report_blocks(path: str) -> tuple[int, list[str]]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, data_only=False, read_only=True)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        totals, titles = 0, []
+        for row in ws.iter_rows(min_col=1, max_col=1):
+            value = row[0].value
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text == "合计":
+                totals += 1
+            elif "炮孔数据报告" in text:
+                titles.append(text)
+        return totals, titles
+    finally:
+        wb.close()
+
+
+def verify(plan: DailyMergePlan) -> dict:
+    """复核并入结果：孔数、日期分段、重复情况、报告块数量。"""
+    out: dict[str, Any] = {}
+
+    for kind, reader in ((KIND_XLS, _xls_holes), (KIND_MDB, _mdb_holes)):
+        path = plan.dst.get(kind)
+        if not path or not os.path.isfile(path):
+            continue
+        try:
+            holes = reader(path)
+        except Exception as exc:  # noqa: BLE001
+            out[kind] = {"error": str(exc)}
+            continue
+        out[kind] = _hole_summary(holes)
+
+    path = plan.dst.get(KIND_REPORT)
+    if path and os.path.isfile(path):
+        try:
+            totals, titles = _report_blocks(path)
+            out[KIND_REPORT] = {"total_rows": totals, "blocks": len(titles), "titles": titles}
+        except Exception as exc:  # noqa: BLE001
+            out[KIND_REPORT] = {"error": str(exc)}
+
+    return out
+
+
+def _hole_summary(holes: list[str]) -> dict:
+    import re
+    from collections import Counter
+
+    segments = Counter()
+    for hole in holes:
+        match = re.match(r"(BS-\d+-\d+)", str(hole))
+        if match:
+            segments[match.group(1)] += 1
+
+    seen, dup = set(), []
+    for hole in holes:
+        key = normalize_key(hole)
+        if key in seen:
+            dup.append(hole)
+        seen.add(key)
+
+    return {
+        "total": len(holes),
+        "unique": len(seen),
+        "duplicates": dup,
+        "segments": dict(segments),
+        "first": holes[0] if holes else "",
+        "last": holes[-1] if holes else "",
+    }
+
+
+def summarize(report: dict) -> list[str]:
+    """把 run() 的结果整理成可直接打印的中文行。"""
+    lines: list[str] = []
+    if report.get("dry_run"):
+        lines.append("[预演] 只计算不写盘")
+    lines.append("日期代号：%s" % (report.get("day_code") or "(未知)"))
+
+    for kind, info in report["backups"].items():
+        lines.append("[备份] %s" % info)
+
+    for kind, res in report["results"].items():
+        label = KIND_LABELS[kind]
+        if kind == KIND_REPORT:
+            if res.get("skipped"):
+                lines.append("[跳过] %s：%s" % (label, res["reason"]))
+            else:
+                lines.append("[并入] %s：追加 %d 行（标题「%s」，公式 %d 个，起始第 %d 行）"
+                             % (label, res["block_rows"], res["title"], res["formulas"], res["insert_at"]))
+            continue
+        pieces = []
+        for table, st in res["tables"].items():
+            if st["status"] != "ok":
+                pieces.append("%s 跳过(%s)" % (table, st["reason"]))
+            else:
+                pieces.append("%s %d→%d(+%d)" % (table, st["existing"], st["existing"] + st["added"], st["added"]))
+        lines.append("[并入] %s：新增 %d 行；%s" % (label, res["added"], "，".join(pieces)))
+
+    for kind, err in report["errors"].items():
+        lines.append("[失败] %s：%s" % (KIND_LABELS[kind], err))
+
+    verify_info = report.get("verify") or {}
+    for kind in (KIND_XLS, KIND_MDB):
+        info = verify_info.get(kind)
+        if not info or "error" in info:
+            continue
+        seg = "、".join("%s×%d" % (k, v) for k, v in sorted(info["segments"].items()))
+        dup = ("，重复 %d 个" % len(info["duplicates"])) if info["duplicates"] else ""
+        lines.append("[复核] %s：共 %d 孔（%s）%s"
+                     % (KIND_LABELS[kind], info["total"], seg, dup))
+    info = verify_info.get(KIND_REPORT)
+    if info and "error" not in info:
+        lines.append("[复核] %s：%d 个日报告块，%d 个合计行"
+                     % (KIND_LABELS[KIND_REPORT], info["blocks"], info["total_rows"]))
+
+    for warn in report.get("warnings", []):
+        lines.append("[提示] %s" % warn)
+    return lines

@@ -53,10 +53,11 @@
       "chain_left": [],
       "chain_right": [],
       "_说明": "模式与外推由 3960 人工图逐个炮区标定（_probe 对照图 + selftest 闸门）",
-      "ring_mode": "clusters"
+      "ring_mode": "clusters",
+      "seam_join_m": 0.0
     },
     "3960-1007": {
-      "extrude_m": 4.0,
+      "extrude_m": 4.5,
       "chain_left": [],
       "chain_right": [],
       "_说明": "人工图是 1 块（6 孔），按指定并成一簇",
@@ -70,10 +71,11 @@
           "P12",
           "P16"
         ]
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-0825": {
-      "extrude_m": 3.0,
+      "extrude_m": 2.5,
       "chain_left": [
         "P45",
         "P14",
@@ -150,7 +152,8 @@
       ],
       "cluster_exclude": [
         "P12"
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-0830": {
       "extrude_m": 3.0,
@@ -211,10 +214,11 @@
         [
           "FP16"
         ]
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-0922": {
-      "extrude_m": 5.0,
+      "extrude_m": 6.0,
       "chain_left": [
         "P52"
       ],
@@ -236,10 +240,11 @@
           "P59",
           "P60"
         ]
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-1008": {
-      "extrude_m": 3.0,
+      "extrude_m": 4.0,
       "chain_left": [
         "P20",
         "P21",
@@ -317,10 +322,11 @@
           "P45",
           "P46"
         ]
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-1009": {
-      "extrude_m": 3.5,
+      "extrude_m": 3.0,
       "chain_left": [],
       "chain_right": [],
       "_说明": "按人工图指定的 4 个簇（我们原来把 P5/P6 拆成两块了）",
@@ -346,7 +352,8 @@
           "P7",
           "P8"
         ]
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-0908": {
       "ring_mode": "clusters",
@@ -413,7 +420,8 @@
       ],
       "cluster_exclude": [
         "P46"
-      ]
+      ],
+      "seam_join_m": 0.0
     },
     "3960-0914": {
       "ring_mode": "clusters",
@@ -476,6 +484,49 @@
       "repair_tip_m": -1,
       "chain_left": [],
       "chain_right": []
+    },
+    "3960-0922-2": {
+      "ring_mode": "clusters",
+      "extrude_m": 3.0,
+      "seam_join_m": 0.5,
+      "cluster_exact": [
+        [
+          "BL1",
+          "BL2",
+          "BL3",
+          "BL4",
+          "BL5",
+          "BL6",
+          "BL7",
+          "BL8",
+          "BL9",
+          "P62",
+          "P63",
+          "P64",
+          "P65",
+          "P66"
+        ],
+        [
+          "P61",
+          "P67",
+          "P68",
+          "P69",
+          "P73",
+          "P74",
+          "P75"
+        ],
+        [
+          "P70",
+          "P71",
+          "P72"
+        ],
+        [
+          "P76",
+          "P77",
+          "P79"
+        ]
+      ],
+      "_说明": "同一天的第二批（文件夹名 北部山头3960平台-0922 - 2；以前被日期解析错成「3960」）。人工图 4 块，按人工图逐块指定孔组，外推 3 m + 贴合：4 块 / 体积 -2.4% / IoU 0.664"
     }
   }
 }

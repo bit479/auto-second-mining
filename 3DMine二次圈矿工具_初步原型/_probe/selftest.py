@@ -35,6 +35,9 @@ from composite import load_composite_blocks                     # noqa: E402
 import params as _params                                        # noqa: E402
 import baseline as _bl                                          # noqa: E402
 
+sys.path.insert(0, str(ROOT / "core"))
+from run_batch import parse_folder                              # noqa: E402
+
 DAY = ROOT.parent
 PLATFORMS = {"3940": DAY / "北部山头3940平台2026",
              "3960": DAY / "北部山头3960平台2026"}
@@ -120,7 +123,9 @@ def main() -> None:
         for folder in sorted(d for d in data.iterdir() if d.is_dir()):
             if not (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls"))):
                 continue
-            date = folder.name.split("-")[-1].strip()
+            _plat, date = parse_folder(folder.name)
+            if not date:
+                date = folder.name.split("-")[-1].strip()
             xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
             holes = load_holes_xls(xls)
             mblocks = manual_blocks(plat, date, list(holes.values()))
@@ -141,7 +146,11 @@ def main() -> None:
                     rg = rg.union(rr)
                 iou = rg.intersection(man).area / rg.union(man).area
                 tv = sum(b.volume_m3 for b in r["blocks"])
-                mv, src = _bl.volume_for_gate(plat, date, man, r["ore"])
+                # 基准体积用**炮区里全部矿孔**（不是只有主矿化带）：按图算时，
+                # 主带孔的 Voronoi 单元会把整张人工图铺满，只用主带孔算出来的
+                # 体积会虚高（1009 上 4124 vs 3062）。
+                mv, src = _bl.volume_for_gate(
+                    plat, date, man, [h for h in holes.values() if h.grade >= 0.5])
                 if mv is None:
                     return None, "无基准"
                 out = [h.short for h in r["ore"] if not rg.contains(Point(h.x, h.y))]
