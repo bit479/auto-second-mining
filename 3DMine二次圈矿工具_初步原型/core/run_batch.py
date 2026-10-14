@@ -43,6 +43,17 @@ def parse_folder(name: str):
     return plat, (d.group(1) if d else "")
 
 
+def _n_ore(r: dict) -> int:
+    """炮区里**全部**矿孔数（主矿化带 + 孤立小组 + 待取样小组）。
+
+    以前这里只印 `len(r["ore"])`（＝主矿化带），0922 这种"主带 + 孤立小组"的炮区
+    会被印成 6 孔（实际 10 孔），对不上人工报告里的孔数。
+    """
+    n = len(r["ore"]) + sum(len(g) for g in r["zones"][1:])
+    n += sum(len(g) for g in r["pending"])
+    return n
+
+
 def run_day(folder: Path, comp):
     xls = sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls"))
     if not xls:
@@ -79,7 +90,7 @@ def write_summary_xlsx(out: Path, results, comp=None) -> None:
     ws2 = wb.create_sheet("按日合计")
     ws2.append(["日期", "矿孔数", "矿块数", "体积(m³)", "重量(t)", "金属量（百克）"])
     for r in results:
-        ws2.append([r["date"], len(r["ore"]), len(r["blocks"]),
+        ws2.append([r["date"], _n_ore(r), len(r["blocks"]),
                     round(sum(b.volume_m3 for b in r["blocks"]), 3),
                     round(sum(b.tonnage_t for b in r["blocks"]), 3),
                     round(sum(b.metal_hg for b in r["blocks"]), 3)])
@@ -199,7 +210,7 @@ def main() -> None:
             continue
         results.append(r)
         print("%-10s 矿孔%3d  %2d 块  %9.1f m3  %8.1f 百克   %s"
-              % (r["date"], len(r["ore"]), len(r["blocks"]),
+              % (r["date"], _n_ore(r), len(r["blocks"]),
                  sum(b.volume_m3 for b in r["blocks"]),
                  sum(b.metal_hg for b in r["blocks"]),
                  ("自检:" + "；".join(r["warn"])) if r["warn"] else ""))

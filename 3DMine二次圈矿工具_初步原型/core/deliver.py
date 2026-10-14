@@ -28,6 +28,7 @@ HID_TRUE_COLOR = 0x004C4C   # 工程号/十字 真彩色 RGB(0,76,76)（用户�
 CROSS_HALF = 0.5         # 十字半臂长(m)：用户指定十字总长 1.0 m
 TRAIL_LEN = 1.2          # 轨迹线长度(m)：人工图实测 1.2 m
 GRID_RULE = "center"     # 方格取舍：只保留格心落在矿界内的格（与人工图一致）
+LABEL_H_M = 5.0          # 矿块号文字高度(m)：人工图实测 char_height=5.0（原来是 3.0）
 
 
 def level_id_of(grade: float):
@@ -398,15 +399,55 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
                      ).set_placement((h.x - 3.19, h.y - 0.35))
 
     # 4) 矿块号：斜引线 + 文字（互不重叠）
+    label_maxx = -1e18          # 由下面的循环填；第 6 步插报告图时用它避让
     if blocks:
+        minx, miny, maxx, maxy = _bounds(holes_all)
+        # 报告图占的矩形（第 5 步插的那张 40 m 宽的图）：矿块号不能压上去
+        table = None
+        if report_png is not None and Path(report_png).exists():
+            w_px, h_px = report_px if report_px else (1200, 800)
+            tw = 40.0
+            th = tw * h_px / float(w_px)
+            table = (maxx + 5.0 - 2.0, maxy - th - 2.0, maxx + 5.0 + tw + 2.0, maxy + 2.0)
+        # 图名占的矩形（第 5 步放在 (minx, maxy+12)）：矿块号也别压上去
+        title = "%s平台 %s二次圈矿矿块图" % (meta["platform"], meta["date"])
+        title_rect = (minx - 1.0, maxy + 12.0 - 1.0,
+                      minx + 5.2 * len(title) + 1.0, maxy + 12.0 + 6.2)
+
+        def hits(x0, y0, half_w, half_h):
+            """文字框（x0±half_w, y0±half_h）是否压到东西。"""
+            r = (x0 - half_w, y0 - half_h, x0 + half_w, y0 + half_h)
+            blockers = []
+            if table is not None:
+                blockers.append(table)
+            if title_rect is not None:
+                blockers.append(title_rect)
+            for o in blockers:
+                if r[0] < o[2] and r[2] > o[0] and r[1] < o[3] and r[3] > o[1]:
+                    return True
+            for px, py in placed:
+                if abs(x0 - px) < half_w * 2 + 4.0 and abs(y0 - py) < half_h * 2 + 1.0:
+                    return True
+            return False
+
+        def inside_blocks(x0, y0, half_w, half_h):
+            """文字框是否压在任一矿块上（人工图把矿块号放在图外，不遮图面）。"""
+            from shapely.geometry import box as _box
+            r = _box(x0 - half_w, y0 - half_h, x0 + half_w, y0 + half_h)
+            return any(b.polygon is not None and not b.polygon.is_empty
+                       and b.polygon.intersects(r) for b in blocks)
+
         allpts = [pt for b in blocks if b.polygon is not None
                   for pt in b.polygon.convex_hull.exterior.coords]
         gcx = sum(p[0] for p in allpts) / len(allpts)
         gcy = sum(p[1] for p in allpts) / len(allpts)
         placed = []
+        label_maxx = -1e18
         for b in blocks:
             if b.polygon is None:
                 continue
+            # "n号矿块" 4 个字：宽约 4×字高、高约字高
+            hw, hh = 2.2 * LABEL_H_M, 0.6 * LABEL_H_M
             cen = b.polygon.representative_point()
             dx, dy = cen.x - gcx, cen.y - gcy
             if abs(dx) < 1e-6 and abs(dy) < 1e-6:
@@ -414,25 +455,42 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
             L = math.hypot(dx, dy)
             ux, uy = dx / L, dy / L
             d = math.sqrt(b.polygon.area) * 0.9 + 8.0
-            tx, ty = cen.x + ux * d, cen.y + uy * d
-            # 简单避让
-            for _ in range(60):
-                clash = any(abs(tx - px) < 9.0 and abs(ty - py) < 4.0 for px, py in placed)
-                if not clash:
+            # 先按"远离整组矿块质心"的方向放；压到报告图/别的标注就试反向，
+            # 最后再沿垂直方向挪，保证标注重开（用户要求"文字不重合就行"、
+            # "引线必须从本块边界出发"，人工图是把号放在图外一侧的）。
+            tx = ty = None
+            dirs = ((ux, uy), (-uy, ux), (uy, -ux), (-ux, -uy))
+            for relax in (0, 1):               # relax=1 时允许压在矿块上（兜底）
+                for vx, vy in dirs:
+                    for k in range(1, 26):
+                        cx = cen.x + vx * (d + k * 2.0)
+                        cy = cen.y + vy * (d + k * 2.0)
+                        if hits(cx, cy, hw, hh):
+                            continue
+                        if not relax and inside_blocks(cx, cy, hw, hh):
+                            continue
+                        tx, ty = cx, cy
+                        break
+                    if tx is not None:
+                        break
+                if tx is not None:
                     break
-                ty += 4.5
+            if tx is None:
+                tx, ty = cen.x + ux * d, cen.y + uy * d
             placed.append((tx, ty))
+            # 记下标注占到的最东边，报告图插到它右边（不然会互相压）
+            label_maxx = max(label_maxx, tx + hw)
             # 引线起点：本块边界上离文字最近的点
             bx, by = _nearest_on_boundary(b.polygon, tx, ty)
             msp.add_line((bx, by), (tx, ty),
                          dxfattribs={"layer": "0", "color": 7})
             msp.add_mtext("%d号矿块" % b.no,
                           dxfattribs={"layer": "0", "style": "CN_TTF",
-                                      "char_height": 3.0}).set_location((tx, ty))
+                                      "char_height": LABEL_H_M}).set_location((tx, ty))
 
     # 5) 图名
     minx, miny, maxx, maxy = _bounds(holes_all)
-    msp.add_text("%s平台 %s二次圈矿矿块图" % (meta["platform"], meta["date"]),
+    msp.add_text(title,
                  dxfattribs={"layer": "0", "color": 7, "height": 5.0,
                              "style": "CN_TTF"},
                  ).set_placement((minx, maxy + 12))
@@ -446,8 +504,10 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
             idef = doc.add_image_def(filename=str(report_png),
                                      size_in_pixel=(w_px, h_px))
             height_m = width_m * h_px / float(w_px)
+            # 报告图贴在最东边的东西（炮孔/矿块/**矿块号标注**）右侧，避免互相压
+            tbl_x = max(maxx, (label_maxx + 3.0) if label_maxx > -1e17 else maxx) + 5.0
             msp.add_image(image_def=idef,
-                          insert=(maxx + 5.0, maxy - height_m),
+                          insert=(tbl_x, maxy - height_m),
                           size_in_units=(width_m, height_m))
             print("    报告图片已插入:", report_png)
         except Exception as exc:
