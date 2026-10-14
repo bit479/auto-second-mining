@@ -1,6 +1,9 @@
-"""图形界面：选文件 → 定输出 → 一键汇总。
+"""图形界面：两个标签页。
 
-不带命令行参数运行 main.py 会自动打开本界面。
+* **炮孔数据报告汇总** —— 把若干份 3DMine 报告汇总成一份炮孔数据报告；
+* **单日数据并入总表** —— 把某一天的 xls / mdb / 报告 并入 2026 年三份总表。
+
+不带命令行参数运行 main.py 会自动打开本界面；``--tab daily`` 直达第二个标签页。
 """
 
 from __future__ import annotations
@@ -49,13 +52,19 @@ def apply_app_icon(root: tk.Tk) -> None:
 
 FILE_TYPES = [("Excel 文件", "*.xlsx;*.xlsm;*.xls;*.csv"), ("所有文件", "*.*")]
 
+_PAD = {"padx": 8, "pady": 4}
 
-class App:
-    def __init__(self, root: tk.Tk):
-        self.root = root
-        root.title("炮孔数据报告汇总工具")
-        root.geometry("760x560")
-        root.minsize(680, 480)
+
+# ==========================================================================
+# 标签页一：炮孔数据报告汇总
+# ==========================================================================
+
+class ReportTab(ttk.Frame):
+    """选文件 → 定输出 → 一键汇总。"""
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.root = master.winfo_toplevel()
 
         self.files: list[str] = []
         self.output_var = tk.StringVar()
@@ -68,11 +77,8 @@ class App:
     # ---------- 界面 ----------
 
     def _build_ui(self):
-        pad = {"padx": 8, "pady": 4}
-
-        # 输入文件区
-        box = ttk.LabelFrame(self.root, text="输入：3DMine 炮孔数据库报告")
-        box.pack(fill="both", expand=True, **pad)
+        box = ttk.LabelFrame(self, text="输入：3DMine 炮孔数据库报告")
+        box.pack(fill="both", expand=True, **_PAD)
 
         self.listbox = tk.Listbox(box, activestyle="none")
         self.listbox.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=8)
@@ -90,9 +96,8 @@ class App:
                           ("清空", self.clear)):
             ttk.Button(btns, text=text, command=cmd, width=10).pack(pady=3)
 
-        # 输出区
-        out = ttk.LabelFrame(self.root, text="输出")
-        out.pack(fill="x", **pad)
+        out = ttk.LabelFrame(self, text="输出")
+        out.pack(fill="x", **_PAD)
         ttk.Label(out, text="输出文件：").grid(row=0, column=0, sticky="w", padx=8, pady=4)
         ttk.Entry(out, textvariable=self.output_var).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Button(out, text="浏览", command=self.choose_output, width=8).grid(row=0, column=2, padx=8)
@@ -108,14 +113,13 @@ class App:
         ttk.Checkbutton(opts, text="小计/合计写公式",
                         variable=self.formula_var).pack(side="left")
 
-        # 执行区
-        run_bar = ttk.Frame(self.root)
-        run_bar.pack(fill="x", **pad)
+        run_bar = ttk.Frame(self)
+        run_bar.pack(fill="x", **_PAD)
         self.run_btn = ttk.Button(run_bar, text="开始汇总", command=self.run)
         self.run_btn.pack(side="left")
         ttk.Button(run_bar, text="打开输出目录", command=self.open_dir).pack(side="left", padx=8)
 
-        self.log = tk.Text(self.root, height=10, state="disabled")
+        self.log = tk.Text(self, height=9, state="disabled")
         self.log.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
     # ---------- 交互 ----------
@@ -227,11 +231,237 @@ class App:
         messagebox.showinfo("完成", "已生成：\n%s" % payload["output"])
 
 
-def launch() -> int:
+# ==========================================================================
+# 标签页二：单日数据并入总表
+# ==========================================================================
+
+class DailyTab(ttk.Frame):
+    """选单日目录 → 自动识别六个文件 → 一键并入三份总表。"""
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.root = master.winfo_toplevel()
+
+        self.day_var = tk.StringVar()
+        self.master_var = tk.StringVar()
+        self.skip_dup_var = tk.BooleanVar(value=True)
+        self.backup_var = tk.BooleanVar(value=True)
+        self.dry_run_var = tk.BooleanVar(value=False)
+        self.appendix_var = tk.BooleanVar(value=False)
+
+        self.plan = None
+        self._build_ui()
+
+    # ---------- 界面 ----------
+
+    def _build_ui(self):
+        src = ttk.LabelFrame(self, text="单日数据")
+        src.pack(fill="x", **_PAD)
+        ttk.Label(src, text="单日目录：").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(src, textvariable=self.day_var).grid(row=0, column=1, sticky="ew", padx=4)
+        ttk.Button(src, text="浏览", width=8,
+                   command=self.choose_day_dir).grid(row=0, column=2, padx=8)
+
+        ttk.Label(src, text="总表目录：").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(src, textvariable=self.master_var).grid(row=1, column=1, sticky="ew", padx=4)
+        ttk.Button(src, text="浏览", width=8,
+                   command=self.choose_master_dir).grid(row=1, column=2, padx=8)
+        ttk.Label(src, text="（留空则从单日目录自动向上定位）",
+                  foreground="#888888").grid(row=2, column=1, sticky="w", padx=4)
+        src.columnconfigure(1, weight=1)
+
+        pair_box = ttk.LabelFrame(self, text="识别到的文件对")
+        pair_box.pack(fill="both", expand=False, **_PAD)
+        self.tree = ttk.Treeview(pair_box, columns=("kind", "day", "master"),
+                                 show="headings", height=3)
+        for col, text, width in (("kind", "类型", 150), ("day", "单日文件", 300),
+                                 ("master", "总表文件", 300)):
+            self.tree.heading(col, text=text)
+            self.tree.column(col, width=width, anchor="w")
+        self.tree.pack(fill="x", padx=8, pady=8)
+
+        opts = ttk.Frame(self)
+        opts.pack(fill="x", **_PAD)
+        ttk.Checkbutton(opts, text="跳过已存在的工程号",
+                        variable=self.skip_dup_var).pack(side="left", padx=(0, 14))
+        ttk.Checkbutton(opts, text="写入前备份总表",
+                        variable=self.backup_var).pack(side="left", padx=(0, 14))
+        ttk.Checkbutton(opts, text="仅预演（不写盘）",
+                        variable=self.dry_run_var).pack(side="left", padx=(0, 14))
+        ttk.Checkbutton(opts, text="报告连同附录",
+                        variable=self.appendix_var).pack(side="left")
+
+        bar = ttk.Frame(self)
+        bar.pack(fill="x", **_PAD)
+        ttk.Button(bar, text="扫描识别", command=self.scan).pack(side="left")
+        self.run_btn = ttk.Button(bar, text="开始并入", command=self.run)
+        self.run_btn.pack(side="left", padx=8)
+        ttk.Button(bar, text="还原备份", command=self.restore).pack(side="left")
+        ttk.Button(bar, text="打开总表目录", command=self.open_master_dir).pack(side="left", padx=8)
+
+        self.log = tk.Text(self, height=10, state="disabled")
+        self.log.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+    # ---------- 交互 ----------
+
+    def log_line(self, text: str):
+        self.log.configure(state="normal")
+        self.log.insert("end", text + "\n")
+        self.log.see("end")
+        self.log.configure(state="disabled")
+
+    def choose_day_dir(self):
+        d = filedialog.askdirectory(title="选择单日数据目录（如 …\\7、单日数据\\北部山头3940平台-1008）")
+        if d:
+            self.day_var.set(d)
+            self.scan()
+
+    def choose_master_dir(self):
+        d = filedialog.askdirectory(title="选择总表目录（含 1、2、3、三份总表）")
+        if d:
+            self.master_var.set(d)
+            self.scan()
+
+    def _merge_options(self, dry_run=None):
+        from src.daily_merge.pipeline import DailyMergeOptions
+
+        return DailyMergeOptions(
+            day_dir=self.day_var.get().strip() or None,
+            master_dir=self.master_var.get().strip() or None,
+            skip_duplicates=self.skip_dup_var.get(),
+            with_report_appendix=self.appendix_var.get(),
+            backup=self.backup_var.get(),
+            dry_run=self.dry_run_var.get() if dry_run is None else dry_run,
+        )
+
+    def scan(self):
+        from src.daily_merge.pipeline import resolve_plan
+
+        self.tree.delete(*self.tree.get_children())
+        day_dir = self.day_var.get().strip()
+        if not day_dir:
+            self.log_line("[提示] 请先选择单日数据目录")
+            return None
+        try:
+            plan = resolve_plan(self._merge_options())
+        except Exception as exc:  # noqa: BLE001
+            self.log_line("[失败] %s" % exc)
+            self.plan = None
+            return None
+
+        self.plan = plan
+        from src.daily_merge.schema import KIND_LABELS, KINDS
+
+        for kind in KINDS:
+            src, dst = plan.src.get(kind), plan.dst.get(kind)
+            self.tree.insert("", "end", values=(
+                KIND_LABELS[kind],
+                os.path.basename(src) if src else "— 未找到 —",
+                os.path.basename(dst) if dst else "— 未找到 —",
+            ))
+        self.log_line("[识别] 日期代号 %s；总表目录 %s"
+                      % (plan.day_code or "未识别", plan.master_dir or "未定位"))
+        if plan.missing:
+            for item in plan.missing:
+                self.log_line("[缺口] %s" % item)
+        else:
+            self.log_line("[识别] 三对文件齐备 ✓")
+        return plan
+
+    def run(self):
+        from src.daily_merge.pipeline import run
+
+        plan = self.scan()
+        if plan is None or not plan.executable:
+            messagebox.showwarning("提示", "没有找到可执行的文件对，请检查目录。")
+            return
+
+        self.run_btn.configure(state="disabled")
+        options = self._merge_options()
+
+        def work():
+            try:
+                report = run(options)
+            except Exception as exc:  # noqa: BLE001
+                self.root.after(0, lambda: self._done(False, str(exc)))
+                return
+            self.root.after(0, lambda: self._done(True, report))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _done(self, ok, payload):
+        from src.daily_merge.pipeline import summarize
+
+        self.run_btn.configure(state="normal")
+        if not ok:
+            self.log_line("[失败] %s" % payload)
+            messagebox.showerror("并入失败", payload)
+            return
+        for line in summarize(payload):
+            self.log_line(line)
+        if payload["errors"]:
+            messagebox.showwarning("部分失败", "有 %d 类数据未完成，请看日志。" % len(payload["errors"]))
+        else:
+            messagebox.showinfo("完成", "已并入 %d 类数据到总表。" % len(payload["results"]))
+
+    def restore(self):
+        from src.daily_merge.pipeline import restore
+
+        master_dir = self.master_var.get().strip()
+        if not master_dir:
+            master_dir = (self.plan.master_dir if self.plan else "") or ""
+        if not master_dir:
+            messagebox.showwarning("提示", "请先指定总表目录。")
+            return
+        if not messagebox.askyesno("确认还原", "将从 *_并入*.bak 还原三份总表，\n"
+                                              "当前文件会另存为 *_还原前<时间>.bak。\n\n继续？"):
+            return
+        try:
+            done = restore(master_dir, None)
+        except Exception as exc:  # noqa: BLE001
+            self.log_line("[失败] %s" % exc)
+            messagebox.showerror("还原失败", str(exc))
+            return
+        if not done:
+            self.log_line("[提示] 没有找到可用的备份。")
+            return
+        for kind, line in done.items():
+            self.log_line("[还原] %s" % line)
+
+    def open_master_dir(self):
+        path = self.master_var.get().strip() or (self.plan.master_dir if self.plan else "")
+        if path and os.path.isdir(path):
+            os.startfile(path)
+        else:
+            messagebox.showwarning("提示", "还没有可打开的总表目录。")
+
+
+# ==========================================================================
+# 主窗口
+# ==========================================================================
+
+class App:
+    def __init__(self, root: tk.Tk, tab: str = "report"):
+        self.root = root
+        root.title("炮孔数据工具")
+        root.geometry("880x660")
+        root.minsize(760, 560)
+
+        notebook = ttk.Notebook(root)
+        notebook.pack(fill="both", expand=True, padx=6, pady=6)
+
+        self.report_tab = ReportTab(notebook)
+        self.daily_tab = DailyTab(notebook)
+        notebook.add(self.report_tab, text=" 炮孔数据报告汇总 ")
+        notebook.add(self.daily_tab, text=" 单日数据并入总表 ")
+        notebook.select(1 if tab == "daily" else 0)
+
+
+def launch(tab: str = "report") -> int:
     set_app_user_model_id()      # 必须在 Tk() 之前，否则任务栏仍显示 python 图标
     root = tk.Tk()
     set_window_icon(root)
-    App(root)
+    App(root, tab=tab)
     root.mainloop()
     return 0
 

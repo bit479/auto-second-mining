@@ -344,9 +344,10 @@ class App:
         """拿一张人工圈矿图，自动标出该炮区的"外推距离 + 左右链"并写进参数。"""
         if self.busy:
             return
+        plat = self.var_platform.get().strip()
         date = self.var_date.get().strip()
-        if not date:
-            messagebox.showwarning("缺少参数", "先填/选日期（炮区号，如 1008）。")
+        if not (plat and date):
+            messagebox.showwarning("缺少参数", "平台号和日期都要填（如 3940 / 1008）。")
             return
         dwg = filedialog.askopenfilename(
             title="选择该炮区的人工圈矿图 DWG",
@@ -356,13 +357,16 @@ class App:
             return
         self.set_busy(True)
         self.log.delete("1.0", "end")
-        self.log_line("标定炮区 %s，人工图 %s" % (date, dwg))
+        self.log_line("标定炮区 %s-%s，人工图 %s" % (plat, date, dwg))
         self.log_line("-" * 68)
 
         def job():
             ok = True
             try:
-                p = subprocess.Popen([PY, "-X", "utf8", str(CALIBRATE), date, dwg, "--write"],
+                # 原来没传 --platform，calibrate 会默认按 3940 找数据库/写参数
+                # （3960 的炮区就会标错平台）；现在按界面上的平台号传进去
+                p = subprocess.Popen([PY, "-X", "utf8", str(CALIBRATE), date, dwg,
+                                      "--platform", plat, "--write"],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                      text=True, encoding="utf-8", errors="replace",
                                      creationflags=CREATE_NO_WINDOW)
