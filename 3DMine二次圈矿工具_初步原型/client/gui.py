@@ -29,6 +29,10 @@ RUN_BATCH = CORE / "run_batch.py"
 MERGE_COMP = CORE / "merge_to_composite.py"
 CALIBRATE = CORE / "calibrate.py"
 APPLY_MERGE = CORE / "apply_merge.py"
+PROBE = ROOT / "_probe"
+PARAMS_REPORT = PROBE / "params_report.py"
+ACCEPT_ALL = PROBE / "accept_all.py"
+ACCEPT_REPORT = ROOT / "验收报告.md"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -146,6 +150,20 @@ class App:
         self.var_merge = tk.BooleanVar(value=True)
         tk.Checkbutton(btn, text="圈完顺手并入综合图副本（出预览）",
                        variable=self.var_merge).pack(side="left", padx=6)
+
+        # ---- 自查（参数台账 / 一键验收）----
+        diag = tk.Frame(root)
+        diag.pack(fill="x", padx=10, pady=(0, 4))
+        tk.Button(diag, text="查看参数台账", command=self.start_params_report,
+                  padx=10).pack(side="left")
+        tk.Button(diag, text="跑一键验收（全量，约 3 分钟）",
+                  command=lambda: self.start_accept(False), padx=10).pack(side="left", padx=8)
+        tk.Button(diag, text="快检（只挑代表炮区）",
+                  command=lambda: self.start_accept(True), padx=10).pack(side="left", padx=4)
+        self.btn_report = tk.Button(diag, text="打开验收报告",
+                                    command=self.open_accept_report, state="disabled",
+                                    padx=10)
+        self.btn_report.pack(side="left", padx=8)
 
         # ---- 日志 ----
         tk.Label(root, text="运行日志：", anchor="w").pack(fill="x", padx=10)
@@ -285,6 +303,62 @@ class App:
                 os.startfile(d)
             except Exception:
                 subprocess.Popen(["explorer", d])
+
+    # ---------- 自查：参数台账 / 一键验收 ----------
+    def _run_stream(self, name, cmd, on_done=None):
+        """跑一个子进程，把输出**流式**打到日志区（台账、验收这类自查都用它）。"""
+        self.set_busy(True)
+        self.log.delete("1.0", "end")
+        self.log_line("== %s ==" % name)
+        self.log_line("-" * 68)
+
+        def job():
+            ok = True
+            try:
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace",
+                                     creationflags=CREATE_NO_WINDOW)
+                for line in p.stdout:
+                    self.log_line(line.rstrip())
+                p.wait(timeout=7200)
+                ok = (p.returncode == 0)
+            except Exception as ex:
+                self.log_line("[异常] %s" % ex)
+                ok = False
+            if on_done:
+                on_done(ok)
+            self.set_busy(False)
+
+        threading.Thread(target=job, daemon=True).start()
+
+    def start_params_report(self):
+        """参数台账：谁覆盖了什么、值多少、依据是什么（只看日志，不动参数）。"""
+        if self.busy:
+            return
+        plat = self.var_platform.get().strip()
+        cmd = [PY, "-X", "utf8", str(PARAMS_REPORT)] + ([plat] if plat else [])
+        self._run_stream("参数台账（params_report.py）", cmd)
+
+    def start_accept(self, quick: bool):
+        """一键验收：圈矿闸门 + 报告口径 + 成果图实体自检 + 精确模式自检。"""
+        if self.busy:
+            return
+        cmd = [PY, "-X", "utf8", str(ACCEPT_ALL)] + (["--quick"] if quick else [])
+
+        def done(ok):
+            self.var_res.set("一键验收：%s\n报告：%s" %
+                             ("通过 ✓" if ok else "**有未通过项**，见日志", ACCEPT_REPORT))
+            self.btn_report.config(state="normal")
+
+        self._run_stream("一键验收（accept_all.py%s）" % ("，快检" if quick else "，全量"),
+                         cmd, done)
+
+    def open_accept_report(self):
+        if ACCEPT_REPORT.exists():
+            try:
+                os.startfile(str(ACCEPT_REPORT))
+            except Exception:
+                pass
 
     def set_busy(self, busy):
         self.busy = busy
