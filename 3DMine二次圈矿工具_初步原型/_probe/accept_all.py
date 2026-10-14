@@ -160,6 +160,13 @@ head = ["# 验收报告（自动生成）", "",
 for name, ok, rc in results:
     head.append("| %s | %s |" % (name, "通过" if ok else "没通过（退出码 %s）" % rc))
 head += ["", "---", "", "```text"]
-(ROOT / "验收报告.md").write_text("\n".join(head + logbuf + ["```"]) + "\n", encoding="utf-8")
-print("\n报告已写入：%s" % (ROOT / "验收报告.md"))
+report = ROOT / "验收报告.md"
+report.write_text("\n".join(head + logbuf + ["```"]) + "\n", encoding="utf-8")
+print("\n报告已写入：%s" % report)
+if "--open" in sys.argv and "--no-open" not in sys.argv:   # 给 .bat 用：跑完直接把报告打开
+    try:
+        import os
+        os.startfile(str(report))
+    except Exception as exc:
+        print("（打开报告失败：%s）" % exc)
 sys.exit(1 if bad else 0)
