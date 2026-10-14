@@ -53,8 +53,9 @@ def find_dxf(plat, date, arg):
             if p.exists():
                 return p
     out = ROOT / "sample_data" / "output" / ("对账_%s" % date)
-    xls = sorted((DAY / ("北部山头%s平台2026" % plat) / "7、单日数据" /
-                  ("北部山头%s平台-%s" % (plat, date))).glob("1、*.xls"))
+    import baseline as _bl
+    folder = _bl.blast_dir(plat, date)
+    xls = sorted(folder.glob("1、*.xls")) if folder else []
     comp = sorted((DAY / ("北部山头%s平台2026" % plat)).glob("*综合*.dwg"))
     if not xls or not comp:
         return None
@@ -78,8 +79,9 @@ def main():
     from oreblocks import load_holes_xls
     doc = ezdxf.readfile(str(dxf))
     msp = doc.modelspace()
-    xls = sorted((DAY / ("北部山头%s平台2026" % plat) / "7、单日数据" /
-                  ("北部山头%s平台-%s" % (plat, date))).glob("1、*.xls"))[0]
+    import baseline as _bl
+    folder = _bl.blast_dir(plat, date)
+    xls = sorted(folder.glob("1、*.xls"))[0]
     holes = list(load_holes_xls(xls).values())
     bad = []
 

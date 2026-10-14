@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 """一键验收（改完代码跑这一条就够）：
 
-  python accept_all.py            # 缺省 3940 3960
-  python accept_all.py 3940       # 只跑 3940
+  python accept_all.py                # 缺省 3940 3960，全炮区
+  python accept_all.py 3940           # 只跑 3940
+  python accept_all.py --quick        # 成果图自检只挑代表炮区（快）
 
-三件事：
+四件事：
   ① 圈矿验收闸门（`selftest.py`，两档：常规 / 严格）
   ② 报告口径回归（`report_check_all.py`，版式 + 每块自洽 + 合计对账）
-  ③ 成果图实体自检（`dxf_check.py`：十字/引线/工程号/品位/方格/矿块号/报告图 逐项验）
+  ③ 成果图实体自检（`dxf_check.py`，图上要素逐条验；全炮区，--quick 时只挑代表）
   ④ 精确模式自检（用人工导出的四段 .3ds 拼矿界，与人工 1008 图求 IoU）
 
-退出码 0 = 全过；1 = 有退化。每一步的输出原样打出来（不吞日志）。
+跑完把全过程写进 `验收报告.md`（覆盖），退出码 0 = 全过。
 """
 from __future__ import annotations
+import datetime as _dt
 import json
 import subprocess
 import sys
@@ -26,21 +28,44 @@ try:
 except Exception:
     pass
 
+QUICK = "--quick" in sys.argv
 PLATS = [a for a in sys.argv[1:] if not a.startswith("-")] or ["3940", "3960"]
-results = []
+QUICK_CASES = {"3940": ["1004", "0915"], "3960": ["0919", "0908"]}
+results, logbuf = [], []
 
 
-def run(name, args, ok_when=None):
-    print("")
-    print("=" * 78)
-    print("== %s" % name)
-    print("=" * 78)
+def emit(s=""):
+    print(s)
+    logbuf.append(s)
+
+
+def run(name, args, gate: bool = True):
+    emit("")
+    emit("=" * 78)
+    emit("== %s" % name)
+    emit("=" * 78)
     p = subprocess.run([sys.executable, "-X", "utf8"] + [str(a) for a in args],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    out = (p.stdout or "") + (p.stderr or "")
-    print(out.rstrip())
-    ok = (p.returncode == 0) if ok_when is None else ok_when(p.returncode, out)
-    results.append((name, ok, p.returncode))
+    out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+    emit(out)
+    ok = p.returncode == 0
+    if gate:
+        results.append((name, ok, p.returncode))
+    else:
+        emit("（这一项只作参考，不计入结论：%s）" % ("数字对得上" if ok else "有出入，见上"))
+    return out
+
+
+def scan_dates(plat):
+    """该平台有"人工图扫描"的炮区号（＝闸门覆盖的那些）。"""
+    import baseline as _bl
+    day = ROOT.parent / ("北部山头%s平台2026" % plat)
+    out = []
+    for d in sorted(x for x in (day / "7、单日数据").iterdir() if x.is_dir()):
+        from run_batch import parse_folder
+        date = parse_folder(d.name)[1]
+        if date and _bl.scan_path(plat, date).exists():
+            out.append(date)
     return out
 
 
@@ -76,38 +101,65 @@ def check_exact():
 run("① 圈矿验收闸门（selftest.py，两档）", [PROBE / "selftest.py"] + PLATS)
 if "3940" in PLATS:
     run("② 报告口径回归（report_check_all.py）", [PROBE / "report_check_all.py", "3940"])
-# ③ 成果图实体自检：各平台挑两个代表炮区（单块的和多块的）
-DXF_CASES = {"3940": ["1004", "0915"], "3960": ["0919", "0908"]}
-dxf_cases = [(p, d) for p in PLATS for d in DXF_CASES.get(p, [])]
-if dxf_cases:
-    for p, d in dxf_cases:
-        run("%s %s 成果图实体自检（dxf_check.py）" % (p, d),
-            [PROBE / "dxf_check.py", p, d, "--fresh"])
-    results.append(("③ 成果图实体自检（%d 个炮区）" % len(dxf_cases),
-                    all(ok for n, ok, _ in results if n.endswith("成果图实体自检（dxf_check.py）")), 0))
-print("")
-print("=" * 78)
-print("== ④ 精确模式自检（人工四段 .3ds 拼矿界）")
-print("=" * 78)
+if "3960" in PLATS:
+    # 3960 的人工报告与人工图本身对不上（用户 2026-10-13 定"以图为准"），
+    # 所以这一档只打印参考、不作为闸门。
+    run("② 报告口径回归（3960，仅参考：该平台人工报告与人工图对不上，口径以图为准）",
+        [PROBE / "report_check_all.py", "3960"], gate=False)
+
+cases = []
+for p in PLATS:
+    ds = scan_dates(p)
+    cases += [(p, d) for d in (QUICK_CASES.get(p, []) if QUICK else ds)]
+if cases:
+    for p, d in cases:
+        run("③ 成果图实体自检 %s-%s" % (p, d), [PROBE / "dxf_check.py", p, d, "--fresh"])
+    ok3 = all(ok for n, ok, _ in results if n.startswith("③ "))
+    results.append(("③ 成果图实体自检（%d 个炮区%s）" % (len(cases), "，快检" if QUICK else "，全量"),
+                    ok3, 0 if ok3 else 1))
+
+emit("")
+emit("=" * 78)
+emit("== ④ 精确模式自检（人工四段 .3ds 拼矿界）")
+emit("=" * 78)
 try:
-    ok3, msg3 = check_exact()
-    print(msg3)
-    if ok3 is not None:
-        results.append(("④ 精确模式自检", ok3, 0 if ok3 else 1))
+    ok4, msg4 = check_exact()
+    emit(msg4)
+    if ok4 is not None:
+        results.append(("④ 精确模式自检", ok4, 0 if ok4 else 1))
 except Exception as exc:
-    print("自检异常：%s" % exc)
+    emit("自检异常：%s" % exc)
     results.append(("④ 精确模式自检", False, 1))
 
-print("")
-print("=" * 78)
-print("== 汇总")
-print("=" * 78)
+emit("")
+emit("=" * 78)
+emit("== 汇总")
+emit("=" * 78)
 for name, ok, rc in results:
-    print("  %-40s %s%s" % (name, "通过" if ok else "**没通过**",
-                            "" if ok else "（退出码 %s）" % rc))
+    emit("  %-44s %s%s" % (name, "通过" if ok else "**没通过**",
+                           "" if ok else "（退出码 %s）" % rc))
 bad = [r for r in results if not r[1]]
-print("")
-if bad:
-    print("结论：有 %d 项没通过：%s" % (len(bad), "、".join(b[0] for b in bad)))
-    sys.exit(1)
-print("结论：一键验收全部通过 ✓")
+emit("")
+emit("结论：%s" % ("全部通过 ✓" if not bad else
+                  "有 %d 项没通过：%s" % (len(bad), "、".join(b[0] for b in bad))))
+
+# 落一份报告
+def git_head():
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(ROOT),
+                              capture_output=True, text=True).stdout.strip()
+    except Exception:
+        return ""
+
+head = ["# 验收报告（自动生成）", "",
+        "- 时间：%s" % _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "- 代码版本：`%s`" % git_head(),
+        "- 平台：%s  模式：%s" % ("、".join(PLATS), "快检" if QUICK else "全量"),
+        "- 结论：**%s**" % ("全部通过 ✓" if not bad else "有 %d 项没通过" % len(bad)),
+        "", "| 项 | 结果 |", "|---|---|"]
+for name, ok, rc in results:
+    head.append("| %s | %s |" % (name, "通过" if ok else "没通过（退出码 %s）" % rc))
+head += ["", "---", "", "```text"]
+(ROOT / "验收报告.md").write_text("\n".join(head + logbuf + ["```"]) + "\n", encoding="utf-8")
+print("\n报告已写入：%s" % (ROOT / "验收报告.md"))
+sys.exit(1 if bad else 0)

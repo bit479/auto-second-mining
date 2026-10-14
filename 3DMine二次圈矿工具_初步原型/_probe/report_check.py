@@ -46,8 +46,9 @@ def main():
         # 没有现成报告就自己跑一遍（这才是"每次改代码都能盯住报告口径"的用法）
         import subprocess
         out = ROOT / "sample_data" / "output" / ("对账_%s" % date)
-        xls = next(iter(sorted((DAY / ("北部山头%s平台2026" % plat) / "7、单日数据" /
-                                ("北部山头%s平台-%s" % (plat, date))).glob("1、*.xls"))), None)
+        import baseline as _bl
+        folder = _bl.blast_dir(plat, date)
+        xls = next(iter(sorted(folder.glob("1、*.xls"))), None) if folder else None
         comp = next(iter(sorted((DAY / ("北部山头%s平台2026" % plat)).glob("*综合*.dwg"))), None)
         if xls is None or comp is None:
             print("找不到数据库或综合图，无法生成报告。")
@@ -57,8 +58,10 @@ def main():
                         str(xls), plat, date, str(out), str(comp)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, check=False)
         ours = out / ("%s平台 %s炮孔数据报告.xlsx" % (plat, date))
-    man = DAY / ("北部山头%s平台2026" % plat) / "7、单日数据" / \
-        ("北部山头%s平台-%s" % (plat, date)) / ("%s平台 %s炮孔数据报告.xlsx" % (plat, date))
+    import baseline as _bl
+    folder = _bl.blast_dir(plat, date)
+    man = (folder / ("%s平台 %s炮孔数据报告.xlsx" % (plat, date))) if folder else \
+        (DAY / ("北部山头%s平台2026" % plat) / "7、单日数据" / "（找不到该炮区目录）")
     if ours is None or not ours.exists():
         print("我们的报告不存在（生成失败）")
         return 2

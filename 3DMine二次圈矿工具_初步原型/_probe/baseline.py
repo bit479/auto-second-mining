@@ -26,6 +26,24 @@ def scan_path(platform: str, date: str) -> Path:
     return PROBE / ("manual_%s-%s_c.json" % (platform, date))
 
 
+def blast_dir(platform: str, date: str):
+    """按"解析出来的炮区号"找单日文件夹。
+
+    不能简单拼 `北部山头<平台>平台-<日期>`：像 "北部山头3960平台-0922 - 2"
+    （同一天第二批，炮区号是 0922-2）就拼不出来。返回 None 表示没找到。
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(PROBE.parent / "core"))
+    from run_batch import parse_folder
+    day = PROBE.parent.parent / ("北部山头%s平台2026" % platform) / "7、单日数据"
+    if not day.exists():
+        return None
+    for d in sorted(x for x in day.iterdir() if x.is_dir()):
+        if parse_folder(d.name)[1] == str(date):
+            return d
+    return None
+
+
 def is_block(poly, layer: str, holes=None) -> bool:
     """人工图里哪些折线算"矿块"。
 
