@@ -28,7 +28,7 @@ HID_TRUE_COLOR = 0x004C4C   # 工程号/十字 真彩色 RGB(0,76,76)（用户�
 CROSS_HALF = 0.5         # 十字半臂长(m)：用户指定十字总长 1.0 m
 TRAIL_LEN = 1.2          # 轨迹线长度(m)：人工图实测 1.2 m
 GRID_RULE = "center"     # 方格取舍：只保留格心落在矿界内的格（与人工图一致）
-LABEL_H_M = 5.0          # 矿块号文字高度(m)：人工图实测 char_height=5.0（原来是 3.0）
+LABEL_H_M = 3.0          # 矿块号文字高度(m)：用户 2026-10-14 定"字号还是用 3.0"
 
 
 def level_id_of(grade: float):

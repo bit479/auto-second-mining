@@ -16,7 +16,7 @@ import math
 
 from oreblocks import load_holes_xls
 from strip import (LAST_RING, average_blocks, block_of_cluster, class_clusters,
-                   isolated_ring, zone_outline)
+                   isolated_ring, join_to_composite, zone_outline)
 
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
@@ -61,6 +61,7 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
             pending.append(g)
 
     blocks, rings, warns = [], [], []
+    seam = float(P.get("seam_join_m", 0.0) or 0.0)
     # ---- 分块模式 ----
     # "clusters"（3960 用）：**每个"同档+相邻"的孔簇各取自己的领地当矿界**，
     #   簇与簇之间留空白——3960 人工图就是这种一段段互不相连的窄条带。
@@ -79,6 +80,7 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                          method="hull")
                 if ring is None or ring.is_empty:
                     continue
+                ring = join_to_composite(ring, comp_blocks, seam)
                 rings.append(ring)
                 warns += list(LAST_RING.get("warn") or [])
                 # 一个簇 = 一块（不再簇内二次分组）
@@ -110,6 +112,7 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                 end_pair_beyond=P.get("end_pair_beyond", True))
         if ring is None:
             continue
+        ring = join_to_composite(ring, comp_blocks, seam)
         rings.append(ring)
         warns += list(LAST_RING.get("warn") or [])
         blocks += average_blocks(zn, ring, P.get("density_ore", 2.7),

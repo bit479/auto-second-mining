@@ -781,6 +781,42 @@ def _voronoi_cells(ore, clip: Polygon):
     return _cells_within(ore, clip)
 
 
+def join_to_composite(ring, comp_blocks, gap: float = 0.5):
+    """把"贴着综合图历史矿块"的那条窄边吸收进来（用户规则：能并在一起就并在一起）。
+
+    只吸收**本来就贴着**的部分：历史矿块在矿界外侧、且两条边界的间距 ≤ gap。
+    离得远的历史矿块（> gap）一点不动——那属于用户说的"不能并在一起"。
+    这样等于把矿界在那一段**改走历史矿块的边界**（人工图北缘就是这么画的：
+    0915 的北边界压在 1003 那块 626.9 m² 的边上，比外推 3 m 再往外 1.5~2 m）。
+    吸收进来的面积照常参与算量（用户 2026-10-14：体积必须与自己实际圈的矿一致）。
+    """
+    if ring is None or ring.is_empty or not comp_blocks or gap <= 0:
+        return ring
+    collar = ring.buffer(gap, join_style="mitre").difference(ring)
+    parts = []
+    for item in comp_blocks:
+        blk = item[2] if isinstance(item, (tuple, list)) and len(item) >= 3 else item
+        if blk is None or blk.is_empty:
+            continue
+        if blk.distance(ring) > gap:
+            continue
+        part = blk.difference(ring).intersection(collar)
+        if part.is_empty:
+            continue
+        parts.append(part)
+    if not parts:
+        return ring
+    out = _safe_union([ring] + parts)
+    if out is None or out.is_empty:
+        return ring
+    if out.geom_type == "MultiPolygon":
+        d = gap + 0.1
+        closed = out.buffer(d, join_style="mitre").buffer(-d, join_style="mitre")
+        if not closed.is_empty:
+            out = closed
+    return out
+
+
 def _cells_within(holes_sub, clip: Polygon):
     """只给 holes_sub 这一组孔做 Voronoi，再裁剪到 clip（块内 Voronoi）。"""
     if not holes_sub or clip is None or clip.is_empty:
