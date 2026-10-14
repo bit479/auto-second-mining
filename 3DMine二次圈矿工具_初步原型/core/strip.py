@@ -781,6 +781,81 @@ def _voronoi_cells(ore, clip: Polygon):
     return _cells_within(ore, clip)
 
 
+def read_3ds_polylines(path):
+    """读 3DMine 导出的 .3ds 字符串文件，返回若干条折线的 (E, N) 坐标表。
+
+    文件里顶点行形如 `1,<N>,<E>,<Z>,[附加属性...]`；表头行也是 `1,7,0,1.00,...`
+    开头（早期版本把它当顶点会多出一个 (0,7) 假点），所以这里要求第 2、3 段
+    解析成"像坐标"的数（量级 ≥ 1e4）才算顶点。
+    """
+    from pathlib import Path
+    txt = Path(path).read_bytes().decode("gbk", "replace")
+    out, cur = [], []
+    for line in txt.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        parts = [x.strip() for x in s.split(",")]
+        if parts and parts[0] == "1" and len(parts) >= 4:
+            try:
+                n = float(parts[1])
+                e = float(parts[2])
+            except ValueError:
+                n = e = 0.0
+            if abs(n) >= 1e4 and abs(e) >= 1e4:
+                cur.append((e, n))                  # X = E, Y = N
+                continue
+        if cur:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return [c for c in out if len(c) >= 2]
+
+
+def ring_from_outline_files(paths, tol: float = 0.35):
+    """精确模式：把人工在 3DMine 里画好的几段线拼成一个闭合矿界。
+
+    用户 2026-10-08 就是这么给 1008 的（左边界已外推 / 与综合图边界 /
+    右边界已外推 / 右上边界），拼接顺序按"端点最近"自动串起来（首尾相接），
+    不需要人工排序；串好后若首尾不重合，再回到起点闭合。
+    """
+    segs = []
+    for p in paths:
+        segs += [list(map(tuple, s)) for s in read_3ds_polylines(p)]
+    if not segs:
+        return None
+    if len(segs) == 1:
+        pts = segs[0]
+        if math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) > 0.01:
+            pts = pts + [pts[0]]
+        poly = Polygon(pts).buffer(0)
+        return poly if not poly.is_empty else None
+    # 贪心串线：每次找端点离当前末端最近的一段（两端都试）
+    cur = list(segs.pop(0))
+    while segs:
+        best = None
+        for i, s in enumerate(segs):
+            for rev in (False, True):
+                pts = list(reversed(s)) if rev else list(s)
+                d = math.hypot(pts[0][0] - cur[-1][0], pts[0][1] - cur[-1][1])
+                if best is None or d < best[0]:
+                    best = (d, i, rev, pts)
+        d, i, rev, pts = best
+        if d > max(tol, 5.0):
+            break
+        segs.pop(i)
+        cur += pts[1:] if d < 1e-9 else pts
+    if math.hypot(cur[0][0] - cur[-1][0], cur[0][1] - cur[-1][1]) > 0.01:
+        cur.append(cur[0])
+    poly = Polygon(cur).buffer(0)
+    if poly.is_empty:
+        return None
+    if poly.geom_type == "MultiPolygon":
+        poly = max(poly.geoms, key=lambda g: g.area)
+    return poly
+
+
 def join_to_composite(ring, comp_blocks, gap: float = 0.5):
     """把"贴着综合图历史矿块"的那条窄边吸收进来（用户规则：能并在一起就并在一起）。
 

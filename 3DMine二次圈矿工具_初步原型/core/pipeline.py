@@ -16,7 +16,8 @@ import math
 
 from oreblocks import load_holes_xls
 from strip import (LAST_RING, average_blocks, block_of_cluster, class_clusters,
-                   isolated_ring, join_to_composite, zone_outline)
+                   isolated_ring, join_to_composite, ring_from_outline_files,
+                   zone_outline)
 
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
@@ -99,6 +100,13 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
         if zi > 0:
             # 孤立小组：用"领地 + 凸包外扩上限"这条规则（邻孔分界线天然挡住）
             ring = isolated_ring(zn, allh, P["extrude_m"], P["simplify_m"])
+        elif P.get("outline_files"):
+            # 精确模式：直接拿人工在 3DMine 里画好的几段线拼出来的矿界
+            ring = ring_from_outline_files(P["outline_files"])
+            if ring is None:
+                ring = zone_outline(zn, allh, P["extrude_m"], comp_blocks=comp_blocks,
+                                    merge_gap=P["merge_gap_m"], blast=blast,
+                                    simplify=P["simplify_m"])
         else:
             ring = zone_outline(zn, allh, P["extrude_m"], comp_blocks=comp_blocks,
                                 merge_gap=P["merge_gap_m"], blast=blast,

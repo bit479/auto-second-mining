@@ -2,7 +2,14 @@
 """验收自检（回归闸门，多平台）：拿人工图/人工报告当基准，打印自动结果的差距。
 
 用法: python selftest.py [平台号 ...]      # 缺省跑 3940 和 3960
+      python selftest.py --strict-only 3940  # 只看严格档
   退出码 0 = 全部达标；1 = 有指标退化（改代码前后各跑一次）
+
+两档对账（用户 2026-10-14 要求加严格档）：
+  ① 常规档：综合图里含"当日本身已经圈过的块"时也照样贴——就是现在生产用的跑法。
+  ② **严格档**：把综合图里与人工图某块几乎重合（IoU ≥ 0.9）的那些块**排掉**再跑，
+     模拟"新的一炮、当天的块还没进综合图"的真实场景。严格档只报数、不设闸门
+     （它的分数天然低——3940/3960 的综合图里都混着当日的块）。
 
 达标线：
   3940-1008：矿界 IoU ≥ 0.90 且体积差 ≤ ±5%   （已验收的基线）
@@ -43,10 +50,11 @@ LIMIT = {"3940-1008": (0.90, 0.05), "3940-0922": (0.60, 0.10)}
 DEFAULT_LIMIT = {"3940": (0.75, 0.20), "3960": (0.35, 0.30)}
 
 
-def manual_poly(platform: str, date: str, holes=None):
+def manual_blocks(platform: str, date: str, holes=None):
+    """人工图里算作"矿块"的折线（列表）。"""
     f = _bl.scan_path(platform, date)
     if not f.exists():
-        return None
+        return []
     j = json.loads(f.read_text(encoding="utf-8"))
     polys = []
     for p in j["polylines"]:
@@ -55,7 +63,34 @@ def manual_poly(platform: str, date: str, holes=None):
         poly = Polygon(p["pts"]).buffer(0)
         if _bl.is_block(poly, p["layer"], holes):
             polys.append(poly)
+    return polys
+
+
+def manual_poly(platform: str, date: str, holes=None):
+    polys = manual_blocks(platform, date, holes)
     return unary_union(polys) if polys else None
+
+
+def strip_own_blocks(comp, man_blocks, tol: float = 0.9):
+    """严格档用：把综合图里"与人工图某块几乎重合"的历史块排掉。
+
+    那些块就是**当日本身**已经被并进综合图的副本（0915 那 7 块、0919 那块 374.6
+    都是顶点级一致），拿它来对账等于自己跟自己贴。返回 (保留的块, 排掉几个)。
+    """
+    keep, dropped = [], 0
+    for item in comp:
+        blk = item[2] if isinstance(item, (tuple, list)) and len(item) >= 3 else item
+        dup = False
+        for m in man_blocks:
+            u = blk.union(m).area
+            if u > 0 and blk.intersection(m).area / u >= tol:
+                dup = True
+                break
+        if dup:
+            dropped += 1
+        else:
+            keep.append(item)
+    return keep, dropped
 
 
 def composite_of(plat_dir: Path):
@@ -72,7 +107,8 @@ def main() -> None:
     except Exception:
         pass
     want = [a for a in sys.argv[1:] if not a.startswith("-")] or list(PLATFORMS)
-    bad, rows = [], []
+    strict_only = "--strict-only" in sys.argv
+    bad, rows, srows = [], [], []
     for plat in want:
         plat_dir = PLATFORMS.get(plat)
         if plat_dir is None or not plat_dir.exists():
@@ -87,44 +123,72 @@ def main() -> None:
             date = folder.name.split("-")[-1].strip()
             xls = (sorted(folder.glob("1、*.xls")) or sorted(folder.glob("*.xls")))[0]
             holes = load_holes_xls(xls)
-            man = manual_poly(plat, date, list(holes.values()))
+            mblocks = manual_blocks(plat, date, list(holes.values()))
+            man = unary_union(mblocks) if mblocks else None
             if man is None:
                 continue        # 这个炮区还没有人工图扫描，不纳入闸门
             P = _params.for_blast(date, platform=plat)
-            try:
-                res = run_blast(holes, list(holes.values()), P, comp, blast=date)
-            except Exception as exc:
-                rows.append(("%s-%s" % (plat, date), "-", "-", "-", "算失败：%s" % exc, False))
+
+            def evaluate(comp_used):
+                try:
+                    r = run_blast(holes, list(holes.values()), P, comp_used, blast=date)
+                except Exception as exc:
+                    return None, "算失败：%s" % exc
+                if not r["rings"]:
+                    return None, "没算出矿界"
+                rg = r["rings"][0]
+                for rr in r["rings"][1:]:
+                    rg = rg.union(rr)
+                iou = rg.intersection(man).area / rg.union(man).area
+                tv = sum(b.volume_m3 for b in r["blocks"])
+                mv, src = _bl.volume_for_gate(plat, date, man, r["ore"])
+                if mv is None:
+                    return None, "无基准"
+                out = [h.short for h in r["ore"] if not rg.contains(Point(h.x, h.y))]
+                warn = list(r.get("warn") or [])
+                note = ("基准:%s  " % src) + (("环外孔" + ",".join(out)) if out else
+                                             ("自检修补:%s" % "；".join(warn) if warn else "OK"))
+                return (iou, len(r["blocks"]), tv, mv, note), None
+
+            got, err = evaluate(comp)
+            if got is None:
+                rows.append(("%s-%s" % (plat, date), "-", "-", "-", err, False))
                 continue
-            if not res["rings"]:
-                rows.append(("%s-%s" % (plat, date), "-", "-", "-", "没算出矿界", False))
-                continue
-            ring = res["rings"][0]
-            for rr in res["rings"][1:]:
-                ring = ring.union(rr)
-            iou = ring.intersection(man).area / ring.union(man).area
-            tv = sum(b.volume_m3 for b in res["blocks"])
-            mv, src = _bl.volume_for_gate(plat, date, man, res["ore"])
-            if mv is None:
-                continue
+            iou, nb, tv, mv, note = got
             dev = (tv - mv) / mv
-            out = [h.short for h in res["ore"] if not ring.contains(Point(h.x, h.y))]
-            warn = list(res.get("warn") or [])
-            note = ("基准:%s  " % src) + (("环外孔" + ",".join(out)) if out else \
-                ("自检修补:%s" % "；".join(warn) if warn else "OK")
-                )
             li, ld = LIMIT.get("%s-%s" % (plat, date),
                                DEFAULT_LIMIT.get(plat, (0.70, 0.30)))
             ok = iou >= li and abs(dev) <= ld
             if not ok:
                 bad.append("%s-%s" % (plat, date))
-            rows.append(("%s-%s" % (plat, date), "%.3f" % iou, "%d" % len(res["blocks"]),
+            rows.append(("%s-%s" % (plat, date), "%.3f" % iou, "%d" % nb,
                          "%9.1f / %9.1f (%+6.1f%%)" % (tv, mv, dev * 100), note, ok))
-    print("%-12s %-7s %-5s %-28s %s" % ("炮区", "矿界IoU", "块数", "体积(自动/人工)", "备注"))
-    for r in rows:
-        print("%-12s %-7s %-5s %-28s %s%s" % (r[0], r[1], r[2], r[3], r[4],
-                                              "" if r[5] else "   ← 未达标"))
-    print()
+            # 严格档：排掉当日本身已进综合图的块再跑一遍
+            comp2, ndrop = strip_own_blocks(comp, mblocks)
+            got2, err2 = evaluate(comp2)
+            if got2 is None:
+                srows.append(("%s-%s" % (plat, date), "-", "-", "-",
+                              "%s（排掉 %d 块）" % (err2, ndrop)))
+            else:
+                iou2, nb2, tv2, mv2, _ = got2
+                srows.append(("%s-%s" % (plat, date), "%.3f" % iou2, "%d" % nb2,
+                              "%9.1f / %9.1f (%+6.1f%%)" % (tv2, mv2, 100 * (tv2 - mv2) / mv2),
+                              "排掉当日本身 %d 块（人工图 %d 块）" % (ndrop, len(mblocks))))
+
+    def dump(title, data, mark_bad):
+        print(title)
+        print("%-12s %-7s %-5s %-28s %s" % ("炮区", "矿界IoU", "块数", "体积(自动/人工)", "备注"))
+        for r in data:
+            print("%-12s %-7s %-5s %-28s %s%s" % (r[0], r[1], r[2], r[3], r[4],
+                                                  "" if (len(r) < 6 or r[5] or not mark_bad)
+                                                  else "   ← 未达标"))
+        print()
+
+    if not strict_only:
+        dump("【常规档】综合图里含当日本身的块也照样贴（生产跑法）", rows, True)
+    if srows:
+        dump("【严格档】把综合图里与人工图某块重合的「当日本身块」排掉（＝新炮区场景，只报数不设闸门）",
+             srows, False)
     if bad:
         print("未达标：%s" % "、".join(bad))
         sys.exit(1)
