@@ -47,7 +47,7 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title("二次圈矿工具客户端")
-        root.geometry("900x680")
+        root.geometry("940x740")
         root.minsize(760, 560)
 
         # ---- 输入 ----
@@ -94,28 +94,29 @@ class App:
                 ("min_fragment_m2", "最小块段(m²)"), ("merge_gap_m", "接综合图(m)"),
                 ("seam_join_m", "贴合综合图(m)"), ("isolated_min_holes", "孤立组最少孔数"),
                 ("ring_alpha_k", "外轮廓兜底k"))
+        self.btn_p = {}
         for i, (key, label) in enumerate(NUMS):
-            r, c = divmod(i, 4)
+            r, c = divmod(i, 3)
             tk.Label(pf, text=label).grid(row=r * 2, column=c * 2, sticky="e", padx=(6, 2))
             v = tk.StringVar()
             tk.Entry(pf, textvariable=v, width=7).grid(row=r * 2, column=c * 2 + 1, sticky="w")
             self.var_p[key] = v
         tk.Label(pf, text="精确模式轮廓文件(.3ds，多个用分号隔开；填了就照人工画的矿界出图)",
-                 fg="#333").grid(row=4, column=0, columnspan=2, sticky="e", pady=(6, 0))
+                 fg="#333").grid(row=6, column=0, columnspan=2, sticky="e", pady=(6, 0))
         self.var_outline = tk.StringVar()
         tk.Entry(pf, textvariable=self.var_outline).grid(
-            row=4, column=2, columnspan=6, sticky="we", pady=(6, 0))
+            row=6, column=2, columnspan=4, sticky="we", pady=(6, 0))
         tk.Button(pf, text="…", width=3,
-                  command=self.browse_outline).grid(row=4, column=8, padx=10)
+                  command=self.browse_outline).grid(row=6, column=6, padx=6, sticky="w")
         tk.Button(pf, text="存为该平台默认", command=self.save_params).grid(
-            row=0, column=8, padx=10)
+            row=7, column=0, padx=(6, 4), pady=(8, 0), sticky="w")
         tk.Button(pf, text="存为该炮区", command=lambda: self.save_params(blast=True)).grid(
-            row=1, column=8, padx=10)
+            row=7, column=1, padx=4, pady=(8, 0), sticky="w")
         tk.Button(pf, text="刷新参数", command=self.refresh_params).grid(
-            row=2, column=8, padx=10)
+            row=7, column=2, padx=4, pady=(8, 0), sticky="w")
         tk.Label(pf, text="（默认 外推3.0 / 连接15 / 最小块段40 / 接图8 / 贴合0.5；"
                           "1003 外推 2.5，各炮区另有个别覆盖）",
-                 fg="#666").grid(row=5, column=0, columnspan=8, sticky="w", pady=(4, 0))
+                 fg="#666").grid(row=8, column=0, columnspan=7, sticky="w", pady=(6, 0))
 
         # ---- 按钮 ----
         btn = tk.Frame(root)

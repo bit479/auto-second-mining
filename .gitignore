@@ -23,3 +23,9 @@ desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# 回归/对账跑出来的中间产物（可随时重跑；不进版本库）
+3DMine二次圈矿工具_初步原型/sample_data/output/对账_*/
+3DMine二次圈矿工具_初步原型/sample_data/output/GUI跑通_*/
+3DMine二次圈矿工具_初步原型/_probe/_gui_run.log
+3DMine二次圈矿工具_初步原型/_probe/__pycache__/
