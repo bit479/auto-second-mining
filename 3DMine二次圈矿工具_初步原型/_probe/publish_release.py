@@ -14,8 +14,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REPO = "bit479/auto-second-mining"
 TAG = "v1.0"
-ZIP = Path(r"D:\WK\N CRT\release_v1\二次圈矿工具_v1.0.zip")
-NOTES = Path(__file__).resolve().with_name("release_notes_v1.md")
+for i, a in enumerate(sys.argv):
+    if a == "--tag" and i + 1 < len(sys.argv):
+        TAG = sys.argv[i + 1]
+ZIP = Path(r"D:\WK\N CRT\release_v1\second-mining-tool-%s.zip" % TAG)
+NOTES = Path(__file__).resolve().with_name("release_notes_%s.md" % TAG.replace(".", "_"))
+if not NOTES.exists():
+    NOTES = Path(__file__).resolve().with_name("release_notes_v1.md")
 DRY = "--dry-run" in sys.argv
 
 
