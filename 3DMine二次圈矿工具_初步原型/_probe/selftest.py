@@ -65,6 +65,12 @@ def composite_of(plat_dir: Path):
 
 
 def main() -> None:
+    # 控制台是 GBK 时，"✓"之类的字符会让 print 抛 UnicodeEncodeError（退出码被顶成 1），
+    # 这里把不可编码的字符替换掉，保证"退出码 = 验收结论"。
+    try:
+        sys.stdout.reconfigure(errors="replace")
+    except Exception:
+        pass
     want = [a for a in sys.argv[1:] if not a.startswith("-")] or list(PLATFORMS)
     bad, rows = [], []
     for plat in want:

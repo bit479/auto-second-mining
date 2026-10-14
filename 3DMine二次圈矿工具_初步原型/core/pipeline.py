@@ -106,7 +106,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                 chain_right=P.get("chain_right") or (),
                                 chain_exclude=P.get("chain_exclude"),
                                 chain_smooth_m=P.get("chain_smooth_m", 0.0),
-                                repair_tip_m=P.get("repair_tip_m"))
+                                repair_tip_m=P.get("repair_tip_m"),
+                                end_pair_beyond=P.get("end_pair_beyond", True))
         if ring is None:
             continue
         rings.append(ring)

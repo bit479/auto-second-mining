@@ -35,6 +35,11 @@ COMPOSITE_BLOCK_LAYERS = None
 # 40 m² + "并入平均品位最接近的邻块" 时，与人工图的分块一致率最高（0.936）。
 MIN_FRAGMENT_M2 = 40.0
 CHAIN_WINDOW_FACTOR = 1.0   # 链提取的沿向窗口 = 1.0 × 中位最近孔距
+# "同一排"的判定窗口 = 这个系数 × 矿孔最近邻距离中位数（用户 2026-10-14 说
+# "不设范围"；实测去掉窗口（设成很大的数）会让几乎所有孔都变成内部孔，
+# 1008 的 12 孔归属从"与人工全一致"掉到 4 个孔进不了链，所以窗口先留着，
+# 系数做成常量方便标定/回退。
+CHAIN_BAND_FACTOR = 0.9
 END_SEARCH_R = 12.0    # 端部找邻孔半径
 END_LIMIT = 2          # 每端每侧最多取几个邻孔的中点
 MIN_HOLES_FOR_INTERIOR = 6   # 少于这么多孔就不做"内部孔"剔除（小组直接分左右）
@@ -162,7 +167,7 @@ def zone_chains(ore, all_holes=None, manual_left=(), manual_right=(), exclude=No
     for i in range(n):
         dmin.append(min(np.hypot(xy[j][0] - xy[i][0], xy[j][1] - xy[i][1])
                         for j in range(n) if j != i) if n > 1 else 0.0)
-    band = 0.9 * float(np.median(dmin)) if n > 1 else 0.0
+    band = CHAIN_BAND_FACTOR * float(np.median(dmin)) if n > 1 else 0.0
     left, right = [], []
     for i in range(n):
         if ore[i].short in ex:
@@ -290,14 +295,25 @@ def _smooth_chain(pts, tol: float):
     return [tuple(c[:2]) for c in ln.coords]
 
 
-def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R):
-    """端部闭合：端孔与附近所有无品位孔的中点，沿 ref_dir 排序。"""
+def _end_mids(end_hole, waste, ref_dir, radius=END_SEARCH_R, beyond_only=True):
+    """端部闭合：端孔与**端部之外**的无品位孔的中点，沿 ref_dir 排序。
+
+    用户规则（2026-10-14）：端部"单排孔"要往**没有炮孔的一侧**推 extrude；
+    另一侧（有无品位孔的一侧）用"1/2 工程间距"＝矿孔与无品位孔的中点。
+    所以只认**落在端孔之外**（沿 ref_dir 前方）的无品位孔——落在矿化带内侧的
+    无品位孔不能拿来当端部闭合点（0915 曾经把内侧的 P21 拿去闭合，端头拧成一团、
+    4 个矿孔被甩到界外）。
+    """
     mids = []
+    r = np.asarray(ref_dir, float)
     for w in waste:
         d = math.hypot(end_hole.x - w.x, end_hole.y - w.y)
-        if d <= radius:
-            mids.append(((end_hole.x + w.x) / 2.0, (end_hole.y + w.y) / 2.0))
-    r = np.asarray(ref_dir, float)
+        if d > radius:
+            continue
+        if beyond_only and ((w.x - end_hole.x) * r[0]
+                            + (w.y - end_hole.y) * r[1]) <= 0:
+            continue                       # 无品位孔在矿化带内侧，不参与端部闭合
+        mids.append(((end_hole.x + w.x) / 2.0, (end_hole.y + w.y) / 2.0))
     mids.sort(key=lambda p: (p[0] - end_hole.x) * r[0] + (p[1] - end_hole.y) * r[1])
     return mids
 
@@ -594,7 +610,7 @@ def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
 
 
 def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
-                blast: str, k: float):
+                blast: str, k: float, end_pair_beyond: bool = True):
     """外轮廓环：矿孔凹包 + 外推，再把北端闭合与南端接综合图的"走廊"补进来。
 
     专治"孔列多、走向弯"的矿带——那时按走向中线分左右链会把外圈孔判成内部孔，
@@ -618,7 +634,8 @@ def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
         sel = [j for j in range(len(ore)) if lo <= s_all[j] <= hi]
         mids = []
         for j in sel:
-            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
+            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0,
+                              beyond_only=end_pair_beyond)
         return mids
 
     north = None
@@ -658,7 +675,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
                  alpha_k: float = 0.0, chain_mode: str = "pca",
                  ring_mode: str = "chain", chain_left=(), chain_right=(),
                  chain_exclude=None, chain_smooth_m: float = 0.0,
-                 repair_tip_m: float = None):
+                 repair_tip_m: float = None, end_pair_beyond: bool = True):
     """整条矿化带的外围矿界（复刻人工图的折线结构：11~21 个拐点）。
 
     人工图的画法（由其 .3ds 逐步还原）：
@@ -671,7 +688,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         return None
     if ring_mode == "alpha":
         poly = _alpha_ring(ore, all_holes, extrude, comp_blocks, merge_gap,
-                           blast, alpha_k or 2.0)
+                           blast, alpha_k or 2.0, end_pair_beyond=end_pair_beyond)
         if poly is not None and not poly.is_empty:
             poly = _finish_ring(poly, ore, extrude, simplify, repair_tip_m)
             LAST_RING["merged_block"] = LAST_RING.get("merged_block")
@@ -702,7 +719,8 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
         sel = [j for j in range(len(ore)) if lo <= s_all[j] <= hi]
         mids = []
         for j in sel:
-            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0)
+            mids += _end_mids(ore[j], waste, u if want_north else -u, radius=12.0,
+                              beyond_only=end_pair_beyond)
         return mids
 
     # 北端：只有"配方所属炮区"才用人工配方（8 个指定孔对的中点，1008 上 8/8 吻合）。
