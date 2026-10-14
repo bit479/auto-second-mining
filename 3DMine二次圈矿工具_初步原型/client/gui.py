@@ -47,6 +47,16 @@ def parse_platform_date(fname: str):
     return platform, (d.group(1) if d else "")
 
 
+def _acad_running() -> bool:
+    """AutoCAD 在不在跑（不在的话第 2/3 步要先把它拉起来）。"""
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq acad.exe"],
+                             capture_output=True, text=True, errors="replace").stdout
+        return "acad.exe" in (out or "").lower()
+    except Exception:
+        return False
+
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -617,19 +627,29 @@ class App:
         dxf = Path(out) / ("%s二次圈矿矿块图.dxf" % tag)
         dwg = Path(out) / ("%s二次圈矿矿块图_2010.dwg" % tag)
         if ok_all and self.var_dwg.get() and dxf.exists():
+            if not _acad_running():
+                self.log_line("（AutoCAD 没在运行，正在拉起它——首次启动约 30~60 秒，请稍等）")
             if not run("第 2 步 DXF → DWG 2010（AutoCAD）",
-                       [PY, "-X", "utf8", str(DXF2DWG), str(dxf)]):
-                self.log_line("（DWG 转换没成功，DXF 已保留，可在 CAD 里手工另存 2010）")
+                       [PY, "-X", "utf8", str(DXF2DWG), str(dxf), "--start"]):
+                self.log_line("（DWG 转换没成功：最常见是 AutoCAD 起不来或停在对话框里。"
+                              "DXF 已保留——在 CAD 里手工打开它另存为 2010 即可；"
+                              "也可以在界面上取消勾选“转 DWG 2010”跳过这一步）")
 
         tds = Path(out) / ("%s矿块边界线.3ds" % tag)
         merged = None
         if ok_all and self.var_merge.get() and tds.exists():
+            if not _acad_running():
+                self.log_line("（AutoCAD 没在运行，正在拉起它——首次启动约 30~60 秒，请稍等）")
             if run("第 3 步 并入综合图副本（原件不动）",
-                   [PY, "-X", "utf8", str(MERGE_COMP), comp, str(tds)]):
+                   [PY, "-X", "utf8", str(MERGE_COMP), comp, str(tds), "--start"]):
                 for line in str(self.log.get("1.0", "end")).splitlines():
                     if "_并入" in line and ".dwg" in line:
                         merged = line.strip().split("->")[-1].strip()
                 self.log_line("（副本可复核后再自己决定是否替换原件）")
+            else:
+                self.log_line("（并入副本没成功：多半是 AutoCAD 起不来或停在对话框里。"
+                              "副本文件其实已经复制出来了，等 CAD 空闲后单独重跑这一步即可；"
+                              "也可以在界面上取消勾选“圈完顺手并入综合图副本”）")
 
         self.log_line("-" * 68)
         if ok_all:

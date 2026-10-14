@@ -57,6 +57,10 @@ def convert(dxf: Path, dwg: Path = None, start: bool = False,
     """返回 (成功?, 说明)。"""
     dxf = Path(dxf)
     dwg = Path(dwg) if dwg else dxf.with_name(dxf.stem + "_2010.dwg")
+    # 交给 AutoCAD COM 的必须是**绝对路径**：相对路径 COM 会按 AutoCAD 自己的工作目录
+    # 去找，报"未找到文件 xxx"（实测过）。
+    dxf = dxf.resolve()
+    dwg = dwg.resolve()
     if not dxf.exists():
         return False, "找不到 DXF：%s" % dxf
     acad = _connect(start=start)

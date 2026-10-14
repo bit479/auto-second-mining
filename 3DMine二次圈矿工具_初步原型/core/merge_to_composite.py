@@ -85,6 +85,9 @@ def merge(comp_dwg: Path, tds: Path, out_dwg: Path = None, start: bool = False):
     tag = m.group(1) if m else (tds.stem.replace("矿块边界线", "").strip() or "new")
     out_dwg = Path(out_dwg) if out_dwg else \
         comp_dwg.with_name("%s_并入%s.dwg" % (comp_dwg.stem, tag))
+    # 交给 AutoCAD COM 的路径必须是绝对的（相对路径 COM 会按 AutoCAD 的工作目录去找）
+    out_dwg = out_dwg.resolve()
+    comp_dwg = comp_dwg.resolve()
     shutil.copy2(comp_dwg, out_dwg)          # 只动副本
     acad = _acad(start=start)
     if acad is None:
