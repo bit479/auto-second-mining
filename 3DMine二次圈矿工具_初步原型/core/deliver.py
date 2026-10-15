@@ -110,7 +110,8 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
         c = ws.cell(row=2, column=i, value=h)
         c.font = Font(bold=True)
         c.alignment = Alignment(horizontal="center")
-        c.fill = PatternFill("solid", fgColor="D9E2F3")
+        # 用户 2026-10-15：报告里**不要单元格底纹**（原来是浅蓝/浅灰）
+        c.fill = PatternFill(fill_type=None)
 
     thin = Side(style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -139,7 +140,7 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
         ws.cell(row=r, column=5, value=round(sm * 100.0 / st, 3) if st else 0)
         ws.cell(row=r, column=6, value=round(sm, 3))
         for c in range(1, 7):
-            ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor="EDEDED")
+            ws.cell(row=r, column=c).fill = PatternFill(fill_type=None)
         r += 1
         totals[0] += sv
         totals[1] += st
@@ -228,10 +229,10 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
     tbl.set_fontsize(9)
     for (r0, c0), cell in tbl.get_celld().items():
         if r0 == 0:
-            cell.set_facecolor("#D9E2F3")
+            cell.set_facecolor("none")          # 用户要求：单元格不要底纹
             cell.set_text_props(weight="bold")
         elif rows[r0][0] in ("小计", "合计"):
-            cell.set_facecolor("#EDEDED")
+            cell.set_facecolor("none")
     if st:
         t2 = ax.table(cellText=st_rows, cellLoc="center",
                       bbox=[0.14, 0.0, 0.72, 0.085])
@@ -239,7 +240,7 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
         t2.set_fontsize(8.5)
         for (r0, c0), cell in t2.get_celld().items():
             if r0 == 0:
-                cell.set_facecolor("#D9E2F3")
+                cell.set_facecolor("none")
                 cell.set_text_props(weight="bold")
     # 只露出标题 + 表格（裁掉四周空白）
     out = path

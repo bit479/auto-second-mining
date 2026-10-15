@@ -47,7 +47,7 @@ def main() -> None:
     t0 = time.time()
     if len(sys.argv) < 2:
         print("用法: python run_strip.py <炮孔数据库.xls> [平台] [日期] "
-              "[输出目录] [综合图.dwg]")
+              "[输出目录] [综合图.dwg] [--manual-blocks a.3ds;b.3ds] [--outline a.3ds]")
         sys.exit(2)
     xls = Path(sys.argv[1])
     if not xls.exists():
@@ -69,6 +69,19 @@ def main() -> None:
         xls.parent / ("二次圈矿成果_%s_%s" % (plat or "?", date or "?"))
     out_dir.mkdir(parents=True, exist_ok=True)
     comp_dwg = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else None
+    # 命令行覆盖两个"人工画线"参数（GUI 用它把界面上的选择直接传进来，不用先存参数）：
+    #   --manual-blocks  人工圈矿模式：每条闭合线 = 一块，程序不再自己圈
+    #   --outline        精确模式：整条当矿界，界内程序按品位再分块
+    manual_blocks = outline = None
+    for key, idx in (("--manual-blocks", None), ("--outline", None)):
+        if key in sys.argv:
+            i = sys.argv.index(key)
+            if i + 1 < len(sys.argv):
+                val = [x.strip() for x in sys.argv[i + 1].split(";") if x.strip()]
+                if key == "--manual-blocks":
+                    manual_blocks = val
+                else:
+                    outline = val
     log = []
 
     def note(s):
@@ -77,8 +90,18 @@ def main() -> None:
 
     meta = {"platform": plat or "?", "date": date or "?", "density": DENSITY}
     P = _params.for_blast(date, platform=plat)
-    note("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
-         % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
+    if manual_blocks:
+        P["manual_blocks"] = list(manual_blocks)
+    if outline:
+        P["outline_files"] = list(outline)
+    if P.get("manual_blocks"):
+        note("模式：**人工圈矿**（%d 个 .3ds：每条闭合线当一块，程序只算量出图）"
+             % len(P["manual_blocks"]))
+        note("参数：容重 废 %.2f / 矿 %.2f；金属量 = 重量×品位÷100（百克，3 位小数）"
+             % (P.get("density_waste", 2.65), P.get("density_ore", 2.7)))
+    else:
+        note("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
+             % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
 
     comp = []
     if comp_dwg:

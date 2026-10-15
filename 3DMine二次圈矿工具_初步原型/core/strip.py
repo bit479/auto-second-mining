@@ -892,6 +892,82 @@ def join_to_composite(ring, comp_blocks, gap: float = 0.5):
     return out
 
 
+def blocks_from_outline_files(paths, all_holes, density_waste: float = 2.65,
+                             density_ore: float = 2.7, min_area: float = 1.0):
+    """人工圈矿模式：**每条闭合折线 = 一块**，程序只算量、不再自己圈。
+
+    用户 2026-10-15 的用法：他在 3DMine 里自己画好矿块（导出成 .3ds，一条闭合线一块），
+    丢给程序算量出图。这里的口径跟自动模式保持一致（`口径确认记录.md` A/C2 节）：
+
+      * 块范围 = 那条闭合线围出来的多边形（原样用，不抽稀、不外推）；
+      * 体积   = Σ(全场孔 Voronoi 单元 ∩ 块范围 的面积 × 该孔 gradeLenght)；
+      * 重量   = 同样求和，但每个单元按**该孔所在档**取容重（<0.5 取 2.65，其余 2.7）；
+      * 品位   = **孔心落在块内**的孔做长度加权（<0.5 废孔也参与）；
+                块内一个孔心都没有时，退化成"单元面积×孔长"加权，免得算不出品位；
+      * 金属量 = 重量 × 品位 ÷ 100（百克，3 位小数）；
+      * 体号   = 按品位档从高到低、同档按体积从大到小重排（与人工报告版式一致）。
+
+    返回 (rings, blocks)：rings 是这些块的多边形（出图用），blocks 是 Block 列表。
+    """
+    from oreblocks import Block, Cell, level_of
+    polys = []
+    for p in paths:
+        for pts in read_3ds_polylines(p):
+            if len(pts) < 3:
+                continue
+            if math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) > 0.01:
+                pts = list(pts) + [pts[0]]          # 没闭合就补上
+            poly = Polygon(pts).buffer(0)
+            if poly.is_empty:
+                continue
+            if poly.geom_type == "MultiPolygon":
+                poly = max(poly.geoms, key=lambda g: g.area)
+            if poly.area < float(min_area):
+                continue
+            polys.append(poly)
+    if not polys:
+        return [], []
+    out_blocks = []
+    for poly in polys:
+        cellmap = _cells_within(all_holes, poly)
+        byh = {h.hid: h for h in all_holes}
+        cs = [Cell(hid=k, hole=byh[k], polygon=c, area_m2=c.area)
+              for k, c in cellmap.items() if byh[k].hid in byh]
+        if not cs:
+            continue
+        hs_in = [h for h in all_holes
+                 if poly.buffer(1e-9).contains(Point(h.x, h.y))]
+        if hs_in:
+            lsum = sum(h.grade_lenght for h in hs_in)
+            grade = (sum(h.grade_lenght * h.grade_disp for h in hs_in) / lsum
+                     if lsum else 0.0)
+        else:                                   # 块里没有孔心 → 用单元加权兜底
+            w = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
+            grade = (sum(c.area_m2 * c.hole.grade_lenght * c.hole.grade_disp for c in cs) / w
+                     if w else 0.0)
+        lid, label = level_of(grade)
+        if lid is None:
+            # 平均品位 <0.5 的整块（人工圈进来的废石区）：列成 0.5-1 以下的一块，
+            # 让报告里也能看到它，而不是悄悄丢掉。
+            lid, label = "L0", "<0.500"
+        b = Block(level_id=lid, label=label, holes=list(hs_in), cells=cs)
+        b.area_m2 = sum(c.area_m2 for c in cs)
+        b.volume_m3 = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
+        b.tonnage_t = sum(c.area_m2 * c.hole.grade_lenght *
+                          (density_waste if c.hole.grade < 0.5 else density_ore)
+                          for c in cs)
+        b.grade = grade
+        b.metal_hg = b.tonnage_t * grade / 100.0
+        b.polygon = poly                        # 出图用人工画的那条线
+        out_blocks.append(b)
+    order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3, "L0": 4}
+    out_blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
+    for i, b in enumerate(out_blocks, 1):
+        b.no = i
+    rings = [b.polygon for b in out_blocks]
+    return rings, out_blocks
+
+
 def _cells_within(holes_sub, clip: Polygon):
     """只给 holes_sub 这一组孔做 Voronoi，再裁剪到 clip（块内 Voronoi）。"""
     if not holes_sub or clip is None or clip.is_empty:

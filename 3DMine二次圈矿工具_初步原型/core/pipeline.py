@@ -15,9 +15,9 @@ from __future__ import annotations
 import math
 
 from oreblocks import load_holes_xls
-from strip import (LAST_RING, average_blocks, block_of_cluster, class_clusters,
-                   isolated_ring, join_to_composite, ring_from_outline_files,
-                   zone_outline)
+from strip import (LAST_RING, average_blocks, block_of_cluster,
+                   blocks_from_outline_files, class_clusters, isolated_ring,
+                   join_to_composite, ring_from_outline_files, zone_outline)
 
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
@@ -60,6 +60,17 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
             zones.append(g)
         else:
             pending.append(g)
+
+    # ---- 人工圈矿模式（用户 2026-10-15）----
+    # 给了 manual_blocks（.3ds）就**完全不自己圈**：每条闭合线当一块，程序只算量出图。
+    manual_files = P.get("manual_blocks") or []
+    if manual_files:
+        rings, blocks = blocks_from_outline_files(
+            [str(x) for x in manual_files], list(allh),
+            density_waste=P.get("density_waste", 2.65),
+            density_ore=P.get("density_ore", 2.7))
+        return {"ore": ore, "pending": pending, "zones": zones, "rings": rings,
+                "blocks": blocks, "warn": [], "holes": allh, "manual": True}
 
     blocks, rings, warns = [], [], []
     seam = float(P.get("seam_join_m", 0.0) or 0.0)

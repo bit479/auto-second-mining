@@ -140,15 +140,20 @@ class App:
             row=6, column=2, columnspan=4, sticky="we", pady=(6, 0))
         tk.Button(pf, text="…", width=3,
                   command=self.browse_outline).grid(row=6, column=6, padx=6, sticky="w")
+        self.var_manual = tk.BooleanVar(value=False)
+        tk.Checkbutton(pf, text="勾上 = 人工圈矿模式（.3ds 里每条闭合线算一块，程序只算量出图）；"
+                                "不勾 = 精确模式（整条当矿界、界内按品位再分块）",
+                       variable=self.var_manual, fg="#0a6").grid(
+            row=7, column=0, columnspan=8, sticky="w", pady=(2, 0))
         tk.Button(pf, text="存为该平台默认", command=self.save_params).grid(
-            row=7, column=0, padx=(6, 4), pady=(8, 0), sticky="w")
+            row=8, column=0, padx=(6, 4), pady=(8, 0), sticky="w")
         tk.Button(pf, text="存为该炮区", command=lambda: self.save_params(blast=True)).grid(
-            row=7, column=1, padx=4, pady=(8, 0), sticky="w")
+            row=8, column=1, padx=4, pady=(8, 0), sticky="w")
         tk.Button(pf, text="刷新参数", command=self.refresh_params).grid(
-            row=7, column=2, padx=4, pady=(8, 0), sticky="w")
+            row=8, column=2, padx=4, pady=(8, 0), sticky="w")
         tk.Label(pf, text="（默认 外推3.0 / 连接15 / 最小块段40 / 接图8 / 贴合0.5；"
                           "1003 外推 2.5，各炮区另有个别覆盖）",
-                 fg="#666").grid(row=8, column=0, columnspan=7, sticky="w", pady=(6, 0))
+                 fg="#666").grid(row=9, column=0, columnspan=7, sticky="w", pady=(6, 0))
 
         # ---- 按钮 ----
         btn = tk.Frame(root)
@@ -691,11 +696,21 @@ class App:
         self.log_line("输出目录  ：%s" % out)
         self.log_line("-" * 68)
         threading.Thread(target=self.run_pipeline,
-                         args=(xls, platform, date, out, comp), daemon=True).start()
+                         args=(xls, platform, date, out, comp,
+                               [x.strip() for x in self.var_outline.get().split(";") if x.strip()],
+                               bool(self.var_manual.get())), daemon=True).start()
 
-    def run_pipeline(self, xls, platform, date, out, comp):
+    def run_pipeline(self, xls, platform, date, out, comp, outlines=None, manual=False):
         tag = "%s平台 %s" % (platform, date)
         ok_all = True
+        # 人工画线：人工圈矿模式 → --manual-blocks（每条线一块）；否则精确模式 → --outline（整条当矿界）
+        extra = []
+        if outlines:
+            extra += (["--manual-blocks", ";".join(outlines)] if manual
+                      else ["--outline", ";".join(outlines)])
+            self.log_line("人工画线：%s（%s）" % (
+                "人工圈矿模式：每条闭合线当一块、只算量出图" if manual
+                else "精确模式：整条当矿界、界内按品位再分块", ";".join(outlines)))
 
         def run(name, cmd):
             self.log_line("== %s ==" % name)
@@ -717,7 +732,7 @@ class App:
                 return False
 
         ok_all = run("第 1 步 圈矿算量 + 出报告/图/.3ds",
-                     [PY, "-X", "utf8", str(RUN_STRIP), xls, platform, date, out, comp])
+                     [PY, "-X", "utf8", str(RUN_STRIP), xls, platform, date, out, comp] + extra)
 
         dxf = Path(out) / ("%s二次圈矿矿块图.dxf" % tag)
         dwg = Path(out) / ("%s二次圈矿矿块图_2010.dwg" % tag)
