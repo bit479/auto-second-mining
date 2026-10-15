@@ -67,7 +67,9 @@ def main() -> int:
 
     title = {"v1.0": "v1.0 —— 二次圈矿工具（首个可用版）",
              "v1.0.1": "v1.0.1 —— 修复：AutoCAD 没开时第2/3步失败",
-             "v1.1": "v1.1 —— 支持把文件拖进窗口"}.get(TAG, "%s —— 二次圈矿工具" % TAG)
+             "v1.1": "v1.1 —— 支持把文件拖进窗口",
+             "v1.2": "v1.2 —— 人工圈矿模式（你画 .3ds，程序只算量出图）+ 报告去底纹"}.get(
+                 TAG, "%s —— 二次圈矿工具" % TAG)
     st, res = api("https://api.github.com/repos/%s/releases" % REPO, tok,
                   {"tag_name": TAG, "name": title,
                    "body": body, "draft": False, "prerelease": False},
