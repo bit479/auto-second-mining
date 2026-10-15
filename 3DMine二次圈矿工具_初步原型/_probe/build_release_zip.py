@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT.parent / "release_v1"
 
-EXCLUDE_DIRS = {".git", "__pycache__", "3dmine_scripts", "归档"}
+EXCLUDE_DIRS = {".git", "__pycache__", "3dmine_scripts", "归档", "_out"}
 EXCLUDE_FILE_GLOBS = ["*.bmp", "*.bak", "*.pyc", "*.dwl", "*.dwl2",
                       "pip_install_log.txt", "pip_scipy_log.txt", "tk_check.txt",
                       "tk_check2.txt", "win_state.txt", "holes_1008.txt",

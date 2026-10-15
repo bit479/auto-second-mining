@@ -159,11 +159,13 @@ class App:
         mrow = tk.Frame(pf)
         mrow.grid(row=7, column=0, columnspan=8, sticky="w", pady=(4, 0))
         tk.Label(mrow, text="圈矿模式：", fg="#0a6").pack(side="left")
-        for val, txt in (("auto", "① 自动圈矿（程序自己圈，不用 .3ds）"),
-                         ("manual", "② 人工圈矿（我画 .3ds，每条闭合线 = 一块，只算量出图）"),
-                         ("exact", "③ 精确模式（.3ds 整条当矿界，界内按品位再分块）")):
+        for val, txt in (("auto", "① 自动圈矿"),
+                         ("manual", "② 人工圈矿（每条闭合线 = 一块）"),
+                         ("exact", "③ 精确模式（整条当矿界）")):
             tk.Radiobutton(mrow, text=txt, value=val, variable=self.var_mode,
                            fg="#0a6").pack(side="left", padx=(6, 0))
+        tk.Label(pf, text="　　① 程序自己圈；② 你画的 .3ds 每条线一块；③ 整条当矿界、界内按品位分块",
+                 fg="#666").grid(row=7, column=4, columnspan=4, sticky="w")
         tk.Button(pf, text="存为该平台默认", command=self.save_params).grid(
             row=8, column=0, padx=(6, 4), pady=(8, 0), sticky="w")
         tk.Button(pf, text="存为该炮区", command=lambda: self.save_params(blast=True)).grid(
