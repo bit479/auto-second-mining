@@ -76,3 +76,19 @@
 三套自检：`tests/test_by_total.py`（14 项）、`tests/test_merge.py`（detail）、`tests/test_daily_merge.py`（30 项）。
 
 **改 `.bat` 时内容必须保持纯 ASCII**：cmd.exe 按 GBK 解析，写中文 UTF-8 会变成乱码指令。
+
+## 版本库与发布
+
+* `D:\WK\N CRT` **本身就是一个 git 仓库**，远端 `https://github.com/bit479/auto-second-mining`（分支 `main`）。
+  `gh` 已登录账号 `bit479`，有 `repo` 权限，无需再配凭据。
+* ⚠️ **仓库是 PUBLIC**，且已跟踪 1238 个文件 —— 三个平台的原始数据（xls / mdb / dwg / 3ds / 报告 / 预览图）
+  都在里面。用户自己的选择，但涉及生产数据，改动前值得提醒一句。
+* 提交习惯（跟随既有历史）：
+  * 中文提交信息 + 前缀 `feat:` / `fix:` / `data:` / `release:` / `probe:` / `gui:`
+  * **数据文件和 `*_并入<日>.bak` 备份也一起进库**（已有 22 个 `.bak` 被跟踪）；用 `--restore` 或 git 都可回滚
+  * 提交走 `git commit -F -`（heredoc）+ `-c i18n.commitEncoding=utf-8`，避免中文乱码
+* `.gitignore` 排除：`_backup/`、`__pycache__/`、`*.pyc`、`~$*`、`*.dwl`、`*.dwl2`、`*.zip`、
+  `release_v1/`、`Excel处理工具/_out/daily_test/`、`*.tmp`
+* 发版：zip 放 `release_v1/`（不进库），用 `gh release create <tag> <zip>` 上传资产，tag 形如 `v1.2.2`。
+* 行尾符：多数文件是 CRLF；用 Python 以文本模式 `open(p,'w')` 改写文件会把 LF 变成 CRLF，
+  造成整文件虚diff —— 要改文本文件优先用 Edit/Write 工具，别用 Python 文本模式整文件重写。
