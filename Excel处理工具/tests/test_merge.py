@@ -1,4 +1,7 @@
-"""自检：用 handle 目录下的 3 个工作簿跑汇总，并与人工成果逐项比对。"""
+"""自检：用 handle 目录下的 3 个工作簿跑**旧口径**（按明细行）汇总，并与人工成果逐项比对。
+
+新口径（按每个文件的「总计」行汇总）的自检见 tests/test_by_total.py。
+"""
 
 from __future__ import annotations
 
@@ -33,7 +36,7 @@ def main() -> int:
     files.sort(key=natural_key_compat)
     print("输入：", [os.path.basename(f) for f in files])
 
-    result = merge_reports(files, OUTPUT, MergeOptions())
+    result = merge_reports(files, OUTPUT, MergeOptions(mode="detail"))
     print("输出：", result["output"])
     print("品位档顺序：", result["tiers"])
 
@@ -41,7 +44,7 @@ def main() -> int:
     from openpyxl import load_workbook
 
     values_out = os.path.join(OUT_DIR, "_values.xlsx")
-    merge_reports(files, values_out, MergeOptions(use_formula=False, with_appendix=False))
+    merge_reports(files, values_out, MergeOptions(mode="detail", use_formula=False, with_appendix=False))
     ws = load_workbook(values_out, data_only=True).active
 
     ok = True

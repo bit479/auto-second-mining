@@ -1,23 +1,32 @@
 """把若干份 3DMine 炮孔数据库报告汇总成一份炮孔数据报告。
 
-汇总规则（与人工成果一致）：
-1. 按"品位档"归组，档位由高到低排列；同档内保持源文件出现顺序；
-2. 每个档位列出全部明细行，随后一行"小计"；
-3. 末尾一行"合计"汇总所有"小计"；
-4. 小计/合计的体积、重量、金属量直接求和；
-   平均品位 = 金属量 × 100 ÷ 重量（不是简单平均）；
-5. 可选在每个源文件原始报告追加在汇总表下方（便于截图贴进 CAD）。
+两种汇总口径，由 :class:`MergeOptions` 的 ``mode`` 选择：
+
+``total``（默认，1011 起的新口径）
+    每份源文件的「总计」行整体当成一个矿块。按矿块品位落档 → 档位从高到低排，
+    同档内保持源文件顺序，体号在最终顺序上重新编号 1→N。
+
+``detail``（旧口径，0915/0922/1008 那批报告）
+    把每行明细拆出来，按品位档归组重排。
+
+两者共用的部分：
+1. 每个档位列出全部明细行，随后一行"小计"；
+2. 末尾一行"合计"，等于各小计之和；
+3. 小计/合计的体积、重量、金属量直接求和，平均品位 = 金属量 × 100 ÷ 重量；
+4. 可选把各源文件原始报告追加在下方（便于截图贴进 CAD）。
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from ..excel_core.writer import SheetPlan, StyleSpec, write_workbook
-from .parser import BlockRecord, SourceReport
-from .schema import METAL_SCALE, OUTPUT_COLUMNS, grade_sort_key
+from . import by_total, naming
+from .parser import BlockRecord, SourceReport, truncate_at_total
+from .schema import (DEFAULT_MODE, METAL_SCALE, MODE_DETAIL, MODE_TOTAL, MODES,
+                     OUTPUT_COLUMNS, grade_sort_key)
 
 __all__ = ["MergeOptions", "merge_reports", "group_records"]
 
@@ -27,14 +36,38 @@ _C_VOL, _C_WGT, _C_GRD, _C_MTL = "C", "D", "E", "F"
 
 @dataclass
 class MergeOptions:
-    title: str | None = None        # 大标题，默认取输出文件名
+    title: str | None = None        # 大标题，默认按"矿名+平台+日期"推断
     with_appendix: bool = True      # 是否追加各源文件原始报告
     appendix_gap: int = 8           # 汇总区与附录区之间空多少行
     use_formula: bool = True        # 小计/合计写公式（False 则写死数值）
+    mode: str = DEFAULT_MODE        # "total" 每个文件的『总计』行当矿块 / "detail" 按明细行
+    mine_prefix: str | None = None  # 标题里的矿名前缀（默认"北部山头"）
+    title_suffix: str = "炮孔数据报告"
     sheet_name: str = "Sheet1"
     column_widths: dict[str, float] = field(
         default_factory=lambda: {"A": 18.55, "B": 9.0, "C": 12.0, "D": 12.0, "E": 18.55, "F": 18.55}
     )
+
+    def __post_init__(self) -> None:
+        if self.mode not in MODES:
+            raise ValueError("不支持的汇总方式：%r（可选 %s）" % (self.mode, " / ".join(MODES)))
+
+    # ---- 由汇总方式派生出来的行为开关 ----
+
+    @property
+    def renumber_body(self) -> bool:
+        """体号是否在最终顺序上重新编号（新口径必须重编）。"""
+        return self.mode == MODE_TOTAL
+
+    @property
+    def appendix_until_total(self) -> bool:
+        """附录是否截到"总计"行为止（丢掉总计下面挂着的杂项行）。"""
+        return self.mode == MODE_TOTAL
+
+    @property
+    def single_row_grade_reference(self) -> bool:
+        """单矿块档位的小计，品位列写成 ``=E<该行>`` 而不是 ``=F/D*100``。"""
+        return self.mode == MODE_TOTAL
 
 
 def group_records(records: Sequence[BlockRecord]) -> list[tuple[str, list[BlockRecord]]]:
@@ -44,6 +77,11 @@ def group_records(records: Sequence[BlockRecord]) -> list[tuple[str, list[BlockR
         buckets.setdefault(rec.grade_type, []).append(rec)
     ordered = sorted(buckets.items(), key=lambda kv: grade_sort_key(kv[0]))
     return [(k, list(v)) for k, v in ordered]
+
+
+def _records_from_details(reports: Sequence[SourceReport]) -> list[BlockRecord]:
+    """旧口径：把每个源文件的全部明细行摊平。"""
+    return [rec for rep in reports for rec in rep.records]
 
 
 def _sum_expr(col: str, rows: Sequence[int]) -> str | None:
@@ -83,6 +121,8 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
     from .parser import parse_report_file  # 局部导入避免循环
 
     opt = options or MergeOptions()
+    input_paths = [item if isinstance(item, str) else getattr(item, "path", "")
+                   for item in inputs]
 
     reports: list[SourceReport] = []
     for item in inputs:
@@ -94,13 +134,31 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
     if not reports:
         raise ValueError("没有解析到任何有效数据，请检查输入文件")
 
-    records: list[BlockRecord] = []
+    build_records: Callable[[Sequence[SourceReport]], list[BlockRecord]] = (
+        by_total.records_from_totals if opt.mode == MODE_TOTAL else _records_from_details
+    )
+    records: list[BlockRecord] = build_records(reports)
+    if not records:
+        raise ValueError("没有解析到任何矿块数据（%s 方式），请检查输入文件里有没有「总计」行"
+                         % opt.mode)
+
     for i, rep in enumerate(reports):
         for j, rec in enumerate(rep.records):
             rec.order = i * 1000 + j
-            records.append(rec)
+    if opt.mode == MODE_TOTAL:
+        # 矿块列表本身就是按源文件顺序生成的，按序号定序即可
+        for k, rec in enumerate(records):
+            rec.order = k
 
     groups = group_records(records)
+
+    # 体号重新编号（新口径）
+    if opt.renumber_body:
+        counter = 0
+        for _key, recs in groups:
+            for rec in recs:
+                counter += 1
+                rec.body = counter
 
     # ---- 第一遍：排布行号（第 1 行标题，第 2 行表头，数据从第 3 行起）----
     row_no = 3
@@ -123,9 +181,9 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
     for key, recs, detail_rows, subtotal in group_rows:
         for rec in recs:
             body.append([rec.grade_type, rec.body, rec.volume, rec.weight, rec.grade, rec.metal])
-        body.append(_subtotal_row(detail_rows, subtotal, recs, opt.use_formula))
+        body.append(_subtotal_row(detail_rows, subtotal, recs, opt))
 
-    body.append(_total_row(subtotal_rows, total_row, groups, opt.use_formula))
+    body.append(_total_row(subtotal_rows, total_row, groups, opt))
 
     summary_end = len(body) - 1   # 合计行在 body 中的下标
 
@@ -137,7 +195,8 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
             appendix_titles.append(len(body))
             body.append([rep.title] + [""] * (_NCOL - 1))
             body.append(_pad_row(rep.header))
-            for raw in rep.raw_rows:
+            raw_rows = truncate_at_total(rep.raw_rows) if opt.appendix_until_total else rep.raw_rows
+            for raw in raw_rows:
                 body.append(_pad_row(raw))
             body.append(_blank_row())
 
@@ -147,7 +206,9 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
             return {"bold": index in appendix_titles, "border": False}
         return {"bold": False, "border": True}
 
-    title = opt.title or os.path.splitext(os.path.basename(output))[0]
+    title = (opt.title
+             or naming.guess_title(input_paths, output, opt.mine_prefix, opt.title_suffix)
+             or os.path.splitext(os.path.basename(output))[0])
 
     plan = SheetPlan(
         name=opt.sheet_name,
@@ -167,6 +228,8 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
 
     return {
         "output": os.path.abspath(output),
+        "title": title,
+        "mode": opt.mode,
         "sources": [r.name for r in reports],
         "blocks": len(records),
         "tiers": [k for k, _ in groups],
@@ -175,13 +238,17 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
     }
 
 
-def _subtotal_row(detail_rows, subtotal, recs, use_formula: bool) -> list[Any]:
-    if use_formula:
+def _subtotal_row(detail_rows, subtotal, recs, opt: MergeOptions) -> list[Any]:
+    if opt.use_formula:
+        if opt.single_row_grade_reference and len(detail_rows) == 1:
+            grade = "=%s%d" % (_C_GRD, detail_rows[0])
+        else:
+            grade = "=%s%d/%s%d*%g" % (_C_MTL, subtotal, _C_WGT, subtotal, METAL_SCALE)
         return [
             "小计", "",
             _sum_expr(_C_VOL, detail_rows),
             _sum_expr(_C_WGT, detail_rows),
-            "=%s%d/%s%d*%g" % (_C_MTL, subtotal, _C_WGT, subtotal, METAL_SCALE),
+            grade,
             _sum_expr(_C_MTL, detail_rows),
         ]
     volume = _num([r.volume for r in recs])
@@ -190,8 +257,8 @@ def _subtotal_row(detail_rows, subtotal, recs, use_formula: bool) -> list[Any]:
     return ["小计", "", volume, weight, _avg_grade(metal, weight), metal]
 
 
-def _total_row(subtotal_rows, total_row, groups, use_formula: bool) -> list[Any]:
-    if use_formula:
+def _total_row(subtotal_rows, total_row, groups, opt: MergeOptions) -> list[Any]:
+    if opt.use_formula:
         return [
             "合计", "",
             _sum_expr(_C_VOL, subtotal_rows),

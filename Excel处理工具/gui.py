@@ -17,7 +17,10 @@ from tkinter import filedialog, messagebox, ttk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from src.blast_report import naming  # noqa: E402
 from src.blast_report.builder import MergeOptions, merge_reports  # noqa: E402
+from src.blast_report.schema import (DEFAULT_MODE, MODE_DETAIL,  # noqa: E402
+                                     MODE_LABELS, MODE_TOTAL)
 from src.excel_core.reader import find_input_files, natural_key_compat  # noqa: E402
 
 # 任务栏图标：Windows 默认按 python.exe 归组，必须显式声明 AppUserModelID
@@ -71,6 +74,7 @@ class ReportTab(ttk.Frame):
         self.title_var = tk.StringVar()
         self.appendix_var = tk.BooleanVar(value=True)
         self.formula_var = tk.BooleanVar(value=True)
+        self.mode_var = tk.StringVar(value=DEFAULT_MODE)
 
         self._build_ui()
 
@@ -96,6 +100,13 @@ class ReportTab(ttk.Frame):
                           ("清空", self.clear)):
             ttk.Button(btns, text=text, command=cmd, width=10).pack(pady=3)
 
+        mode_box = ttk.LabelFrame(self, text="汇总方式")
+        mode_box.pack(fill="x", **_PAD)
+        ttk.Radiobutton(mode_box, text="按每个文件的「总计」行当一个矿块",
+                        value=MODE_TOTAL, variable=self.mode_var).pack(side="left", padx=(8, 20), pady=6)
+        ttk.Radiobutton(mode_box, text="按明细行汇总（旧）",
+                        value=MODE_DETAIL, variable=self.mode_var).pack(side="left", pady=6)
+
         out = ttk.LabelFrame(self, text="输出")
         out.pack(fill="x", **_PAD)
         ttk.Label(out, text="输出文件：").grid(row=0, column=0, sticky="w", padx=8, pady=4)
@@ -103,7 +114,7 @@ class ReportTab(ttk.Frame):
         ttk.Button(out, text="浏览", command=self.choose_output, width=8).grid(row=0, column=2, padx=8)
         ttk.Label(out, text="报告标题：").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         ttk.Entry(out, textvariable=self.title_var).grid(row=1, column=1, sticky="ew", padx=4)
-        ttk.Label(out, text="（留空则取输出文件名）").grid(row=1, column=2, sticky="w", padx=8)
+        ttk.Label(out, text="（留空则按「矿名+平台+日期」推断）").grid(row=1, column=2, sticky="w", padx=8)
         out.columnconfigure(1, weight=1)
 
         opts = ttk.Frame(out)
@@ -173,13 +184,30 @@ class ReportTab(ttk.Frame):
         self.listbox.delete(0, "end")
         for f in self.files:
             self.listbox.insert("end", os.path.basename(f) + "   (" + os.path.dirname(f) + ")")
+        self.autofill()
+
+    def autofill(self):
+        """按「矿名+平台+日期」补出空着的标题与输出路径，填过的字段不动。"""
+        if not self.files:
+            return
+        if self.title_var.get().strip():
+            return
+        title = naming.guess_title(self.files, self.output_var.get().strip() or None)
+        if not title:
+            return
+        self.title_var.set(title)
+        if not self.output_var.get().strip():
+            self.output_var.set(naming.default_output_path(self.files, title))
 
     def choose_output(self):
-        p = filedialog.asksaveasfilename(title="保存为", defaultextension=".xlsx",
-                                         filetypes=[("Excel 工作簿", "*.xlsx")])
+        p = filedialog.asksaveasfilename(
+            title="保存为", defaultextension=".xlsx",
+            initialfile=(self.title_var.get().strip() or "炮孔数据报告") + ".xlsx",
+            initialdir=os.path.dirname(self.files[0]) if self.files else None,
+            filetypes=[("Excel 工作簿", "*.xlsx")])
         if p:
             self.output_var.set(p)
-            if not self.title_var.get():
+            if not self.title_var.get().strip():
                 self.title_var.set(os.path.splitext(os.path.basename(p))[0])
 
     def open_dir(self):
@@ -191,18 +219,24 @@ class ReportTab(ttk.Frame):
         if not self.files:
             messagebox.showwarning("提示", "请先添加输入文件")
             return
+        self.autofill()
         output = self.output_var.get().strip()
+        if not output:
+            output = naming.default_output_path(self.files, self.title_var.get().strip())
+            self.output_var.set(output)
         if not output:
             messagebox.showwarning("提示", "请先指定输出文件")
             return
 
         self.run_btn.configure(state="disabled")
+        self.log_line("[方式] %s" % MODE_LABELS.get(self.mode_var.get(), self.mode_var.get()))
         self.log_line("[开始] 共 %d 个输入文件" % len(self.files))
 
         options = MergeOptions(
             title=self.title_var.get().strip() or None,
             with_appendix=self.appendix_var.get(),
             use_formula=self.formula_var.get(),
+            mode=self.mode_var.get(),
         )
         files = sorted(self.files, key=natural_key_compat)
 
@@ -224,7 +258,7 @@ class ReportTab(ttk.Frame):
             return
         t = payload["total"]
         self.log_line("[输出] %s" % payload["output"])
-        self.log_line("[汇总] 矿块明细 %d 条，品位档：%s"
+        self.log_line("[汇总] 矿块 %d 个，品位档：%s"
                       % (payload["blocks"], " / ".join(payload["tiers"])))
         self.log_line("[合计] 体积 %.3f m3 | 重量 %.3f t | 平均品位 %.4f g/t | 金属量 %.3f 百克"
                       % (t["体积"], t["重量"], t["平均品位"] or 0, t["金属量"]))

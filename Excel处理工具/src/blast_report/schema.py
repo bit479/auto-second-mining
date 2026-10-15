@@ -10,6 +10,8 @@ __all__ = [
     "COL_TYPE", "COL_BODY", "COL_VOLUME", "COL_WEIGHT", "COL_GRADE", "COL_METAL",
     "OUTPUT_COLUMNS", "COLUMN_SYNONYMS", "NUMERIC_COLUMNS",
     "SUMMARY_TOKENS", "parse_grade_range", "grade_sort_key",
+    "MODE_TOTAL", "MODE_DETAIL", "MODES", "MODE_LABELS",
+    "GRADE_BANDS", "TOTAL_TOKENS", "band_of_grade", "DEFAULT_MINE_PREFIX",
 ]
 
 # 业务标准列名
@@ -112,3 +114,55 @@ def grade_sort_key(text: Any) -> tuple:
     """品位档排序键：档次由高到低，同档按下限降序。"""
     low, high = parse_grade_range(text)
     return (-low, -high)
+
+
+# --------------------------------------------------------------------------
+# 汇总方式
+# --------------------------------------------------------------------------
+# total  —— 每份源文件的「总计」行整体当成一个矿块（1011 起的新口径）
+# detail —— 把每行明细拆出来按品位档归组（0915/0922/1008 的旧口径）
+MODE_TOTAL = "total"
+MODE_DETAIL = "detail"
+MODES = (MODE_TOTAL, MODE_DETAIL)
+MODE_LABELS = {
+    MODE_TOTAL: "按每个文件的「总计」行汇总",
+    MODE_DETAIL: "按明细行汇总",
+}
+DEFAULT_MODE = MODE_TOTAL
+
+# 报告的"总结行"标志（第一处即汇总块结束位置）
+TOTAL_TOKENS = ("总计", "合计", "共计")
+
+# --------------------------------------------------------------------------
+# 品位档区间（3DMine 报告口径）
+# --------------------------------------------------------------------------
+# 判定规则：下限含、上限不含。即 0.500 归入 "0.500-1.000"。
+# 最后一个区间上限为 None（表示无上限）。
+GRADE_BANDS = (
+    (0.0, 0.5, "0.000-0.500"),
+    (0.5, 1.0, "0.500-1.000"),
+    (1.0, 1.5, "1.000-1.500"),
+    (1.5, 3.0, "1.500-3.000"),
+    (3.0, None, "3.000-999.000"),
+)
+
+# 默认矿名前缀：路径里找不到形如「北部山头3940平台」的段时补上
+DEFAULT_MINE_PREFIX = "北部山头"
+
+
+def band_of_grade(grade: Any) -> str:
+    """把一个品位值落到标准档位字符串。落在区间外时贴到最近的一档。"""
+    from ..excel_core.model import to_number
+
+    value = to_number(grade)
+    if value is None:
+        return ""
+    for low, high, name in GRADE_BANDS:
+        if high is None:
+            if value >= low:
+                return name
+            continue
+        if low <= value < high:
+            return name
+    return GRADE_BANDS[0][2]          # 小于 0.000 的一律贴到最低档
+

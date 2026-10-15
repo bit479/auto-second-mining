@@ -9,9 +9,11 @@ from typing import Any
 from ..excel_core.model import DataTable, to_number, to_text
 from ..excel_core.reader import detect_header_row, read_workbook
 from .schema import (COL_BODY, COL_GRADE, COL_METAL, COL_TYPE, COL_VOLUME,
-                     COL_WEIGHT, COLUMN_SYNONYMS, NUMERIC_COLUMNS, SUMMARY_TOKENS)
+                     COL_WEIGHT, COLUMN_SYNONYMS, NUMERIC_COLUMNS,
+                     SUMMARY_TOKENS, TOTAL_TOKENS)
 
-__all__ = ["BlockRecord", "SourceReport", "parse_report_file", "parse_report_files"]
+__all__ = ["BlockRecord", "SourceReport", "parse_report_file", "parse_report_files",
+           "find_total_values", "truncate_at_total"]
 
 
 @dataclass
@@ -37,10 +39,58 @@ class SourceReport:
     header: list[str] = field(default_factory=list)
     raw_rows: list[list[Any]] = field(default_factory=list)  # 含"小计"行的原始行，用于附录
     records: list[BlockRecord] = field(default_factory=list)
+    total_values: dict | None = None    # 第一处"总计/合计"行的四个数值（按"总计"行当矿块时用）
+    total_index: int = -1               # 该行在 raw_rows 里的下标，-1 表示没找到
 
     @property
     def name(self) -> str:
         return os.path.basename(self.path)
+
+
+def _column_positions(header_row: list[Any]) -> dict[str, int]:
+    """表头行 -> {标准列名: 列下标}（按真实列位，不过滤空表头）。"""
+    index_of: dict[str, int] = {}
+    for i, raw in enumerate(header_row):
+        std = COLUMN_SYNONYMS.get(to_text(raw))
+        if std and std not in index_of:
+            index_of[std] = i
+    return index_of
+
+
+def find_total_values(matrix: list[list[Any]], header_row: int) -> tuple[dict | None, int]:
+    """在表头下方找**第一处**"总计/合计"行，取出体积/重量/品位/金属量。
+
+    返回 ``(数值字典, 它在数据行中的序号)``；找不到返回 ``(None, -1)``。
+    只看第一处，总计行下面挂着的杂项行一律不管。
+    """
+    header = matrix[header_row] if header_row < len(matrix) else []
+    index_of = _column_positions(header)
+
+    def pick(row: list[Any], column: str) -> float | None:
+        pos = index_of.get(column)
+        return to_number(row[pos]) if pos is not None and pos < len(row) else None
+
+    walked = 0
+    for row in matrix[header_row + 1:]:
+        if all(to_text(v) == "" for v in row):
+            continue
+        if to_text(row[0] if row else "") in TOTAL_TOKENS:
+            return {
+                COL_VOLUME: pick(row, COL_VOLUME),
+                COL_WEIGHT: pick(row, COL_WEIGHT),
+                COL_GRADE: pick(row, COL_GRADE),
+                COL_METAL: pick(row, COL_METAL),
+            }, walked
+        walked += 1
+    return None, -1
+
+
+def truncate_at_total(raw_rows: list[list[Any]]) -> list[list[Any]]:
+    """把附录行截到"总计/合计"行为止（丢掉总计行下面挂着的杂项行）。"""
+    for i, row in enumerate(raw_rows):
+        if to_text(row[0] if row else "") in TOTAL_TOKENS:
+            return raw_rows[:i + 1]
+    return raw_rows
 
 
 def parse_report_file(path: str) -> SourceReport:
@@ -69,6 +119,8 @@ def parse_report_matrix(matrix: list[list[Any]], path: str = "", sheet: str = "S
             continue
         raw.append([row[i] if i < len(row) else None for i in range(ncol)])
     report.raw_rows = raw
+
+    report.total_values, report.total_index = find_total_values(matrix, hr)
 
     table = DataTable.from_matrix(matrix[hr:], name=sheet, source=os.path.basename(path))
     table = table.map_columns(COLUMN_SYNONYMS)

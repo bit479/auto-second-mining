@@ -4,9 +4,20 @@
 
 1. **报告汇总**：把若干份 3DMine 炮孔数据库报告汇总成一份炮孔数据报告。
 
+   汇总方式有两种（``--mode``，默认 ``total``）：
+
+   * ``total``（1011 起的新口径）—— 每份源文件的「总计」行整体当成一个矿块，
+     按矿块品位落档、档位从高到低排、同档内保持文件顺序、体号重新编号；
+   * ``detail``（0915/0922/1008 的旧口径）—— 把每行明细拆开按品位档归组。
+
    .. code-block:: bat
 
-      python main.py -d "D:\\handle" -p "工作簿*.xlsx" -o "D:\\handle\\3940平台 1008炮孔数据报告.xlsx"
+      python main.py -i "工作表1.xls" "工作表2.xls" "工作表3.xls" "工作表4.xls"
+      python main.py -d "…\\Desktop\\3940平台\\1011" -p "工作表*.xls"
+      python main.py -d "…\\handle" -p "工作簿*.xlsx" --mode detail -o "…\\3940平台 1008炮孔数据报告.xlsx"
+
+   不给 ``-o`` 时输出到第一个输入文件所在目录，文件名按
+   「<矿名><平台>平台<日期>炮孔数据报告.xlsx」生成。
 
 2. **单日并入总表**：把某一天的 xls / mdb / 报告 并入 2026 年三份总表。
 
@@ -28,6 +39,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.blast_report.builder import MergeOptions, merge_reports  # noqa: E402
+from src.blast_report import naming  # noqa: E402
+from src.blast_report.schema import (DEFAULT_MINE_PREFIX, DEFAULT_MODE,  # noqa: E402
+                                     MODE_LABELS, MODES)
 from src.excel_core.reader import find_input_files, natural_key_compat  # noqa: E402
 
 natural_key = natural_key_compat
@@ -50,9 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
     g1.add_argument("-p", "--pattern", default=DEFAULT_PATTERN,
                     help="目录收集时的文件名匹配模式，默认 %(default)s")
     g1.add_argument("-o", "--output", required=False, default=None,
-                    help="输出 xlsx 路径")
+                    help="输出 xlsx 路径；留空则写到第一个输入文件所在目录，"
+                         "文件名取「<矿名><平台>平台<日期>炮孔数据报告.xlsx」")
     g1.add_argument("-t", "--title", default=None,
-                    help="报告大标题，默认取输出文件名（不含扩展名）")
+                    help="报告大标题，默认按「矿名+平台+日期」推断"
+                         "（如 北部山头3940平台1011炮孔数据报告）")
+    g1.add_argument("--mode", choices=list(MODES), default=DEFAULT_MODE,
+                    help="汇总方式，默认 %(default)s —— "
+                         "total=每个文件的「总计」行当一个矿块；detail=把明细行拆开按档汇总")
+    g1.add_argument("--mine-prefix", dest="mine_prefix", default=None,
+                    help="标题里的矿名前缀，默认 %s" % DEFAULT_MINE_PREFIX)
     g1.add_argument("--no-appendix", action="store_true",
                     help="不在下方追加各源文件的原始报告")
     g1.add_argument("--values", action="store_true",
@@ -103,24 +124,28 @@ def run_merge(args: argparse.Namespace) -> int:
     if not files:
         print("[错误] 没有找到任何输入文件，请用 -i 或 -d/-p 指定。")
         return 2
-    if not args.output:
-        print("[错误] 请用 -o 指定输出文件路径。")
-        return 2
+
+    title = args.title or naming.guess_title(files, args.output, args.mine_prefix)
+    output = args.output or naming.default_output_path(files, title)
 
     print("[输入] 共 %d 个文件：" % len(files))
     for f in files:
         print("       - %s" % f)
+    print("[方式] %s" % MODE_LABELS.get(args.mode, args.mode))
+    print("[标题] %s" % (title or os.path.splitext(os.path.basename(output))[0]))
+    print("[输出] %s" % output)
 
     options = MergeOptions(
         title=args.title,
         with_appendix=not args.no_appendix,
         appendix_gap=args.gap,
         use_formula=not args.values,
+        mode=args.mode,
+        mine_prefix=args.mine_prefix,
     )
-    result = merge_reports(files, args.output, options)
+    result = merge_reports(files, output, options)
 
-    print("[输出] %s" % result["output"])
-    print("[汇总] 矿块明细 %d 条，品位档 %s" % (result["blocks"], " / ".join(result["tiers"])))
+    print("[汇总] 矿块 %d 个，品位档 %s" % (result["blocks"], " / ".join(result["tiers"])))
     t = result["total"]
     print("[合计] 体积 %.3f m3 | 重量 %.3f t | 平均品位 %.4f g/t | 金属量 %.3f 百克"
           % (t["体积"], t["重量"], t["平均品位"] or 0, t["金属量"]))
@@ -227,7 +252,7 @@ def main(argv=None) -> int:
             return 0
         return launch(tab=args.tab)
 
-    if not args.output:
+    if not (args.inputs or args.dir):
         parser.print_help()
         return 0
     return run_merge(args)
