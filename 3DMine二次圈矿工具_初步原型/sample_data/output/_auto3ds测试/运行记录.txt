@@ -1,0 +1,29 @@
+3970平台 1011 二次圈矿运行记录
+运行时间：2026-10-15 12:42:17
+结果：成功
+总耗时：1.8 秒
+
+【输入】
+  炮孔数据库：D:\WK\N CRT\北部山头3970平台2026\7、单日数据\北部山头3970平台-1011\1、3970平台 炮孔数据库1011.xls
+  综合图 DWG：D:\WK\N CRT\北部山头3970平台2026\5、 北部山头3970平台二次圈矿矿块图-2026综合.dwg
+【参数】
+  extrude_m=3.0 / zone_link_m=15.0 / min_fragment_m2=40.0 / merge_gap_m=8.0 / grid_res_m=1.0 / simplify_m=0.8 / ring_alpha_k=0.0 / ring_mode=chain / isolated_min_holes=3 / chain_left=[] / chain_right=[] / chain_exclude=[] / chain_smooth_m=0.0 / repair_tip_m=0.8 / end_pair_beyond=True / seam_join_m=0.5 / outline_files=[] / manual_blocks=['D:\\WK\\N CRT\\北部山头3970平台2026\\7、单日数据\\北部山头3970平台-1011\\选择集对象分品位.3ds'] / block_merge_gap=0.0 / same_block=[] / density_waste=2.65 / density_ore=2.7 / platform=3970 / blast=1011
+【产出文件】
+  sample_data\output\_auto3ds测试\3970平台 1011炮孔数据报告.xlsx
+  sample_data\output\_auto3ds测试\3970平台 1011炮孔数据报告.png
+  sample_data\output\_auto3ds测试\3970平台 1011二次圈矿矿块图.dxf
+  sample_data\output\_auto3ds测试\3970平台 1011矿块边界线.3ds
+
+【运行日志】
+  模式：**人工圈矿**（1 个 .3ds：每条闭合线当一块，程序只算量出图）
+  参数：容重 废 2.65 / 矿 2.70；金属量 = 重量×品位÷100（百克，3 位小数）
+  [自动取用] 炮区文件夹里的 选择集对象分品位.3ds（2 条闭合线）——不想用它就在界面上指定别的 .3ds，或把该文件移开
+  综合图历史矿块 90 个
+  数据库: D:\WK\N CRT\北部山头3970平台2026\7、单日数据\北部山头3970平台-1011\1、3970平台 炮孔数据库1011.xls
+  炮孔 66 个；矿孔 25 个；主矿化带 25 孔；孤立待取样 0 组
+  外围矿界面积 = 42.812 m2
+  外围矿界面积 = 694.095 m2
+     1 号 1.000-1.500     42.812 m2     513.738 m3    1386.732 t  1.135 g/t  15.739 百克  (P8、P9)
+     2 号 0.500-1.000    694.095 m2    8754.351 m3   23558.980 t  0.651 g/t  153.413 百克  (P13、P15、P16、P20、P21、P24、P25、P28、P29、P30、P32、P33、P34、P37、P39、P41、P43、P46、P49、P50、P51、P52、P56、P66)
+  合计 9268.089 m3 / 24945.712 t / 169.153 百克
+  完成 -> sample_data\output\_auto3ds测试

@@ -42,6 +42,7 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
+VERSION = "v1.2.2"          # 界面上会显示——以后一眼就能看出跑的是哪版代码
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -80,7 +81,7 @@ def count_3ds_lines(paths) -> int:
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("二次圈矿工具客户端")
+        root.title("二次圈矿工具客户端  %s" % VERSION)
         root.geometry("940x740")
         root.minsize(760, 560)
         self._manual_dwg = None      # 拖进来的"人工圈矿图"，给"标定本炮区"直接用
@@ -393,6 +394,24 @@ class App:
                 self.var_comp.set(str(cand))
                 break
         self.refresh_params()
+        # 注意顺序：refresh_params() 会按"平台+日期"重填参数框（含轮廓框），
+        # 所以自动取用的 .3ds 必须**在它之后**写。
+        # 炮区文件夹里如果有 .3ds（比如"选择集对象.3ds"），**自动填上并选好模式**——
+        # 用户 2026-10-15：他的习惯就是把它放这儿，不想每次在界面上找
+        threes = sorted(folder.glob("*.3ds"))
+        if threes:
+            pick = next((c for c in threes if "分品位" in c.name), threes[0])
+            n = count_3ds_lines([str(pick)])
+            self.var_outline.set(str(pick))
+            mode = "exact" if n <= 1 else "manual"
+            self.var_mode.set(mode)
+            self.log.delete("1.0", "end")
+            self.log_line("炮区文件夹里发现 %d 个 .3ds，自动取用：%s（%d 条闭合线）"
+                          % (len(threes), pick.name, n))
+            self.log_line("   模式自动设为：%s" % ("③ 精确模式（整条当矿界、界内按品位分块）"
+                                              if mode == "exact" else
+                                              "② 人工圈矿（每条闭合线 = 一块）"))
+            self.log_line("   —— 要用别的 .3ds 或改成①自动圈矿，在参数区自己改。")
 
     def browse_comp(self):
         f = filedialog.askopenfilename(

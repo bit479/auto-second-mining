@@ -73,6 +73,7 @@ def convert(dxf: Path, dwg: Path = None, start: bool = False,
     except Exception:
         pythoncom_ok = False
     doc = None
+    alt = None
     try:
         doc = acad.Documents.Open(str(dxf), True)      # 只读打开
         time.sleep(1.5)
@@ -81,13 +82,22 @@ def convert(dxf: Path, dwg: Path = None, start: bool = False,
                 dwg.unlink()
             except Exception:
                 pass
-        doc.SaveAs(str(dwg), ACAD_ENUM_2010)
+        try:
+            doc.SaveAs(str(dwg), ACAD_ENUM_2010)
+        except Exception:
+            # 目标 DWG 被占着（最常见：这张图正开在 AutoCAD 里）→ 换个名字存，
+            # 免得整步白跑（用户 2026-10-15 就是这么撞上的）
+            alt = dwg.with_name(dwg.stem + "_new" + dwg.suffix)
+            doc.SaveAs(str(alt), ACAD_ENUM_2010)
+            dwg = alt
         time.sleep(1.0)
         head = dwg.read_bytes()[:6].decode("ascii", "ignore") if dwg.exists() else ""
         if not dwg.exists():
             return False, "SaveAs 未生成文件"
-        return True, "DWG 版本头 %s（AC1024=DWG2010），%.1f KB" % (
-            head, dwg.stat().st_size / 1024.0)
+        tail = ("（原来那个 .dwg 被占着——多半是你正开着它；这份是新存的：%s）"
+                % alt.name) if alt else ""
+        return True, "DWG 版本头 %s（AC1024=DWG2010），%.1f KB%s" % (
+            head, dwg.stat().st_size / 1024.0, tail)
     except Exception as exc:
         return False, "转换异常：%s" % exc
     finally:

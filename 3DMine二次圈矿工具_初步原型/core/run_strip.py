@@ -82,6 +82,21 @@ def main() -> None:
                     manual_blocks = val
                 else:
                     outline = val
+    # 没在命令行/参数里给 .3ds 时，**自己去炮区文件夹里找**（用户 2026-10-15：
+    # 他的习惯就是把"选择集对象.3ds"放在数据库旁边，希望程序直接用）。
+    auto_3ds = None
+    if not manual_blocks and not outline:
+        cands = sorted(xls.parent.glob("*.3ds"))
+        if cands:
+            # 优先"分品位"那份（他自己按品位分好的），否则取第一个
+            pick = next((c for c in cands if "分品位" in c.name), cands[0])
+            from strip import read_3ds_polylines as _r3
+            n = len(_r3(pick))
+            auto_3ds = (pick, n)
+            if n <= 1:
+                outline = [str(pick)]
+            else:
+                manual_blocks = [str(pick)]
     log = []
 
     def note(s):
@@ -99,9 +114,15 @@ def main() -> None:
              % len(P["manual_blocks"]))
         note("参数：容重 废 %.2f / 矿 %.2f；金属量 = 重量×品位÷100（百克，3 位小数）"
              % (P.get("density_waste", 2.65), P.get("density_ore", 2.7)))
+    elif P.get("outline_files"):
+        note("模式：**精确模式**（%d 个 .3ds：整条当矿界、界内按品位档分块；矿界原样用，"
+             "不抽稀/不修补/不并综合图）" % len(P["outline_files"]))
     else:
         note("参数：外推 %.2f m / 连接半径 %.1f m / 最小块段 %.0f m² / 接综合图 %.1f m"
              % (P["extrude_m"], P["zone_link_m"], P["min_fragment_m2"], P["merge_gap_m"]))
+    if auto_3ds:
+        note("[自动取用] 炮区文件夹里的 %s（%d 条闭合线）——"
+             "不想用它就在界面上指定别的 .3ds，或把该文件移开" % (auto_3ds[0].name, auto_3ds[1]))
 
     comp = []
     if comp_dwg:
