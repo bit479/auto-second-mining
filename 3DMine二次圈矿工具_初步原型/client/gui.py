@@ -42,7 +42,9 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.2.2"          # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.3"            # 界面上会显示——以后一眼就能看出跑的是哪版代码
+EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
+EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -214,6 +216,20 @@ class App:
                                     command=self.open_accept_report, state="disabled",
                                     padx=10)
         self.btn_report.pack(side="left", padx=8)
+
+        # ---- Excel 工具（整合进来的"炮孔数据工具"：报告汇总 / 单日并入总表）----
+        xt = tk.LabelFrame(root, text="Excel 工具（报告汇总 / 单日数据并入总表）", padx=10, pady=6)
+        xt.pack(fill="x", padx=10, pady=(0, 4))
+        tk.Button(xt, text="炮孔报告汇总…", padx=10,
+                  command=lambda: self.open_excel_tool("report")).pack(side="left")
+        tk.Button(xt, text="单日数据并入总表…", padx=10,
+                  command=lambda: self.open_excel_tool("daily")).pack(side="left", padx=8)
+        tk.Label(xt, text="（上面两个打开完整窗口：选文件/目录、有预演与还原）",
+                 fg="#666").pack(side="left", padx=(4, 12))
+        tk.Button(xt, text="把数据库所在的那天并入总表（预演）", padx=10,
+                  command=lambda: self.merge_day(dry=True)).pack(side="left")
+        tk.Button(xt, text="正式并入", padx=10,
+                  command=lambda: self.merge_day(dry=False)).pack(side="left", padx=6)
 
         # ---- 日志 ----
         tk.Label(root, text="运行日志：", anchor="w").pack(fill="x", padx=10)
@@ -501,6 +517,48 @@ class App:
                 os.startfile(str(ACCEPT_REPORT))
             except Exception:
                 pass
+
+    # ---------- Excel 工具（整合进来的"炮孔数据工具"）----------
+    def open_excel_tool(self, tab: str = "report"):
+        """打开完整窗口：报告汇总（tab=report）/ 单日并入总表（tab=daily）。"""
+        if not EXCEL_MAIN.exists():
+            messagebox.showwarning("找不到工具", "没见过 %s" % EXCEL_MAIN)
+            return
+        try:
+            subprocess.Popen([PY, "-X", "utf8", str(EXCEL_MAIN), "--gui", "--tab", tab],
+                             cwd=str(EXCEL_TOOLS))
+            self.log_line("已打开 Excel 工具：%s（%s）"
+                          % ("单日数据并入总表" if tab == "daily" else "炮孔报告汇总", EXCEL_MAIN))
+        except Exception as ex:
+            messagebox.showerror("打开失败", str(ex))
+
+    def merge_day(self, dry: bool = True):
+        """把"当前数据库所在的那个单日文件夹"并入年度总表（调用整合进来的 daily_merge）。"""
+        if self.busy:
+            return
+        xls = self.var_xls.get().strip()
+        if not xls or not Path(xls).exists():
+            messagebox.showwarning("缺少输入", "先选一个炮孔数据库 Excel——用它所在的文件夹当单日目录。")
+            return
+        day_dir = str(Path(xls).parent)
+        if not dry:
+            if not messagebox.askyesno(
+                    "确认并入总表",
+                    "把这一天的三份文件并入年度总表：\n%s\n\n"
+                    "（工具会先备份成 <原名>_并入<日>.bak；按工程号判重，重复运行安全）\n\n"
+                    "确定现在正式写入吗？" % day_dir):
+                return
+        cmd = [PY, "-X", "utf8", str(EXCEL_MAIN), "--daily", "--day-dir", day_dir]
+        if dry:
+            cmd.append("--dry-run")
+
+        def done(ok):
+            self.var_res.set("并入总表%s：%s\n日志见上"
+                             % ("（预演）" if dry else "（正式）",
+                                "完成 ✓" if ok else "有失败项，见日志"))
+
+        self._run_stream("单日数据并入总表（%s）\n单日目录：%s"
+                         % ("预演，不写盘" if dry else "正式写入", day_dir), cmd, done)
 
     def set_busy(self, busy):
         self.busy = busy

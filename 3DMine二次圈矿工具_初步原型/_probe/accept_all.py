@@ -131,6 +131,23 @@ except Exception as exc:
     emit("自检异常：%s" % exc)
     results.append(("④ 精确模式自检", False, 1))
 
+# ⑤ 整合进来的"Excel 工具"（炮孔数据工具）自己的三项自检
+XL = ROOT / "excel_tools"
+if XL.exists():
+    xl_ok = True
+    for name, script in (("报告汇总(total口径)", "tests/test_by_total.py"),
+                         ("报告汇总(detail口径)", "tests/test_merge.py"),
+                         ("单日数据并入总表", "tests/test_daily_merge.py")):
+        p = subprocess.run([sys.executable, "-X", "utf8", str(XL / script)],
+                           cwd=str(XL), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+        out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+        emit("")
+        emit("== ⑤ Excel 工具自检：%s" % name)
+        emit(out.splitlines()[-1] if out else "(没有输出)")
+        xl_ok = xl_ok and p.returncode == 0
+    results.append(("⑤ Excel 工具自检（3 项）", xl_ok, 0 if xl_ok else 1))
+
 emit("")
 emit("=" * 78)
 emit("== 汇总")
