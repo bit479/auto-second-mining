@@ -170,9 +170,15 @@ def main() -> None:
         write_dxf(blocks, allh, [], meta, dxf,
                   report_png=png_used, report_px=(pw, ph),
                   pending=[("L1", g) for g in pending], composite_blocks=comp,
-                  merge_candidates=cands)
+                  merge_candidates=cands,
+                  # 用了人工画的 .3ds（人工圈矿 / 精确模式）：**不并综合图、不画综合图参照线**——
+                  # 成果图必须严格就是我画的那几条线（用户 2026-10-15）
+                  check_merge=not (P.get("manual_blocks") or P.get("outline_files")))
         made.append(dxf)
-        write_3ds(blocks, meta, tds, composite_blocks=comp, merge_candidates=cands)
+        _keep_comp = None if (P.get("manual_blocks") or P.get("outline_files")) else comp
+        _keep_cands = None if (P.get("manual_blocks") or P.get("outline_files")) else cands
+        write_3ds(blocks, meta, tds,
+                  composite_blocks=_keep_comp, merge_candidates=_keep_cands)
         made.append(tds)
     except PermissionError as exc:
         note("[错误] 有成果文件正被占用（多半是 Excel/CAD 开着同名文件）：%s" % exc)

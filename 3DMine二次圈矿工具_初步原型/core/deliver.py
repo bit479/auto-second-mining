@@ -290,7 +290,8 @@ BLANK_NOTE = "（缺工程，待取样验证后再进行施工）"
 def write_dxf(blocks, holes_all, cells, meta, path: Path,
               report_png: Path = None, report_px=None,
               pending=None, composite_blocks=None, merge_gap: float = 8.0,
-              check_merge: bool = True, merge_candidates=None) -> None:
+              check_merge: bool = True, merge_candidates=None,
+              draw_composite: bool = False) -> None:
     from ezdxf import new
 
     doc = new("R2010")
@@ -309,7 +310,9 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
                 "L3": "1.500-3.000", "L4": "3.000-999.000"}
     # 0) 综合图历史矿块（细线参照）+ 当日矿块与综合图合并后的轮廓
     merged_outlines = []
-    if composite_blocks:
+    # 用户 2026-10-15：**最终成果图里不要画综合图的边界**（那 85 条灰线参照），
+    # 只保留"当日矿块（含并进来的历史块）"的彩色轮廓。要参照时把 draw_composite 打开。
+    if composite_blocks and draw_composite:
         for _, col, p in composite_blocks:
             rings = [p.exterior] + list(p.interiors)
             for r in rings:

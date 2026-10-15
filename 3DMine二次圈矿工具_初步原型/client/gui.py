@@ -66,6 +66,17 @@ def _acad_running() -> bool:
         return False
 
 
+def count_3ds_lines(paths) -> int:
+    """数一下这几个 .3ds 里一共有几条闭合折线——用来帮用户判断该用哪种模式。"""
+    try:
+        if str(CORE) not in sys.path:
+            sys.path.insert(0, str(CORE))
+        from strip import read_3ds_polylines
+        return sum(len(read_3ds_polylines(p)) for p in paths if Path(p).exists())
+    except Exception:
+        return 0
+
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -140,11 +151,16 @@ class App:
             row=6, column=2, columnspan=4, sticky="we", pady=(6, 0))
         tk.Button(pf, text="…", width=3,
                   command=self.browse_outline).grid(row=6, column=6, padx=6, sticky="w")
-        self.var_manual = tk.BooleanVar(value=False)
-        tk.Checkbutton(pf, text="勾上 = 人工圈矿模式（.3ds 里每条闭合线算一块，程序只算量出图）；"
-                                "不勾 = 精确模式（整条当矿界、界内按品位再分块）",
-                       variable=self.var_manual, fg="#0a6").grid(
-            row=7, column=0, columnspan=8, sticky="w", pady=(2, 0))
+        # 三种模式用单选按钮，避免"填了 .3ds 却忘了切换模式"
+        self.var_mode = tk.StringVar(value="auto")
+        mrow = tk.Frame(pf)
+        mrow.grid(row=7, column=0, columnspan=8, sticky="w", pady=(4, 0))
+        tk.Label(mrow, text="圈矿模式：", fg="#0a6").pack(side="left")
+        for val, txt in (("auto", "① 自动圈矿（程序自己圈，不用 .3ds）"),
+                         ("manual", "② 人工圈矿（我画 .3ds，每条闭合线 = 一块，只算量出图）"),
+                         ("exact", "③ 精确模式（.3ds 整条当矿界，界内按品位再分块）")):
+            tk.Radiobutton(mrow, text=txt, value=val, variable=self.var_mode,
+                           fg="#0a6").pack(side="left", padx=(6, 0))
         tk.Button(pf, text="存为该平台默认", command=self.save_params).grid(
             row=8, column=0, padx=(6, 4), pady=(8, 0), sticky="w")
         tk.Button(pf, text="存为该炮区", command=lambda: self.save_params(blast=True)).grid(
@@ -687,6 +703,26 @@ class App:
             return
         out = self.var_out.get().strip() or str(Path(xls).parent)
         Path(out).mkdir(parents=True, exist_ok=True)
+        # 防呆：填了 .3ds 却选"自动圈矿"——直接问一句，别又白跑一次
+        outlines = [x.strip() for x in self.var_outline.get().split(";") if x.strip()]
+        mode = self.var_mode.get()
+        if outlines and mode == "auto":
+            n = count_3ds_lines(outlines)
+            # 1 条闭合线 = 多半是"整个矿界"，界内还要按品位分块 → 精确模式；
+            # 多条线 = 多半是"一块一条线" → 人工圈矿模式。
+            suggest, how = (("exact", "③ 精确模式（整条当矿界、界内按品位再分块）")
+                            if n <= 1 else
+                            ("manual", "② 人工圈矿（%d 条闭合线 = %d 块，只算量出图）" % (n, n)))
+            if messagebox.askyesno(
+                    "模式没切",
+                    "你填了 .3ds 轮廓（里面 %d 条闭合线）：\n%s\n\n"
+                    "但圈矿模式选的是「① 自动圈矿」——那样**不会用你的线**。\n\n"
+                    "要不要改用 %s？\n\n"
+                    "选「是」= 就按它跑；选「否」= 忽略这个 .3ds、按自动圈矿跑"
+                    % (n, "\n".join(outlines[:3]), how)):
+                mode = suggest
+                self.var_mode.set(suggest)
+                self.log_line("（已按提示切到「%s」）" % how)
         self.var_res.set("（生成中...）")
         self.set_busy(True)
         self.log.delete("1.0", "end")
@@ -697,20 +733,21 @@ class App:
         self.log_line("-" * 68)
         threading.Thread(target=self.run_pipeline,
                          args=(xls, platform, date, out, comp,
-                               [x.strip() for x in self.var_outline.get().split(";") if x.strip()],
-                               bool(self.var_manual.get())), daemon=True).start()
+                               outlines, mode), daemon=True).start()
 
-    def run_pipeline(self, xls, platform, date, out, comp, outlines=None, manual=False):
+    def run_pipeline(self, xls, platform, date, out, comp, outlines=None, mode="auto"):
         tag = "%s平台 %s" % (platform, date)
         ok_all = True
-        # 人工画线：人工圈矿模式 → --manual-blocks（每条线一块）；否则精确模式 → --outline（整条当矿界）
+        # 人工画线：② 人工圈矿 → --manual-blocks（每条线一块）；③ 精确模式 → --outline（整条当矿界）
         extra = []
-        if outlines:
-            extra += (["--manual-blocks", ";".join(outlines)] if manual
+        if outlines and mode in ("manual", "exact"):
+            extra += (["--manual-blocks", ";".join(outlines)] if mode == "manual"
                       else ["--outline", ";".join(outlines)])
             self.log_line("人工画线：%s（%s）" % (
-                "人工圈矿模式：每条闭合线当一块、只算量出图" if manual
+                "人工圈矿模式：每条闭合线当一块、只算量出图" if mode == "manual"
                 else "精确模式：整条当矿界、界内按品位再分块", ";".join(outlines)))
+        elif outlines:
+            self.log_line("（注意：填了 .3ds 但模式是「自动圈矿」，这次不用你的线）")
 
         def run(name, cmd):
             self.log_line("== %s ==" % name)

@@ -1,13 +1,13 @@
 3970平台 1011 二次圈矿运行记录
-运行时间：2026-10-15 05:59:31
+运行时间：2026-10-15 12:19:12
 结果：成功
-总耗时：248.6 秒
+总耗时：1.6 秒
 
 【输入】
   炮孔数据库：D:\WK\N CRT\北部山头3970平台2026\7、单日数据\北部山头3970平台-1011\1、3970平台 炮孔数据库1011.xls
   综合图 DWG：D:\WK\N CRT\北部山头3970平台2026\5、 北部山头3970平台二次圈矿矿块图-2026综合 - 副本.dwg
 【参数】
-  extrude_m=3.0 / zone_link_m=15.0 / min_fragment_m2=40.0 / merge_gap_m=8.0 / grid_res_m=1.0 / simplify_m=0.8 / ring_alpha_k=0.0 / ring_mode=chain / isolated_min_holes=3 / chain_left=[] / chain_right=[] / chain_exclude=[] / chain_smooth_m=0.0 / repair_tip_m=0.8 / end_pair_beyond=True / seam_join_m=0.5 / outline_files=[] / block_merge_gap=0.0 / same_block=[] / density_waste=2.65 / density_ore=2.7 / platform=3970 / blast=1011
+  extrude_m=3.0 / zone_link_m=15.0 / min_fragment_m2=40.0 / merge_gap_m=8.0 / grid_res_m=1.0 / simplify_m=0.8 / ring_alpha_k=0.0 / ring_mode=chain / isolated_min_holes=3 / chain_left=[] / chain_right=[] / chain_exclude=[] / chain_smooth_m=0.0 / repair_tip_m=0.8 / end_pair_beyond=True / seam_join_m=0.5 / outline_files=[] / manual_blocks=[] / block_merge_gap=0.0 / same_block=[] / density_waste=2.65 / density_ore=2.7 / platform=3970 / blast=1011
 【产出文件】
   D:\WK\N CRT\北部山头3970平台2026\7、单日数据\北部山头3970平台-1011\二次圈矿成果_3970_1011\3970平台 1011炮孔数据报告.xlsx
   D:\WK\N CRT\北部山头3970平台2026\7、单日数据\北部山头3970平台-1011\二次圈矿成果_3970_1011\3970平台 1011炮孔数据报告.png

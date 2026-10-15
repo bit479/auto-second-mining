@@ -74,6 +74,9 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
 
     blocks, rings, warns = [], [], []
     seam = float(P.get("seam_join_m", 0.0) or 0.0)
+    # 用了人工画的 .3ds（精确模式 / 人工圈矿）：矿界就是人家画的线，
+    # **不抽稀、不修补、也不跟综合图贴合**——否则图上就不是他画的那条线了。
+    from_outline = bool(P.get("outline_files") or P.get("manual_blocks"))
     # ---- 分块模式 ----
     # "clusters"（3960 用）：**每个"同档+相邻"的孔簇各取自己的领地当矿界**，
     #   簇与簇之间留空白——3960 人工图就是这种一段段互不相连的窄条带。
@@ -112,12 +115,11 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
             # 孤立小组：用"领地 + 凸包外扩上限"这条规则（邻孔分界线天然挡住）
             ring = isolated_ring(zn, allh, P["extrude_m"], P["simplify_m"])
         elif P.get("outline_files"):
-            # 精确模式：直接拿人工在 3DMine 里画好的几段线拼出来的矿界
+            # 精确模式：直接拿人工在 3DMine 里画好的几段线拼出来的矿界，
+            # **原样用**（不抽稀、不修补、不与综合图贴合）——用户要的就是他画的线
             ring = ring_from_outline_files(P["outline_files"])
-            if ring is None:
-                ring = zone_outline(zn, allh, P["extrude_m"], comp_blocks=comp_blocks,
-                                    merge_gap=P["merge_gap_m"], blast=blast,
-                                    simplify=P["simplify_m"])
+            if ring is not None:
+                LAST_RING["warn"] = []
         else:
             ring = zone_outline(zn, allh, P["extrude_m"], comp_blocks=comp_blocks,
                                 merge_gap=P["merge_gap_m"], blast=blast,
@@ -131,7 +133,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                 end_pair_beyond=P.get("end_pair_beyond", True))
         if ring is None:
             continue
-        ring = join_to_composite(ring, comp_blocks, seam)
+        if not from_outline:
+            ring = join_to_composite(ring, comp_blocks, seam)
         rings.append(ring)
         warns += list(LAST_RING.get("warn") or [])
         blocks += average_blocks(zn, ring, P.get("density_ore", 2.7),
