@@ -1,10 +1,12 @@
 """单日数据并入总表 —— 编排层。
 
-一次调用完成三件事：
+一次调用完成四件事：
 
 1. 解析计划（自动探测单日 / 总表文件，支持显式覆盖）；
-2. 备份三份总表（``*_并入<日>.bak``，不覆盖旧备份）；
-3. 依次并入 xls / mdb / 报告，最后复核行数与判重结果。
+2. 备份会被改动的总表（``*_并入<日>.bak``，不覆盖旧备份）；
+3. 依次并入 xls / mdb / 报告；
+4. **顺手把二次圈矿矿块图复制进总目录的「6、…二次圈矿矿块图」文件夹**（去掉「5、」前缀），
+   最后复核行数与判重结果。
 """
 
 from __future__ import annotations
@@ -14,11 +16,12 @@ import shutil
 from dataclasses import replace
 from typing import Any
 
-from . import db_mdb, db_xls, report_xlsx
-from .discover import (DailyMergeOptions, DailyMergePlan, find_master_files,
-                       resolve_plan)
-from .schema import (DB_KEY_COLUMNS, DB_TABLES, KIND_LABELS, KIND_MDB,
-                     KIND_REPORT, KIND_XLS, normalize_key)
+from . import db_mdb, db_xls, map_copy, report_xlsx
+from .discover import (DailyMergeOptions, DailyMergePlan, find_map_folder,
+                       find_master_files, resolve_plan)
+from .schema import (DB_KEY_COLUMNS, DB_TABLES, KIND_DWG, KIND_LABELS,
+                     KIND_MDB, KIND_REPORT, KIND_XLS, MERGE_KINDS,
+                     map_target_name, normalize_key)
 
 __all__ = ["DailyMergeOptions", "DailyMergePlan", "resolve_plan", "run",
            "backup_file", "verify", "summarize", "restore"]
@@ -65,6 +68,22 @@ def restore(master_dir: str, day_code: str = None) -> dict:
         shutil.copy2(master, keep)
         shutil.copy2(source, master)
         restored[kind] = "%s  <-  %s" % (os.path.basename(master), os.path.basename(source))
+
+    # 矿块图：只在明确给了日期代号时才还原 —— 6、文件夹里还躺着别的日期的 .bak，别误动
+    if day_code:
+        map_dir = find_map_folder(master_dir)
+        if map_dir:
+            for source in sorted(glob.glob(os.path.join(map_dir, "*%s.bak" % day_code)),
+                                 key=os.path.getmtime):
+                stem = source[: -len(".bak")]
+                target = stem + ".dwg"
+                if not os.path.isfile(target):
+                    continue
+                shutil.copy2(target, "%s_还原前%s.bak"
+                             % (stem, time.strftime("%Y%m%d-%H%M%S")))
+                shutil.copy2(source, target)
+                restored[KIND_DWG] = "%s  <-  %s" % (os.path.basename(target),
+                                                     os.path.basename(source))
     return restored
 
 
@@ -82,6 +101,8 @@ def _merge_one(kind: str, src: str, dst: str, options: DailyMergeOptions) -> dic
                                         with_appendix=options.with_report_appendix,
                                         skip_duplicates=options.skip_duplicates,
                                         dry_run=options.dry_run)
+    if kind == KIND_DWG:
+        return map_copy.copy_map(src, dst, backup=options.backup, dry_run=options.dry_run)
     raise ValueError("未知的数据类型：%s" % kind)
 
 
@@ -126,8 +147,11 @@ def run(options: DailyMergeOptions) -> dict:
     pending = [p for p in plan.pairs if preview.get(p[0], {}).get("added")]
 
     # 2) 备份"确实会被改动"的总表（无改动就完全不落备份文件）
+    #    矿块图的目标是文件夹，而且复制时自带 <原名>.bak 备份，这里不参与
     if options.backup:
         for kind, _src, dst in pending:
+            if kind not in MERGE_KINDS:
+                continue
             report["backups"][kind] = backup_file(dst, plan.day_code)
 
     # 3) 真正写盘；没有改动的直接沿用预演结果
@@ -212,6 +236,16 @@ def verify(plan: DailyMergePlan) -> dict:
         except Exception as exc:  # noqa: BLE001
             out[KIND_REPORT] = {"error": str(exc)}
 
+    src_map, map_dir = plan.src.get(KIND_DWG), plan.dst.get(KIND_DWG)
+    if src_map and map_dir:
+        target = os.path.join(map_dir, map_target_name(src_map))
+        exists = os.path.isfile(target)
+        out[KIND_DWG] = {
+            "target": target,
+            "exists": exists,
+            "identical": map_copy.files_identical(src_map, target) if exists else False,
+        }
+
     return out
 
 
@@ -254,6 +288,9 @@ def summarize(report: dict) -> list[str]:
 
     for kind, res in report["results"].items():
         label = KIND_LABELS[kind]
+        if kind == KIND_DWG:
+            lines.append(map_copy.describe(res))
+            continue
         if kind == KIND_REPORT:
             if res.get("skipped"):
                 lines.append("[跳过] %s：%s" % (label, res["reason"]))
@@ -285,6 +322,18 @@ def summarize(report: dict) -> list[str]:
     if info and "error" not in info:
         lines.append("[复核] %s：%d 个日报告块，%d 个合计行"
                      % (KIND_LABELS[KIND_REPORT], info["blocks"], info["total_rows"]))
+
+    info = verify_info.get(KIND_DWG)
+    if info:
+        if not info.get("exists"):
+            lines.append("[复核] %s：6、文件夹里还没有 %s"
+                         % (KIND_LABELS[KIND_DWG], os.path.basename(info["target"])))
+        elif info.get("identical"):
+            lines.append("[复核] %s：6、文件夹里的 %s 与单日图一致 ✓"
+                         % (KIND_LABELS[KIND_DWG], os.path.basename(info["target"])))
+        else:
+            lines.append("[复核] %s：6、文件夹里的 %s 与单日图内容不同！"
+                         % (KIND_LABELS[KIND_DWG], os.path.basename(info["target"])))
 
     check = report.get("totals_check") or {}
     if check.get("checked"):

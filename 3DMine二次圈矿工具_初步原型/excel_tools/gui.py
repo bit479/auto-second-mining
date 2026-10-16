@@ -282,6 +282,7 @@ class DailyTab(ttk.Frame):
         self.backup_var = tk.BooleanVar(value=True)
         self.dry_run_var = tk.BooleanVar(value=False)
         self.appendix_var = tk.BooleanVar(value=False)
+        self.map_var = tk.BooleanVar(value=True)
 
         self.plan = None
         self._build_ui()
@@ -309,7 +310,7 @@ class DailyTab(ttk.Frame):
         self.tree = ttk.Treeview(pair_box, columns=("kind", "day", "master"),
                                  show="headings", height=3)
         for col, text, width in (("kind", "类型", 150), ("day", "单日文件", 300),
-                                 ("master", "总表文件", 300)):
+                                 ("master", "目标（总表 / 6、文件夹）", 300)):
             self.tree.heading(col, text=text)
             self.tree.column(col, width=width, anchor="w")
         self.tree.pack(fill="x", padx=8, pady=8)
@@ -324,6 +325,13 @@ class DailyTab(ttk.Frame):
                         variable=self.dry_run_var).pack(side="left", padx=(0, 14))
         ttk.Checkbutton(opts, text="报告连同附录",
                         variable=self.appendix_var).pack(side="left")
+
+        opts2 = ttk.Frame(self)
+        opts2.pack(fill="x", **_PAD)
+        ttk.Checkbutton(opts2, text="同时把二次圈矿矿块图复制进 6、文件夹（去掉「5、」前缀）",
+                        variable=self.map_var).pack(side="left")
+        ttk.Label(opts2, text="（目标已有同名图且内容相同就跳过；不同则先备份成 <原名>.bak 再覆盖）",
+                  foreground="#888888").pack(side="left", padx=(6, 0))
 
         bar = ttk.Frame(self)
         bar.pack(fill="x", **_PAD)
@@ -364,6 +372,7 @@ class DailyTab(ttk.Frame):
             master_dir=self.master_var.get().strip() or None,
             skip_duplicates=self.skip_dup_var.get(),
             with_report_appendix=self.appendix_var.get(),
+            with_map=self.map_var.get(),
             backup=self.backup_var.get(),
             dry_run=self.dry_run_var.get() if dry_run is None else dry_run,
         )

@@ -2,10 +2,12 @@
 
 流程（全程在 ``_out/daily_test`` 的副本里操作，绝不碰真实数据）：
 
-1. 用 3940 平台 1008 的三个单日文件 + 三份总表搭一个沙箱；
+1. 用 3940 平台 1008 的三个单日文件 + 一张矿块图 + 三份总表搭一个沙箱；
 2. 跑一次并入，逐行比对 xls / mdb 的追加行、检查报告块的公式平移；
-3. 再跑一次，确认"判重"生效（新增 0 行、报告不重复粘）；
-4. 从备份还原，确认总表回到并入前的孔数。
+3. 检查矿块图是否复制进 ``6、…二次圈矿矿块图`` 且**去掉了「5、」前缀**；
+4. 再跑一次，确认"判重"生效（新增 0 行、报告不重复粘、矿块图不再复制）；
+5. 把目标图改脏再跑，确认它会先备份成 ``<原名>.bak`` 再覆盖；
+6. 从备份还原，确认总表回到并入前的孔数。
 
 用法::
 
@@ -21,13 +23,16 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from src.daily_merge import map_copy  # noqa: E402
 from src.daily_merge.pipeline import (DailyMergeOptions, resolve_plan,  # noqa: E402
                                       restore, run, summarize)
-from src.daily_merge.schema import KIND_MDB, KIND_REPORT, KIND_XLS  # noqa: E402
+from src.daily_merge.schema import (KIND_DWG, KIND_MDB, KIND_REPORT,  # noqa: E402
+                                    KIND_XLS)
 
 REAL_MASTER = r"D:\WK\N CRT\北部山头3940平台2026"
 REAL_DAY = os.path.join(REAL_MASTER, r"7、单日数据\北部山头3940平台-1008")
 SANDBOX = os.path.join(ROOT, "_out", "daily_test")
+MAP_FOLDER_NAME = "6、北部山头3940平台二次圈矿矿块图"
 
 MASTER_FILES = [
     "1、北部山头3940平台 炮孔数据库-2026.xls",
@@ -39,6 +44,8 @@ DAY_FILES = [
     "2、3940平台炮孔数据库1008.mdb",
     "3940平台 1008炮孔数据报告.xlsx",
 ]
+DAY_MAP_FILE = "5、 北部山头3940平台二次圈矿矿块图1008.dwg"     # 注意「5、」后面有个空格
+MAP_TARGET_NAME = "北部山头3940平台二次圈矿矿块图1008.dwg"       # 复制后应变成这个名字
 
 _checks: list[tuple[bool, str]] = []
 
@@ -51,13 +58,15 @@ def check(ok: bool, message: str) -> None:
 def build_sandbox() -> str:
     if os.path.exists(SANDBOX):
         shutil.rmtree(SANDBOX)
-    day_dir = os.path.join(SANDBOX, "北部山头3940平台2026", "7、单日数据", "北部山头3940平台-1008")
+    root = os.path.join(SANDBOX, "北部山头3940平台2026")
+    day_dir = os.path.join(root, "7、单日数据", "北部山头3940平台-1008")
     os.makedirs(day_dir)
+    os.makedirs(os.path.join(root, MAP_FOLDER_NAME))
     for name in MASTER_FILES:
-        shutil.copy2(os.path.join(REAL_MASTER, name),
-                     os.path.join(SANDBOX, "北部山头3940平台2026", name))
+        shutil.copy2(os.path.join(REAL_MASTER, name), os.path.join(root, name))
     for name in DAY_FILES:
         shutil.copy2(os.path.join(REAL_DAY, name), os.path.join(day_dir, name))
+    shutil.copy2(os.path.join(REAL_DAY, DAY_MAP_FILE), os.path.join(day_dir, DAY_MAP_FILE))
     return day_dir
 
 
@@ -140,6 +149,35 @@ def compare_report() -> None:
 # 主流程
 # --------------------------------------------------------------------------
 
+def test_map(day_dir: str) -> None:
+    """矿块图：复制到位、去掉「5、」前缀、幂等、目标被改脏时先备份再覆盖。"""
+    master = os.path.join(SANDBOX, "北部山头3940平台2026")
+    target = os.path.join(master, MAP_FOLDER_NAME, MAP_TARGET_NAME)
+    source = os.path.join(day_dir, DAY_MAP_FILE)
+
+    check(os.path.isfile(target), "矿块图已复制进 6、文件夹（文件名去掉了「5、」前缀）")
+    check(os.path.basename(target) == MAP_TARGET_NAME, "目标文件名 = %s" % MAP_TARGET_NAME)
+    check(map_copy.files_identical(source, target), "复制过去的图与单日图逐字节一致")
+
+    # 幂等：同名同内容 -> 跳过
+    again = run(DailyMergeOptions(day_dir=day_dir))
+    info = again["results"][KIND_DWG]
+    check(info.get("skipped") and not info["written"], "再跑一次：同名同内容 -> 跳过、不写盘")
+
+    # 目标被改脏 -> 先备份 <原名>.bak 再覆盖
+    with open(target, "ab") as handle:
+        handle.write(b"DIRTY")
+    info = run(DailyMergeOptions(day_dir=day_dir))["results"][KIND_DWG]
+    backup = info.get("backup") or ""
+    check(info["written"] and bool(backup) and os.path.isfile(backup),
+          "目标图被改脏后：先备份成 %s 再覆盖" % (os.path.basename(backup) or "?"))
+    check(map_copy.files_identical(source, target), "覆盖后内容与单日图一致")
+
+    # --no-map / with_map=False：整类不参与
+    off = resolve_plan(DailyMergeOptions(day_dir=day_dir, with_map=False))
+    check(KIND_DWG not in [p[0] for p in off.pairs], "with_map=False 时矿块图整类不参与")
+
+
 def main() -> int:
     print("=" * 78)
     print("沙箱：", SANDBOX)
@@ -152,9 +190,11 @@ def main() -> int:
         print(line)
     print("-" * 78)
 
-    check(len(plan.pairs) == 3, "自动识别出 3 对文件")
+    merge_pairs = [k for k, _s, _d in plan.pairs if k != KIND_DWG]
+    check(len(merge_pairs) == 3, "自动识别出 3 对要并入的文件")
+    check(KIND_DWG in [k for k, _s, _d in plan.pairs], "另外识别出 1 张二次圈矿矿块图")
 
-    print("\n[1/4] 首次并入")
+    print("\n[1/5] 首次并入")
     report = run(options)
     for line in summarize(report):
         print("   " + line)
@@ -174,28 +214,42 @@ def main() -> int:
         check(report["results"][KIND_REPORT]["added"] == 8, "报告追加 8 行块")
         check(len(report["backups"]) == 3, "三份总表都已备份")
 
-    print("\n[2/4] 逐行比对")
+    print("\n[2/5] 逐行比对")
     compare_xls(day_dir)
     compare_mdb(day_dir)
     compare_report()
 
-    print("\n[3/4] 重复执行（判重）")
+    print("\n[3/5] 重复执行（判重）")
     again = run(DailyMergeOptions(day_dir=day_dir))
     check(again["results"][KIND_XLS]["added"] == 0, "xls 第二次新增 0 行")
     check(again["results"][KIND_MDB]["added"] == 0, "mdb 第二次新增 0 行")
     check(again["results"][KIND_REPORT].get("skipped"), "报告第二次未重复粘贴")
     check(not again["backups"], "没有改动就不产生多余备份")
 
-    print("\n[4/4] 还原备份")
-    done = restore(os.path.join(SANDBOX, "北部山头3940平台2026"), "1008")
-    if done:
-        check(len(done) == 3, "三份总表都从备份还原")
+    print("\n[4/5] 矿块图复制\n")
+    test_map(day_dir)
+
+    print("\n[5/5] 还原备份")
+    master = os.path.join(SANDBOX, "北部山头3940平台2026")
+    done = restore(master, "1008")
+    merge_done = {k: v for k, v in done.items() if k != KIND_DWG}
+    if merge_done:
+        check(len(merge_done) == 3, "三份总表都从备份还原")
         preview = run(DailyMergeOptions(day_dir=day_dir, dry_run=True))
         check(preview["results"][KIND_XLS]["added"] == 150, "还原后 xls 又是 70→120")
         check(preview["results"][KIND_MDB]["added"] == 150, "还原后 mdb 又是 70→120")
     else:
-        print("   （本次没有产生备份——总表本来就没变过，跳过还原检查）")
-        check(True, "无备份可还原（数据本已并入）")
+        print("   （本次没有产生总表备份——总表本来就没变过，跳过总表还原检查）")
+        check(True, "无总表备份可还原（数据本已并入）")
+
+    if KIND_DWG in done:
+        check(os.path.isfile(os.path.join(master, MAP_FOLDER_NAME, MAP_TARGET_NAME))
+              and not os.path.isfile(os.path.join(master, MAP_FOLDER_NAME,
+                                                  MAP_TARGET_NAME + ".bak")),
+              "矿块图的 <原名>.bak 也还原回了原名")
+    else:
+        print("   （没有矿块图备份——跳过）")
+        check(True, "无矿块图备份可还原")
 
     failed = [msg for ok, msg in _checks if not ok]
     print("\n" + "=" * 78)

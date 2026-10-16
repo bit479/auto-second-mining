@@ -93,9 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
     g2.add_argument("--src-xls", default=None, help="指定单日炮孔数据库 .xls")
     g2.add_argument("--src-mdb", default=None, help="指定单日炮孔数据库 .mdb")
     g2.add_argument("--src-report", default=None, help="指定单日炮孔数据报告 .xlsx")
+    g2.add_argument("--src-map", default=None,
+                    help="指定单日二次圈矿矿块图 .dwg（形如 5、…二次圈矿矿块图1008.dwg）")
     g2.add_argument("--dst-xls", default=None, help="指定总表炮孔数据库 .xls")
     g2.add_argument("--dst-mdb", default=None, help="指定总表炮孔数据库 .mdb")
     g2.add_argument("--dst-report", default=None, help="指定总表综合报告 .xlsx")
+    g2.add_argument("--dst-map", default=None,
+                    help="指定总表的「6、…二次圈矿矿块图」文件夹，留空自动探测")
+    g2.add_argument("--no-map", action="store_true",
+                    help="不复制二次圈矿矿块图（默认会顺手把 5、…矿块图 复制进 6、文件夹）")
     g2.add_argument("--allow-duplicates", action="store_true",
                     help="不判重：工程号已存在也照插（默认跳过重复）")
     g2.add_argument("--with-appendix", action="store_true",
@@ -159,7 +165,7 @@ def run_merge(args: argparse.Namespace) -> int:
 def run_daily(args: argparse.Namespace) -> int:
     from src.daily_merge.pipeline import (DailyMergeOptions, resolve_plan,
                                           restore, run, summarize)
-    from src.daily_merge.schema import KIND_MDB, KIND_REPORT, KIND_XLS
+    from src.daily_merge.schema import KIND_DWG, KIND_MDB, KIND_REPORT, KIND_XLS
 
     if args.restore:
         master_dir = args.master_dir or args.day_dir
@@ -181,18 +187,21 @@ def run_daily(args: argparse.Namespace) -> int:
         return 0
 
     if not args.day_dir and not any(
-            (args.src_xls, args.src_mdb, args.src_report)):
+            (args.src_xls, args.src_mdb, args.src_report, args.src_map)):
         print("[错误] 请用 --day-dir 指定单日目录，或用 --src-* 逐个指定单日文件。")
         return 2
 
     options = DailyMergeOptions(
         day_dir=args.day_dir,
         master_dir=args.master_dir,
-        src={KIND_XLS: args.src_xls, KIND_MDB: args.src_mdb, KIND_REPORT: args.src_report},
-        dst={KIND_XLS: args.dst_xls, KIND_MDB: args.dst_mdb, KIND_REPORT: args.dst_report},
+        src={KIND_XLS: args.src_xls, KIND_MDB: args.src_mdb,
+             KIND_REPORT: args.src_report, KIND_DWG: args.src_map},
+        dst={KIND_XLS: args.dst_xls, KIND_MDB: args.dst_mdb,
+             KIND_REPORT: args.dst_report, KIND_DWG: args.dst_map},
         day_code=args.day,
         skip_duplicates=not args.allow_duplicates,
         with_report_appendix=args.with_appendix,
+        with_map=not args.no_map,
         backup=not args.no_backup,
         dry_run=args.dry_run,
     )

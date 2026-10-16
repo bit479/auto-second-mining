@@ -1,8 +1,21 @@
 """单日数据并入总表 —— 文件命名约定与表结构定义。
 
-这里的每一项都来自北部山头 3940 / 3960 平台 2026 的真实数据：
+这里的每一项都来自北部山头 3940 / 3960 / 3970 平台 2026 的真实数据：
 * 炮孔数据库（xls 与 mdb）都含 ``定位表 / 测斜表 / pit_blast`` 三张表，列名完全一致；
-* 炮孔数据报告是从上到下依次堆叠的"日报告块"，每块 = 标题行 + 表头行 + 明细 + 小计 + 合计。
+* 炮孔数据报告是从上到下依次堆叠的"日报告块"，每块 = 标题行 + 表头行 + 明细 + 小计 + 合计；
+* 二次圈矿矿块图（dwg）是**复制**进 ``6、…二次圈矿矿块图`` 文件夹的，不做合并。
+
+目录编号习惯（总目录与单日目录同名，只是单日目录多一层）：
+
+===========================  ==============================
+总目录                        单日目录
+===========================  ==============================
+``1、…炮孔数据库-2026.xls``     ``1、…炮孔数据库1008.xls``
+``2、…炮孔数据库-2026.mdb``     ``2、…炮孔数据库1008.mdb``
+``3、…炮孔数据报告-2026综合.xlsx``  ``…炮孔数据报告.xlsx``
+（无）                         ``5、…二次圈矿矿块图1008.dwg``
+``6、…二次圈矿矿块图\\``           （复制到总目录的 6、文件夹，去掉 ``5、`` 前缀）
+===========================  ==============================
 """
 
 from __future__ import annotations
@@ -11,24 +24,32 @@ import re
 from typing import Any
 
 __all__ = [
-    "KIND_XLS", "KIND_MDB", "KIND_REPORT", "KINDS",
+    "KIND_XLS", "KIND_MDB", "KIND_REPORT", "KIND_DWG", "KINDS",
+    "MERGE_KINDS", "COPY_KINDS",
     "KIND_LABELS",
     "DB_TABLES", "DB_KEY_COLUMNS", "DB_TEXT_COLUMNS",
     "REPORT_TOTAL_TOKEN", "REPORT_TOTAL_TOKENS", "REPORT_SUBTOTAL_TOKENS",
     "REPORT_TYPE_COLUMN",
-    "DAY_PATTERNS", "MASTER_PATTERNS", "SKIP_PREFIXES",
+    "DAY_PATTERNS", "MASTER_PATTERNS", "MAP_FOLDER_PATTERNS", "SKIP_PREFIXES",
+    "strip_number_prefix", "map_target_name",
     "normalize_key", "key_of_row", "guess_day_code", "day_code_from_holes",
 ]
 
 KIND_XLS = "xls"
 KIND_MDB = "mdb"
 KIND_REPORT = "report"
-KINDS = (KIND_XLS, KIND_MDB, KIND_REPORT)
+KIND_DWG = "dwg"
+KINDS = (KIND_XLS, KIND_MDB, KIND_REPORT, KIND_DWG)
+
+# 前三类是"并入"（往总表里加数据），最后一类是"复制"（把矿块图搬进 6、文件夹）
+MERGE_KINDS = (KIND_XLS, KIND_MDB, KIND_REPORT)
+COPY_KINDS = (KIND_DWG,)
 
 KIND_LABELS = {
     KIND_XLS: "炮孔数据库 (.xls)",
     KIND_MDB: "炮孔数据库 (.mdb)",
     KIND_REPORT: "炮孔数据报告 (.xlsx)",
+    KIND_DWG: "二次圈矿矿块图 (.dwg)",
 }
 
 # --------------------------------------------------------------------------
@@ -59,14 +80,16 @@ REPORT_SUBTOTAL_TOKENS = ("小计",)
 REPORT_TYPE_COLUMN = "类型"      # 表头首列的标志文本
 
 # --------------------------------------------------------------------------
-# 文件探测：目录 -> 三类文件
+# 文件探测：目录 -> 四类文件
 # --------------------------------------------------------------------------
 # 单日目录里的文件名形如「1、3940平台 炮孔数据库1008.xls」，
-# 报告名形如「3940平台 1008炮孔数据报告.xlsx」。
+# 报告名形如「3940平台 1008炮孔数据报告.xlsx」，
+# 矿块图形如「5、北部山头3970平台二次圈矿矿块图1011.dwg」（也有写成「5、 」带空格的）。
 DAY_PATTERNS = {
     KIND_XLS: ["1、*.xls", "1、*.xlsx"],
     KIND_MDB: ["2、*.mdb"],
     KIND_REPORT: ["*炮孔数据报告*.xlsx", "*炮孔数据报告*.xls"],
+    KIND_DWG: ["5、*二次圈矿矿块图*.dwg", "*二次圈矿矿块图*.dwg"],
 }
 
 # 总目录里的文件名形如「1、北部山头3940平台 炮孔数据库-2026.xls」。
@@ -76,11 +99,35 @@ MASTER_PATTERNS = {
     KIND_REPORT: ["3、*.xlsx", "3、*.xls"],
 }
 
+# 总目录里的矿块图**文件夹**：「6、北部山头3940平台二次圈矿矿块图」
+MAP_FOLDER_PATTERNS = ["6、*", "6、 *", "*二次圈矿矿块图"]
+
 # Excel / Access 的临时文件前缀，一律跳过
 SKIP_PREFIXES = ("~$",)
 
+# 文件名开头的编号前缀：「1、」「5、 」「6、」……
+_NUMBER_PREFIX_RE = re.compile(r"^\s*\d+\s*、\s*")
+
 _HOLE_DAY_RE = re.compile(r"BS-\d+-(\d{3,4})-", re.IGNORECASE)
 _DIR_DAY_RE = re.compile(r"[-_ ](\d{3,4})\s*$")
+
+
+def strip_number_prefix(name: str) -> str:
+    """去掉文件名开头的「N、」前缀（含紧跟的空格）。
+
+    ``5、北部山头3970平台二次圈矿矿块图1011.dwg`` -> ``北部山头3970平台二次圈矿矿块图1011.dwg``
+    ``5、 北部山头3940平台二次圈矿矿块图1008.dwg`` -> ``北部山头3940平台二次圈矿矿块图1008.dwg``
+    """
+    import os
+
+    base = os.path.basename(str(name or "").strip())
+    return _NUMBER_PREFIX_RE.sub("", base) or base
+
+
+def map_target_name(name: str) -> str:
+    """矿块图复制到 6、文件夹时用的新文件名（就是去掉编号前缀）。"""
+    return strip_number_prefix(name)
+
 
 
 def _norm_text(value: Any) -> str:

@@ -33,8 +33,9 @@ desktop.ini
 # 发版用的打包产物（Release 资产，不进版本库）
 release_v1/
 
-# Excel处理工具 单日并入自检的沙箱副本（每次跑测试自动重建）
-Excel处理工具/_out/daily_test/
+# 单日并入自检的沙箱副本（每次跑测试自动重建）
+# 注意：带中间斜杠的规则会被锚定到本文件所在目录，所以要写 **/ 才能匹配任意层级
+**/daily_test/
 
 # AutoCAD / 3DMine 的临时文件
 *.tmp
