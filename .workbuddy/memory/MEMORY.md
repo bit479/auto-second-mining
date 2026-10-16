@@ -68,12 +68,26 @@
 
 ## 工具
 
-`D:\WK\N CRT\Excel处理工具\`（openpyxl + xlrd/xlwt/xlutils + pyodbc）
+**注意：工具已经搬家。** 顶层 `Excel处理工具\` 在 v1.3 被整体整合进主程序：
+
+`D:\WK\N CRT\3DMine二次圈矿工具_初步原型\excel_tools\`（openpyxl + xlrd/xlwt/xlutils + pyodbc）
 
 * 标签页①「炮孔数据报告汇总」：多份 3DMine 报告 → 一份炮孔数据报告（`--mode total|detail`，默认 total）
-* 标签页②「单日数据并入总表」：单日 3 份文件 → 3 份总表（`--daily`，自动探测、判重、自动备份）
+* 标签页②「单日数据并入总表」：单日 **3 份文件并入 3 份总表 + 1 张矿块图复制进 6、文件夹**
+  （`--daily`，自动探测、判重、自动备份）
 
-三套自检：`tests/test_by_total.py`（14 项）、`tests/test_merge.py`（detail）、`tests/test_daily_merge.py`（30 项）。
+主程序 `client/gui.py` 里有「Excel 工具（报告汇总 / 单日数据并入总表）」区块，
+通过 `excel_tools/main.py --gui --tab daily` 打开完整窗口，另有"把数据库所在的那天并入总表（预演/正式）"。
+
+三套自检：`tests/test_by_total.py`（14 项）、`tests/test_merge.py`（detail）、`tests/test_daily_merge.py`（35 项）。
+`_probe/accept_all.py` 的 ⑤ 会自动跑这三套。
+
+### 矿块图复制约定（与并入一并进行）
+
+`7、单日数据\<日>\5、…二次圈矿矿块图<日>.dwg` → `6、…二次圈矿矿块图\…（去掉开头的「N、」前缀）`
+
+* 目标已有同名图且逐字节相同 → 跳过；不同 → 先备份 `<原名>.bak`（沿用 6、文件夹里 `1003.bak` 的既有习惯）再覆盖
+* `--no-map` / 界面勾选可关掉这一步
 
 **改 `.bat` 时内容必须保持纯 ASCII**：cmd.exe 按 GBK 解析，写中文 UTF-8 会变成乱码指令。
 
@@ -81,14 +95,19 @@
 
 * `D:\WK\N CRT` **本身就是一个 git 仓库**，远端 `https://github.com/bit479/auto-second-mining`（分支 `main`）。
   `gh` 已登录账号 `bit479`，有 `repo` 权限，无需再配凭据。
-* ⚠️ **仓库是 PUBLIC**，且已跟踪 1238 个文件 —— 三个平台的原始数据（xls / mdb / dwg / 3ds / 报告 / 预览图）
+* ⚠️ **仓库是 PUBLIC**，且已跟踪 1200+ 个文件 —— 三个平台的原始数据（xls / mdb / dwg / 3ds / 报告 / 预览图）
   都在里面。用户自己的选择，但涉及生产数据，改动前值得提醒一句。
 * 提交习惯（跟随既有历史）：
   * 中文提交信息 + 前缀 `feat:` / `fix:` / `data:` / `release:` / `probe:` / `gui:`
-  * **数据文件和 `*_并入<日>.bak` 备份也一起进库**（已有 22 个 `.bak` 被跟踪）；用 `--restore` 或 git 都可回滚
+  * **数据文件和 `*_并入<日>.bak` 备份也一起进库**；用 `--restore` 或 git 都可回滚
   * 提交走 `git commit -F -`（heredoc）+ `-c i18n.commitEncoding=utf-8`，避免中文乱码
-* `.gitignore` 排除：`_backup/`、`__pycache__/`、`*.pyc`、`~$*`、`*.dwl`、`*.dwl2`、`*.zip`、
-  `release_v1/`、`Excel处理工具/_out/daily_test/`、`*.tmp`
 * 发版：zip 放 `release_v1/`（不进库），用 `gh release create <tag> <zip>` 上传资产，tag 形如 `v1.2.2`。
-* 行尾符：多数文件是 CRLF；用 Python 以文本模式 `open(p,'w')` 改写文件会把 LF 变成 CRLF，
-  造成整文件虚diff —— 要改文本文件优先用 Edit/Write 工具，别用 Python 文本模式整文件重写。
+
+### 两个反复踩的坑
+
+1. **`.gitignore` 中间带斜杠的规则会被锚定到仓库根**：`Excel处理工具/_out/daily_test/` 匹配不到
+   搬家后的路径；`_out/daily_test/` 也不行（中间有斜杠）。**要写 `**/daily_test/`**。
+   而且 gitignore 对**已跟踪**的文件无效，得先 `git rm -r --cached` 撤出索引。
+2. **行尾符**：多数文件是 CRLF，但有些是 LF。用 Python 文本模式 `open(p,'w')` 整文件重写会把 LF 变成
+   CRLF，造成整文件虚diff（`test_merge.py` 3 行变 145 行、`test_daily_merge.py` 88 行变 480 行，犯过两次）。
+   **改文本文件优先用 Edit/Write 工具**；必须用 Python 时加 `newline=''`。
