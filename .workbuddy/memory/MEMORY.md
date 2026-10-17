@@ -101,7 +101,26 @@
   * 中文提交信息 + 前缀 `feat:` / `fix:` / `data:` / `release:` / `probe:` / `gui:`
   * **数据文件和 `*_并入<日>.bak` 备份也一起进库**；用 `--restore` 或 git 都可回滚
   * 提交走 `git commit -F -`（heredoc）+ `-c i18n.commitEncoding=utf-8`，避免中文乱码
-* 发版：zip 放 `release_v1/`（不进库），用 `gh release create <tag> <zip>` 上传资产，tag 形如 `v1.2.2`。
+* 发版：zip 放 `release_v1/`（不进库），tag 形如 `v1.4`。
+
+### 发版流程（照这个走，别漏）
+
+1. **改版本号**：`3DMine二次圈矿工具_初步原型/client/gui.py` 的 `VERSION = "vX.Y"`
+   （窗口标题会显示，是判断"跑的是哪版代码"的依据）。功能新增 → minor（v1.3→v1.4），纯修复 → patch。
+2. **同步文档**：`README.md`（Excel 工具章节）、`交付说明.md`、`项目结构说明.md`。
+3. **写发版说明**：`_probe/release_notes_v1_4.md`（文件名 = tag 的点换成下划线），
+   内容照 v1.3 那份的风格：新增功能 → 表格 → 判重/安全 → 验收数字 → 怎么用。
+4. **打包**：`python _probe/build_release_zip.py v1.4` → `release_v1/second-mining-tool-v1.4.zip`。
+   排除项在脚本里（`_out`/`归档`/`__pycache__`/`.bak`/`.bmp` 等），**别手工改 zip**。
+5. **提交 & 打 tag**：`git tag -a v1.4 -m "…"` + `git push origin main` + `git push origin v1.4`。
+6. **发 Release**：用 `python _probe/publish_release.py --tag v1.4`
+   （title 走脚本内置映射，没配就走 `<tag> —— 二次圈矿工具`，与 v1.2.1/v1.2.2/v1.3 一致）。
+7. **验签**：`gh release download <tag> --pattern "*.zip"` 下载回来比 MD5，再解包跑三套自检。
+
+⚠️ **`gh release create` 在本机会失败**：它创建后要 PATCH 一次
+`api.github.com/repos/.../releases/<id>`，这条连接反复被 `wsarecv ... forcibly closed` 掐断，
+gh 会把已建的 release 回滚删除，最终报 `release not found`。**改用 `publish_release.py`**
+（只发 POST + 传资产到 uploads.github.com，不碰 PATCH）。
 
 ### 两个反复踩的坑
 
