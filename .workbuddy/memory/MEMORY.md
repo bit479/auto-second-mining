@@ -22,6 +22,24 @@
 * 工程号格式：`BS-<平台>-<MMDD>-P<n>`，另有个别 `BL<n>`。
 * 备份命名习惯：`<原名>_并入<日>.bak`（DWG 与数据总表统一用这个后缀）。
 
+## 第二套数据：南部山头（⚠️ 扩展名与内容相反）
+
+`D:\WK\26.09.22南部山头二号矿体\南部山头新增Ⅱ号矿体资料\二次圈矿资料\南部山头2026\`
+（`南部山头39xx平台-2026` 等；另有 `南部山头各平台-2025\`）。工具已支持，但几点要记：
+
+| | 北部山头 | 南部山头 |
+|---|---|---|
+| 库 | `.xls`（BIFF） | **`.xlsx`** |
+| 综合报告 | `.xlsx` | **`.xls`（BIFF）** |
+| 工程号 | `BS-` | `NS-` |
+| 报告块尾 | 合计 | **总计** |
+| 报告列 | 6 列 | 7~8 列（多 `24年爆破/25年出矿`），档位如 `2.500-999.000` |
+| 综合报告 | 单 sheet | 4 个 sheet：`每日 / 总表 / 每日合计 / 2026年`，块堆在**第 1 张 `每日`** |
+
+* db 的 xlsx 多一张 `每日坐标` 表（**无表头行**，E 列是公式 `=D1-3960`）；三张业务表列名与北部山头一致。
+* **工具已改成读文件头（魔数）判断格式**（`src/excel_core/filetype.py`），扩展名不参与决策，
+  xls↔xlsx 四种交叉组合都能并。以后写 Excel 相关代码一律这么做，别按扩展名选库。
+
 ## 数据表结构
 
 炮孔数据库（xls 与 mdb 同构）三张表：
@@ -79,8 +97,16 @@
 主程序 `client/gui.py` 里有「Excel 工具（报告汇总 / 单日数据并入总表）」区块，
 通过 `excel_tools/main.py --gui --tab daily` 打开完整窗口，另有"把数据库所在的那天并入总表（预演/正式）"。
 
-三套自检：`tests/test_by_total.py`（14 项）、`tests/test_merge.py`（detail）、`tests/test_daily_merge.py`（35 项）。
-`_probe/accept_all.py` 的 ⑤ 会自动跑这三套。
+四套自检：`tests/test_by_total.py`（14 项）、`tests/test_merge.py`（detail）、
+`tests/test_daily_merge.py`（35 项）、`tests/test_formats.py`（26 项，xls/xlsx 格式自适应）。
+`_probe/accept_all.py` 的 ⑤ 会自动跑这四套。
+
+### ⚠️ openpyxl 保存会清掉公式的缓存值
+
+xlsx 总表里若有公式（南部山头 `每日坐标` 的 `=D1-3960`），openpyxl `save()` 后**缓存值全空**，
+公式本身还在、可设 `wb.calculation.fullCalcOnLoad = True` 让 Excel 打开时重算，
+但**不开 Excel 直接读值**的工具会读到空。BIFF 走 xlutils 没有这个问题。
+→ 凡是用 openpyxl 改别人做的工作簿，都要考虑这条，并给用户提示。
 
 ### 矿块图复制约定（与并入一并进行）
 
