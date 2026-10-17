@@ -29,7 +29,8 @@ __all__ = [
     "KIND_LABELS",
     "DB_TABLES", "DB_KEY_COLUMNS", "DB_TEXT_COLUMNS",
     "REPORT_TOTAL_TOKEN", "REPORT_TOTAL_TOKENS", "REPORT_SUBTOTAL_TOKENS",
-    "REPORT_TYPE_COLUMN",
+    "REPORT_TYPE_COLUMN", "REPORT_TITLE_WORDS", "REPORT_TITLE_PREFIXES",
+    "is_report_title",
     "DAY_PATTERNS", "MASTER_PATTERNS", "MAP_FOLDER_PATTERNS", "SKIP_PREFIXES",
     "strip_number_prefix", "map_target_name",
     "normalize_key", "key_of_row", "guess_day_code", "day_code_from_holes",
@@ -46,9 +47,9 @@ MERGE_KINDS = (KIND_XLS, KIND_MDB, KIND_REPORT)
 COPY_KINDS = (KIND_DWG,)
 
 KIND_LABELS = {
-    KIND_XLS: "炮孔数据库 (.xls)",
+    KIND_XLS: "炮孔数据库 (.xls/.xlsx)",
     KIND_MDB: "炮孔数据库 (.mdb)",
-    KIND_REPORT: "炮孔数据报告 (.xlsx)",
+    KIND_REPORT: "炮孔数据报告 (.xlsx/.xls)",
     KIND_DWG: "二次圈矿矿块图 (.dwg)",
 }
 
@@ -79,16 +80,32 @@ REPORT_TOTAL_TOKENS = ("合计", "总计")   # 老版报告用"总计"，两种�
 REPORT_SUBTOTAL_TOKENS = ("小计",)
 REPORT_TYPE_COLUMN = "类型"      # 表头首列的标志文本
 
+# 日报告块标题的特征：北部山头写「…炮孔数据报告…」，
+# 南部山头写「…炮孔数据库报告…」「…矿块报告…」，都用这两条判。
+REPORT_TITLE_WORDS = ("报告",)
+REPORT_TITLE_PREFIXES = ("炮孔", "矿块")
+
+
+def is_report_title(text: Any) -> bool:
+    """判断某行首列文本是不是一个日报告块的标题。"""
+    value = str(text or "").strip()
+    if not value:
+        return False
+    return (any(w in value for w in REPORT_TITLE_WORDS)
+            and any(p in value for p in REPORT_TITLE_PREFIXES))
+
 # --------------------------------------------------------------------------
 # 文件探测：目录 -> 四类文件
 # --------------------------------------------------------------------------
 # 单日目录里的文件名形如「1、3940平台 炮孔数据库1008.xls」，
-# 报告名形如「3940平台 1008炮孔数据报告.xlsx」，
+# 报告名形如「3940平台 1008炮孔数据报告.xlsx」（南部山头还有「…炮孔数据库报告…」「…矿块报告…」两种叫法），
 # 矿块图形如「5、北部山头3970平台二次圈矿矿块图1011.dwg」（也有写成「5、 」带空格的）。
 DAY_PATTERNS = {
     KIND_XLS: ["1、*.xls", "1、*.xlsx"],
     KIND_MDB: ["2、*.mdb"],
-    KIND_REPORT: ["*炮孔数据报告*.xlsx", "*炮孔数据报告*.xls"],
+    KIND_REPORT: ["*炮孔数据报告*.xlsx", "*炮孔数据报告*.xls",
+                  "*炮孔数据库报告*.xlsx", "*炮孔数据库报告*.xls",
+                  "*矿块报告*.xlsx", "*矿块报告*.xls"],
     KIND_DWG: ["5、*二次圈矿矿块图*.dwg", "*二次圈矿矿块图*.dwg"],
 }
 
@@ -108,7 +125,8 @@ SKIP_PREFIXES = ("~$",)
 # 文件名开头的编号前缀：「1、」「5、 」「6、」……
 _NUMBER_PREFIX_RE = re.compile(r"^\s*\d+\s*、\s*")
 
-_HOLE_DAY_RE = re.compile(r"BS-\d+-(\d{3,4})-", re.IGNORECASE)
+# 工程号形如 BS-3940-1008-P12 / NS-3970-0708-P1 / BL1
+_HOLE_DAY_RE = re.compile(r"[A-Z]{2,3}-\d+-(\d{3,4})-", re.IGNORECASE)
 _DIR_DAY_RE = re.compile(r"[-_ ](\d{3,4})\s*$")
 
 

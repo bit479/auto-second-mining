@@ -167,6 +167,12 @@ def run(options: DailyMergeOptions) -> dict:
         except Exception as exc:  # noqa: BLE001
             report["errors"][kind] = "%s" % exc
 
+    # 4) 收集各类并入返回的提示（不阻断流程，但要让用户看见）
+    for res in report["results"].values():
+        for notice in res.get("notices", []) or []:
+            if notice not in report["warnings"]:
+                report["warnings"].append(notice)
+
     report["verify"] = verify(plan)
     return report
 
@@ -191,26 +197,46 @@ def _mdb_holes(path: str) -> list[str]:
 
 
 def _report_blocks(path: str) -> tuple[int, list[str]]:
-    from openpyxl import load_workbook
+    """数总表第一张表里有几个日报告块（xls / xlsx 都行）。"""
+    from ..excel_core.filetype import FMT_XLSX, sniff
+    from .schema import REPORT_TOTAL_TOKENS, is_report_title
 
-    from .schema import REPORT_TOTAL_TOKENS
+    totals, titles = 0, []
+    if sniff(path) == FMT_XLSX:
+        from openpyxl import load_workbook
 
-    wb = load_workbook(path, data_only=False, read_only=True)
-    try:
-        ws = wb[wb.sheetnames[0]]
-        totals, titles = 0, []
-        for row in ws.iter_rows(min_col=1, max_col=1):
-            value = row[0].value
-            if value is None:
-                continue
-            text = str(value).strip()
-            if text in REPORT_TOTAL_TOKENS:
-                totals += 1
-            elif "炮孔数据报告" in text:
-                titles.append(text)
-        return totals, titles
-    finally:
-        wb.close()
+        wb = load_workbook(path, data_only=False, read_only=True)
+        try:
+            ws = wb[wb.sheetnames[0]]
+            for row in ws.iter_rows(min_col=1, max_col=1):
+                value = row[0].value
+                if value is None:
+                    continue
+                text = str(value).strip()
+                if text in REPORT_TOTAL_TOKENS:
+                    totals += 1
+                elif is_report_title(text):
+                    titles.append(text)
+        finally:
+            wb.close()
+    else:
+        import xlrd
+
+        book = xlrd.open_workbook(path)
+        try:
+            sh = book.sheet_by_index(0)
+            for r in range(sh.nrows):
+                value = sh.cell_value(r, 0)
+                if value is None or str(value).strip() == "":
+                    continue
+                text = str(value).strip()
+                if text in REPORT_TOTAL_TOKENS:
+                    totals += 1
+                elif is_report_title(text):
+                    titles.append(text)
+        finally:
+            book.release_resources()
+    return totals, titles
 
 
 def verify(plan: DailyMergePlan) -> dict:
@@ -255,7 +281,8 @@ def _hole_summary(holes: list[str]) -> dict:
 
     segments = Counter()
     for hole in holes:
-        match = re.match(r"(BS-\d+-\d+)", str(hole))
+        # 工程号形如 BS-3940-1008-P12 / NS-3970-0719-P1，前缀按"两三个字母-平台号-日期"取
+        match = re.match(r"([A-Za-z]{2,3}-\d+-\d+)", str(hole))
         if match:
             segments[match.group(1)] += 1
 
