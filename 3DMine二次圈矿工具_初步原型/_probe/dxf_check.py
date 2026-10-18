@@ -12,8 +12,9 @@
   5. 品位数字：高 0.7，数值与数据库一致；
   6. 1 m 方格：层 `爆区方格网`，每个闭合小多边形边长 ≈1.0 m；
   7. 网格品位小字：层 0，高 0.133；
-  8. 矿块号："n号矿块" MText 每块一个、不重号、互不重叠、不压矿块、不压报告图；
-  9. 报告图：有一张 IMAGE 实体。
+  8. 矿块号："n号矿块" MText 每块一个、不重号、互不重叠、不压矿块、不压报告表，
+     引线起点落在本块内部（不能落在两块交界处）；
+  9. 报告表：表头/品位统计是矢量 TEXT + LINE（不依赖外部 PNG，手机端也能看）。
 退出码 0 = 全过。
 """
 from __future__ import annotations
@@ -182,13 +183,44 @@ def main():
     rep(not any(r.intersects(b) for r in rects for b in blocks), "矿块号不压矿块")
     rep(all(not a.intersects(b) for i, a in enumerate(rects) for b in rects[i + 1:]),
         "矿块号互不重叠")
-    img = [e for e in msp if e.dxftype() == "IMAGE"]
-    rep(bool(img), "报告图（IMAGE）%d 张" % len(img))
-    if img:
-        i = img[0]
-        r = _box(i.dxf.insert[0], i.dxf.insert[1],
-                 i.dxf.insert[0] + 40.0, i.dxf.insert[1] + 29.0)
-        rep(not any(x.intersects(r) for x in rects), "矿块号不压报告图")
+    # 引线起点：在本块内部（用户 2026-10-19：不能位于两块交界处）
+    lead_lines = []
+    for e in msp:
+        if e.dxftype() != "LINE" or e.dxf.layer != "0":
+            continue
+        a, b = e.dxf.start, e.dxf.end
+        for lab_e in lab:
+            ins = lab_e.dxf.insert
+            if abs(a[0] - ins[0]) < 0.01 and abs(a[1] - ins[1]) < 0.01:
+                lead_lines.append((lab_e, Point(b[0], b[1])))
+            elif abs(b[0] - ins[0]) < 0.01 and abs(b[1] - ins[1]) < 0.01:
+                lead_lines.append((lab_e, Point(a[0], a[1])))
+    bad_lead = []
+    for lab_e, p in lead_lines:
+        inside = [blk for blk in blocks if blk.contains(p)]
+        if not inside:
+            bad_lead.append("%s 起点不在矿块内" % str(lab_e.text))
+        elif min(blk.boundary.distance(p) for blk in inside) < 0.05:
+            bad_lead.append("%s 起点贴边" % str(lab_e.text))
+    rep(len(lead_lines) == len(lab) and not bad_lead,
+        "矿块号引线起点都在本块内部%s" %
+        ("" if not bad_lead else "（%s）" % "；".join(bad_lead[:3])))
+
+    # 9. 报告表：矢量 TEXT + LINE（手机 CAD 看图王不认外部图片参照）
+    heads = {"类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"}
+    got_heads = {str(t.dxf.text) for t in texts} & heads
+    rep(got_heads == heads, "报告表表头 %d/6 列（矢量 TEXT）" % len(got_heads))
+    rep(any("炮孔品位统计" in str(t.dxf.text) for t in texts),
+        "炮孔品位统计行（矢量 TEXT）")
+    rep(not any(e.dxftype() == "IMAGE" for e in msp),
+        "成果图不引用外部图片（手机端可正常显示）")
+    table_title = [t for t in texts if "炮孔数据报告" in str(t.dxf.text)
+                   and abs(t.dxf.height - 1.6) < 1e-6]
+    if table_title:
+        tt = table_title[0]
+        r = _box(tt.dxf.insert[0] - 1.0, tt.dxf.insert[1] - 60.0,
+                 tt.dxf.insert[0] + 41.0, tt.dxf.insert[1] + 2.0)
+        rep(not any(x.intersects(r) for x in rects), "矿块号不压报告表")
 
     print()
     if bad:

@@ -8,7 +8,8 @@
   品位         孔口偏移 (-3.19, -0.35)，h=0.7，按档着色（层 钻孔）
   1m 方格      按矿界裁剪后的 1×1 闭合小多边形（层 爆区方格网）
   方格品位     方格中心，h=0.1333，按档着色
-  矿块号       "n号矿块" h=3.0 + 斜向引线（从本块边界出发）
+  矿块号       "n号矿块" h=3.0 + 斜向引线（从本块内部中心出发）
+  报告表       矢量 LINE + TEXT（手机 CAD 看图王也能显示，不再依赖外部 PNG）
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import math
 from pathlib import Path
 
 from shapely.geometry import LineString, Point, Polygon, box
-from shapely.ops import unary_union
+from shapely.ops import polylabel, unary_union
 
 from composite import load_composite_blocks, merge_outline      # noqa: E402
 
@@ -384,6 +385,116 @@ BLANK_LAYER = "缺工程待取样"
 COMPOSITE_LAYER = "综合图_历史矿块"
 BLANK_NOTE = "（缺工程，待取样验证后再进行施工）"
 
+# 报告表（矢量）：列宽合计 40 m，与原来贴图宽度一致；行高/字高按图面比例定
+TABLE_COL_W = (6.0, 5.0, 7.0, 7.0, 8.0, 7.0)
+TABLE_ROW_H = 2.2
+TABLE_TEXT_H = 0.8
+TABLE_TITLE_H = 1.6
+
+
+def _table_data(blocks, holes):
+    """成果图里那张报告表的行（全部是字符串，跟 PNG 报告版式一致）。"""
+    rows = [["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"]]
+    for lid in ("L4", "L3", "L2", "L1"):
+        bs = [b for b in blocks if b.level_id == lid]
+        if not bs:
+            continue
+        for b in bs:
+            rows.append([b.label, str(b.no), "%.3f" % b.volume_m3,
+                         "%.3f" % b.tonnage_t, "%.3f" % b.grade,
+                         "%.3f" % b.metal_hg])
+        st = sum(b.tonnage_t for b in bs)
+        sm = sum(b.metal_hg for b in bs)
+        rows.append(["小计", "", "%.3f" % sum(b.volume_m3 for b in bs),
+                     "%.3f" % st, "%.3f" % (sm * 100.0 / st if st else 0),
+                     "%.3f" % sm])
+    tt = sum(b.tonnage_t for b in blocks)
+    tm = sum(b.metal_hg for b in blocks)
+    rows.append(["合计", "", "%.3f" % sum(b.volume_m3 for b in blocks),
+                 "%.3f" % tt, "%.3f" % (tm * 100.0 / tt if tt else 0),
+                 "%.3f" % tm])
+    st = grade_stats(holes) if holes else {}
+    stat_rows = [["≥3", "1.5-3", "1-1.5", "0.5-1", "<0.5", "合计"],
+                 [str(st.get(">=3", 0)), str(st.get("1.5-3", 0)),
+                  str(st.get("1-1.5", 0)), str(st.get("0.5-1", 0)),
+                  str(st.get("<0.5", 0)),
+                  str(sum(st.values())) if st else "0"]]
+    return rows, stat_rows
+
+
+def _table_height(rows, stat_rows):
+    """矢量报告表总高（米），第 4 步给矿块号避让用。"""
+    if not stat_rows:
+        return TABLE_TITLE_H + 1.2 + TABLE_ROW_H * len(rows)
+    return (TABLE_TITLE_H + 1.2 + TABLE_ROW_H * len(rows)
+            + 1.8 + TABLE_TITLE_H * 0.8 + 0.5
+            + TABLE_ROW_H * len(stat_rows))
+
+
+def _text_width(s, h):
+    """估算文字宽度（中文按 1 个字高，西文/数字按 0.58 个字高）。"""
+    return sum(h if ord(ch) > 127 else h * 0.58 for ch in str(s))
+
+
+def _draw_report_table(msp, x0, y_top, rows, stat_rows, title):
+    """把报告表画成 LINE + TEXT 矢量实体（不引用外部图片）。"""
+    total_w = sum(TABLE_COL_W)
+    xs = [x0]
+    for w in TABLE_COL_W:
+        xs.append(xs[-1] + w)
+    attrib = {"layer": "0", "color": 7, "style": "CN_TTF"}
+
+    def cell_text(s, cx, cy, h, bold=False):
+        s = str(s)
+        w = _text_width(s, h)
+        msp.add_text(s, dxfattribs=dict(attrib, height=h)).set_placement(
+            (cx - w / 2.0, cy - h * 0.36))
+
+    # 标题
+    msp.add_text(title, dxfattribs=dict(attrib, height=TABLE_TITLE_H)
+                 ).set_placement((x0, y_top - TABLE_TITLE_H))
+    y = y_top - TABLE_TITLE_H - 1.2
+
+    # 主表
+    n = len(rows)
+    for i in range(n + 1):
+        yy = y - i * TABLE_ROW_H
+        msp.add_line((x0, yy), (x0 + total_w, yy),
+                     dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+    for xx in xs:
+        msp.add_line((xx, y), (xx, y - n * TABLE_ROW_H),
+                     dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+    for i, row in enumerate(rows):
+        cy = y - (i + 0.5) * TABLE_ROW_H
+        h = TABLE_TEXT_H
+        for j, val in enumerate(row):
+            if val == "":
+                continue
+            cell_text(val, (xs[j] + xs[j + 1]) / 2.0, cy, h)
+    y -= n * TABLE_ROW_H
+
+    if stat_rows:
+        # 炮孔品位统计：小标题 + 两行（列宽与主表一致）
+        y -= 1.8
+        msp.add_text("炮孔品位统计（孔数）",
+                     dxfattribs=dict(attrib, height=TABLE_TITLE_H * 0.8)
+                     ).set_placement((x0, y - TABLE_TITLE_H * 0.8))
+        y -= TABLE_TITLE_H * 0.8 + 0.5
+        m = len(stat_rows)
+        for i in range(m + 1):
+            yy = y - i * TABLE_ROW_H
+            msp.add_line((x0, yy), (x0 + total_w, yy),
+                         dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+        for xx in xs:
+            msp.add_line((xx, y), (xx, y - m * TABLE_ROW_H),
+                         dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+        for i, row in enumerate(stat_rows):
+            cy = y - (i + 0.5) * TABLE_ROW_H
+            for j, val in enumerate(row):
+                cell_text(val, (xs[j] + xs[j + 1]) / 2.0, cy, TABLE_TEXT_H)
+        y -= m * TABLE_ROW_H
+    return y
+
 
 def write_dxf(blocks, holes_all, cells, meta, path: Path,
               report_png: Path = None, report_px=None,
@@ -501,16 +612,15 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
                      ).set_placement((h.x - 3.19, h.y - 0.35))
 
     # 4) 矿块号：斜引线 + 文字（互不重叠）
-    label_maxx = -1e18          # 由下面的循环填；第 6 步插报告图时用它避让
+    label_maxx = -1e18          # 由下面的循环填；第 6 步画报告表时用它避让
+    table_rows, table_stat_rows = _table_data(blocks, holes_all)
+    table_w = sum(TABLE_COL_W)
+    table_h = _table_height(table_rows, table_stat_rows)
     if blocks:
         minx, miny, maxx, maxy = _bounds(holes_all)
-        # 报告图占的矩形（第 5 步插的那张 40 m 宽的图）：矿块号不能压上去
-        table = None
-        if report_png is not None and Path(report_png).exists():
-            w_px, h_px = report_px if report_px else (1200, 800)
-            tw = 40.0
-            th = tw * h_px / float(w_px)
-            table = (maxx + 5.0 - 2.0, maxy - th - 2.0, maxx + 5.0 + tw + 2.0, maxy + 2.0)
+        # 报告表占的矩形（第 6 步画的 40 m 宽矢量表）：矿块号不能压上去
+        table = (maxx + 3.0, maxy - table_h - 2.0,
+                 maxx + 5.0 + table_w + 2.0, maxy + 2.0)
         # 图名占的矩形（第 5 步放在 (minx, maxy+12)）：矿块号也别压上去
         title = "%s平台 %s二次圈矿矿块图" % (meta["platform"], meta["date"])
         title_rect = (minx - 1.0, maxy + 12.0 - 1.0,
@@ -563,7 +673,14 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
                 continue
             # "n号矿块" 4 个字：宽约 4×字高、高约字高
             hw, hh = 2.2 * LABEL_H_M, 0.6 * LABEL_H_M
-            cen = b.polygon.representative_point()
+            # 引线起点取"矿块主体（最大那片）的最深内部点"——representative_point
+            # 在多片矿块上可能落到 0.09 m² 的细条里，看起来就像贴着两块交界。
+            main = (max(b.polygon.geoms, key=lambda g: g.area)
+                    if b.polygon.geom_type == "MultiPolygon" else b.polygon)
+            try:
+                cen = polylabel(main, tolerance=0.05)
+            except Exception:
+                cen = main.representative_point()
             dx, dy = cen.x - gcx, cen.y - gcy
             if abs(dx) < 1e-6 and abs(dy) < 1e-6:
                 dx, dy = 1.0, 0.0
@@ -595,8 +712,8 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
             placed.append((tx, ty))
             # 记下标注占到的最东边，报告图插到它右边（不然会互相压）
             label_maxx = max(label_maxx, tx + hw)
-            # 引线起点：本块边界上离文字最近的点
-            bx, by = _nearest_on_boundary(b.polygon, tx, ty)
+            # 引线起点：本块内部中心（用户 2026-10-19：不能落在两块交界处）
+            bx, by = cen.x, cen.y
             msp.add_line((bx, by), (tx, ty),
                          dxfattribs={"layer": "0", "color": 7})
             msp.add_mtext("%d号矿块" % b.no,
@@ -610,23 +727,13 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
                              "style": "CN_TTF"},
                  ).set_placement((minx, maxy + 12))
 
-    # 6) 报告图片（位图参照，贴在图右侧）
-    if report_png is not None and Path(report_png).exists():
-        try:
-            w_px, h_px = report_px if report_px else (1200, 800)
-            width_m = 40.0                      # 报告图在图纸上的宽度（米）
-            scale = width_m / float(w_px)
-            idef = doc.add_image_def(filename=str(report_png),
-                                     size_in_pixel=(w_px, h_px))
-            height_m = width_m * h_px / float(w_px)
-            # 报告图贴在最东边的东西（炮孔/矿块/**矿块号标注**）右侧，避免互相压
-            tbl_x = max(maxx, (label_maxx + 3.0) if label_maxx > -1e17 else maxx) + 5.0
-            msp.add_image(image_def=idef,
-                          insert=(tbl_x, maxy - height_m),
-                          size_in_units=(width_m, height_m))
-            print("    报告图片已插入:", report_png)
-        except Exception as exc:
-            print("    报告图片插入失败:", exc)
+    # 6) 报告表：矢量 LINE + TEXT（贴在图右侧）
+    #    用户 2026-10-19：手机 CAD 看图王看不到外部 PNG 参照，只显示文件路径，
+    #    所以成果图里画真正的表格实体；PNG 仍单独生成，供报告/预览使用。
+    tbl_x = max(maxx, (label_maxx + 3.0) if label_maxx > -1e17 else maxx) + 5.0
+    _draw_report_table(msp, tbl_x, maxy, table_rows, table_stat_rows,
+                       "%s平台 %s炮孔数据报告" % (meta["platform"], meta["date"]))
+    print("    报告表已绘制（矢量，%d 行 + 品位统计）" % len(table_rows))
     try:
         doc.saveas(str(path))
     except PermissionError:

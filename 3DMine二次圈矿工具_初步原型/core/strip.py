@@ -979,24 +979,49 @@ def blocks_from_outline_files(paths, all_holes, density_waste: float = 2.65,
                     nxt += new if new else [part]
                 parts = nxt
             polys += [g for g in parts if g.area > 0]
-        # 切出来的细条（切偏了/切线贴边）不要
-        floor = max(float(min_area), 0.005 * sum(g.area for g in closed_rings))
-        dropped = [g.area for g in polys if g.area < floor]
-        polys = [g for g in polys if g.area >= floor]
-        # 另外：一个孔心都没有、又明显比主体小的片（多半是切线切出来的边角料）也丢掉
-        if polys:
-            biggest = max(g.area for g in polys)
-            keep = []
-            for g in polys:
-                has_hole = any(g.buffer(1e-9).contains(Point(h.x, h.y)) for h in all_holes)
-                if has_hole or g.area >= 0.3 * biggest:
-                    keep.append(g)
-                else:
-                    dropped.append(g.area)
-            polys = keep
-        if dropped:
-            print("[人工画线] 丢掉 %d 个过小切片（面积 %s m2）"
-                  % (len(dropped), ", ".join("%.2f" % a for a in dropped)))
+        # 切出来的细小片**不要丢**，而是并进"跟它共边最长"的相邻块——
+        # 用户 2026-10-19：左下角青块与红块交界处少了一小块，就是被当成边角料丢掉了。
+        # 判据：面积 < max(1 m², 矿界 0.5%)，或"没有孔心且 < 最大块的 30%"。
+        total_area = sum(g.area for g in closed_rings)
+        floor = max(float(min_area), 0.005 * total_area)
+        if len(polys) > 1:
+            changed = True
+            while changed and len(polys) > 1:
+                changed = False
+                biggest = max(g.area for g in polys)
+                for i, g in enumerate(polys):
+                    has_hole = any(g.buffer(1e-9).contains(Point(h.x, h.y))
+                                   for h in all_holes)
+                    tiny = g.area < floor or (not has_hole and g.area < 0.3 * biggest)
+                    if not tiny:
+                        continue
+                    # 并进**面积最大的相邻块**（用户 2026-10-19：左下角那块小片要归青色主块，
+                    # 不是归共边更长的红色块）。相邻 = 有接触（距离≈0）。
+                    best, best_area = None, -1.0
+                    for j, h2 in enumerate(polys):
+                        if j == i:
+                            continue
+                        try:
+                            if g.distance(h2) > 0.05:
+                                continue
+                        except Exception:
+                            continue
+                        if h2.area > best_area:
+                            best, best_area = j, h2.area
+                    if best is None:
+                        continue
+                    merged = _safe_union([polys[best], g])
+                    if merged is None or merged.is_empty:
+                        continue
+                    if merged.geom_type == "MultiPolygon":
+                        merged = max(merged.geoms, key=lambda x: x.area)
+                    print("[人工画线] 小块 %.2f m2（无孔/过小）并入相邻的最大块 %.2f m2"
+                          % (g.area, polys[best].area))
+                    new_polys = [x for k, x in enumerate(polys) if k not in (i, best)]
+                    new_polys.append(merged)
+                    polys = new_polys
+                    changed = True
+                    break
     elif closed_rings:
         polys = closed_rings
     else:

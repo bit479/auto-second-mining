@@ -173,8 +173,9 @@ def convert(dxf: Path, dwg: Path = None, start: bool = False,
             t0 = time.time()
             try:
                 out = _convert_oda(oda, dxf, dwg)
-                return True, "DWG 版本头 %s，%.1f KB（ODA File Converter，不依赖 AutoCAD，用时 %.1f 秒）" % (
-                    _dwg_head(out), out.stat().st_size / 1024.0, time.time() - t0)
+                note = "" if out == dwg else "（原 DWG 被占用，已另存为 %s）" % out.name
+                return True, "DWG 版本头 %s，%.1f KB（ODA File Converter，不依赖 AutoCAD，用时 %.1f 秒）%s" % (
+                    _dwg_head(out), out.stat().st_size / 1024.0, time.time() - t0, note)
             except Exception as exc:
                 print("[dxf2dwg] ODA 转换失败，换下一条路：%s" % exc)
         elif via == "oda":
@@ -186,8 +187,9 @@ def convert(dxf: Path, dwg: Path = None, start: bool = False,
             t0 = time.time()
             try:
                 out = _convert_accore(acc, dxf, dwg)
-                return True, "DWG 版本头 %s，%.1f KB（accoreconsole 无界面内核，用时 %.1f 秒）" % (
-                    _dwg_head(out), out.stat().st_size / 1024.0, time.time() - t0)
+                note = "" if out == dwg else "（原 DWG 被占用，已另存为 %s）" % out.name
+                return True, "DWG 版本头 %s，%.1f KB（accoreconsole 无界面内核，用时 %.1f 秒）%s" % (
+                    _dwg_head(out), out.stat().st_size / 1024.0, time.time() - t0, note)
             except Exception as exc:
                 print("[dxf2dwg] accoreconsole 转换失败，退回 AutoCAD COM：%s" % exc)
         elif via == "accore":
