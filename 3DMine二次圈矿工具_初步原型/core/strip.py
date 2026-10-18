@@ -892,8 +892,39 @@ def join_to_composite(ring, comp_blocks, gap: float = 0.5):
     return out
 
 
+def _extend_line_ends(pts, ext: float = 12.0):
+    """把一条开口折线的两端沿各自**末端那段的方向**各外延 ext 米（切线要切穿矿界）。"""
+    import numpy as _np
+    p = _np.array(pts, float)
+    if len(p) < 2:
+        return [tuple(x) for x in p]
+    d0 = p[0] - p[1]
+    d1 = p[-1] - p[-2]
+    n0 = _np.linalg.norm(d0) or 1.0
+    n1 = _np.linalg.norm(d1) or 1.0
+    return ([tuple(p[0] + d0 / n0 * ext)] + [tuple(x) for x in p] +
+            [tuple(p[-1] + d1 / n1 * ext)])
+
+
+def split_polygon(poly, line):
+    """用一条线把多边形切开，只返回切出来的多边形（切不开就原样返回）。"""
+    from shapely.ops import split as _split
+    try:
+        geoms = list(_split(poly, line).geoms)
+    except Exception:
+        return [poly]
+    out = []
+    for g in geoms:
+        if g.geom_type == "Polygon" and g.area > 0:
+            out.append(g)
+        elif g.geom_type == "MultiPolygon":
+            out += [x for x in g.geoms if x.area > 0]
+    return out if out else [poly]
+
+
 def blocks_from_outline_files(paths, all_holes, density_waste: float = 2.65,
-                             density_ore: float = 2.7, min_area: float = 1.0):
+                             density_ore: float = 2.7, min_area: float = 1.0,
+                             cut_extend_m: float = 12.0):
     """人工圈矿模式：**每条闭合折线 = 一块**，程序只算量、不再自己圈。
 
     用户 2026-10-15 的用法：他在 3DMine 里自己画好矿块（导出成 .3ds，一条闭合线一块），
@@ -907,24 +938,84 @@ def blocks_from_outline_files(paths, all_holes, density_waste: float = 2.65,
       * 金属量 = 重量 × 品位 ÷ 100（百克，3 位小数）；
       * 体号   = 按品位档从高到低、同档按体积从大到小重排（与人工报告版式一致）。
 
+    另外（用户 2026-10-18）支持**没闭合的线**：
+
+      * 文件里**有闭合线**、也有**开口线** → 闭合线当**矿界**，开口线当**分块切线**
+        （两端沿各自末端方向外延 cut_extend_m 米，保证切穿矿界；切出来的每一片 = 一块）；
+      * 只有开口线 → 每条首尾相连当一块（老行为）；
+      * 只有闭合线 → 每条闭合线一块。
+
     返回 (rings, blocks)：rings 是这些块的多边形（出图用），blocks 是 Block 列表。
     """
     from oreblocks import Block, Cell, level_of
-    polys = []
+    closed_rings, open_lines = [], []
     for p in paths:
         for pts in read_3ds_polylines(p):
             if len(pts) < 3:
                 continue
-            if math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) > 0.01:
-                pts = list(pts) + [pts[0]]          # 没闭合就补上
-            poly = Polygon(pts).buffer(0)
+            gap = math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1])
+            if gap < 0.05:
+                poly = Polygon(list(pts)).buffer(0)
+                if poly.is_empty:
+                    continue
+                if poly.geom_type == "MultiPolygon":
+                    poly = max(poly.geoms, key=lambda g: g.area)
+                closed_rings.append(poly)
+            else:
+                open_lines.append(list(pts))
+    polys = []
+    if closed_rings and open_lines:
+        # 闭合线 = 矿界；开口线 = 切线 → 逐条把矿界切开
+        for ring in closed_rings:
+            parts = [ring]
+            for pts in open_lines:
+                ln = LineString(_extend_line_ends(pts, cut_extend_m))
+                nxt = []
+                for part in parts:
+                    try:
+                        new = [g for g in split_polygon(part, ln)]
+                    except Exception:
+                        new = [part]
+                    nxt += new if new else [part]
+                parts = nxt
+            polys += [g for g in parts if g.area > 0]
+        # 切出来的细条（切偏了/切线贴边）不要
+        floor = max(float(min_area), 0.005 * sum(g.area for g in closed_rings))
+        dropped = [g.area for g in polys if g.area < floor]
+        polys = [g for g in polys if g.area >= floor]
+        # 另外：一个孔心都没有、又明显比主体小的片（多半是切线切出来的边角料）也丢掉
+        if polys:
+            biggest = max(g.area for g in polys)
+            keep = []
+            for g in polys:
+                has_hole = any(g.buffer(1e-9).contains(Point(h.x, h.y)) for h in all_holes)
+                if has_hole or g.area >= 0.3 * biggest:
+                    keep.append(g)
+                else:
+                    dropped.append(g.area)
+            polys = keep
+        if dropped:
+            print("[人工画线] 丢掉 %d 个过小切片（面积 %s m2）"
+                  % (len(dropped), ", ".join("%.2f" % a for a in dropped)))
+    elif closed_rings:
+        polys = closed_rings
+    else:
+        for pts in open_lines:
+            poly = Polygon(list(pts) + [pts[0]]).buffer(0)   # 首尾相连
             if poly.is_empty:
                 continue
             if poly.geom_type == "MultiPolygon":
                 poly = max(poly.geoms, key=lambda g: g.area)
-            if poly.area < float(min_area):
-                continue
             polys.append(poly)
+    # 环里含环时，外层要减掉内层（否则会重复算量）
+    if len(polys) > 1:
+        fixed = []
+        for i, g in enumerate(polys):
+            inner = _safe_union([h for j, h in enumerate(polys)
+                                 if j != i and g.contains(h.representative_point())])
+            fixed.append(g.difference(inner) if inner is not None else g)
+        polys = [g.buffer(0) for g in fixed if not g.is_empty]
+    polys = [g for g in polys if g.area >= float(min_area)]
     if not polys:
         return [], []
     out_blocks = []

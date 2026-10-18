@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
-                     write_report_xlsx)
+                     write_report_split, write_report_xls, write_report_xlsx)
 from oreblocks import load_holes_xls                           # noqa: E402
 from pipeline import pick_zone, run_blast                      # noqa: E402
 import params as _params                                       # noqa: E402
@@ -186,6 +186,17 @@ def main() -> None:
     try:
         write_report_xlsx(blocks, meta, xlsx, allh)
         made.append(xlsx)
+        # 另出旧版 .xls（同内容）和"炮孔数据报告分表"文件夹（每块一份）——
+        # 用户 2026-10-18 要求交付里有这两样
+        try:
+            xls = out_dir / ("%s炮孔数据报告.xls" % tag)
+            write_report_xls(blocks, meta, xls, allh)
+            made.append(xls)
+            split_files = write_report_split(blocks, meta, out_dir / "炮孔数据报告分表", allh)
+            made += split_files
+            note("分表：%d 个文件 -> %s" % (len(split_files), out_dir / "炮孔数据报告分表"))
+        except Exception as exc:
+            note("[提示] .xls / 分表导出失败（不影响其它成果）：%s" % exc)
         png_used, pw, ph = write_report_png(blocks, meta, allh, png)
         made.append(Path(png_used))
         write_dxf(blocks, allh, [], meta, dxf,

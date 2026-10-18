@@ -186,6 +186,104 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
 
 
 # ---------------------------------------------------------------- DXF
+def _report_rows(blocks):
+    """报告主表的行（含小计/合计），xlsx / xls / 分表三种导出共用。"""
+    rows = []
+    for lid in ("L4", "L3", "L2", "L1", "L0"):
+        bs = [b for b in blocks if b.level_id == lid]
+        if not bs:
+            continue
+        for b in bs:
+            rows.append([b.label, b.no, b.volume_m3, b.tonnage_t, b.grade, b.metal_hg])
+        st = sum(b.tonnage_t for b in bs)
+        sm = sum(b.metal_hg for b in bs)
+        rows.append(["小计", "", sum(b.volume_m3 for b in bs), st,
+                     (sm * 100.0 / st if st else 0), sm])
+    tt = sum(b.tonnage_t for b in blocks)
+    tm = sum(b.metal_hg for b in blocks)
+    rows.append(["合计", "", sum(b.volume_m3 for b in blocks), tt,
+                 (tm * 100.0 / tt if tt else 0), tm])
+    return rows
+
+
+def write_report_xls(blocks, meta, path: Path, holes=None) -> None:
+    """再出一份**旧版 .xls**（内容与 xlsx 相同）——有些流程只认 .xls（用户 2026-10-18 要的）。"""
+    import xlwt
+    wb = xlwt.Workbook(encoding="utf-8")
+    ws = wb.add_sheet("Sheet1")
+    style_title = xlwt.easyxf("font: bold on, height 260; align: horiz center")
+    style_head = xlwt.easyxf("font: bold on; align: horiz center; borders: left thin,"
+                             " right thin, top thin, bottom thin")
+    style_cell = xlwt.easyxf("align: horiz center; borders: left thin, right thin,"
+                             " top thin, bottom thin")
+    style_num = xlwt.easyxf("align: horiz center; borders: left thin, right thin,"
+                            " top thin, bottom thin", num_format_str="0.000")
+    ws.write_merge(0, 0, 0, 5, "%s平台 %s炮孔数据报告" % (meta["platform"], meta["date"]),
+                   style_title)
+    head = ["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"]
+    for c, h in enumerate(head):
+        ws.write(1, c, h, style_head)
+    for r, row in enumerate(_report_rows(blocks), start=2):
+        for c, v in enumerate(row):
+            if c >= 2 and isinstance(v, (int, float)):
+                ws.write(r, c, round(float(v), 6), style_num)
+            else:
+                ws.write(r, c, v if v is not None else "", style_cell)
+    ws.col(0).width = 3600
+    ws.col(2).width = 3000
+    ws.col(3).width = 3000
+    ws.col(4).width = 3200
+    ws.col(5).width = 3600
+    wb.save(str(path))
+
+
+def write_report_split(blocks, meta, folder: Path, holes=None):
+    """每块一份 xlsx，放进「炮孔数据报告分表」文件夹（照 3DMine 分表的版式：
+    标题「3DMine 炮孔数据库报告」+ 表头 + 该块一行 + 小计 + 总计）。"""
+    import openpyxl
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    thin = Side(style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    out = []
+    for b in blocks:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws["A1"] = "3DMine 炮孔数据库报告"
+        ws.merge_cells("A1:F1")
+        ws["A1"].font = Font(bold=True, size=12)
+        ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+        for i, h in enumerate(["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量"], 1):
+            c = ws.cell(row=2, column=i, value=h)
+            c.font = Font(bold=True)
+            c.alignment = Alignment(horizontal="center")
+            c.fill = PatternFill(fill_type=None)
+        vals = [b.label, b.no, round(b.volume_m3, 3), round(b.tonnage_t, 3),
+                round(b.grade, 3), round(b.metal_hg, 3)]
+        for i, v in enumerate(vals, 1):
+            ws.cell(row=3, column=i, value=v)
+        ws.cell(row=4, column=1, value="小计")
+        for col, v in ((3, vals[2]), (4, vals[3]), (5, vals[4]), (6, vals[5])):
+            ws.cell(row=4, column=col, value=v)
+        ws.cell(row=5, column=1, value="总计")
+        for col, v in ((3, vals[2]), (4, vals[3]), (5, vals[4]), (6, vals[5])):
+            ws.cell(row=5, column=col, value=v)
+        for row in ws.iter_rows(min_row=2, max_row=5, min_col=1, max_col=6):
+            for c in row:
+                c.border = border
+                c.alignment = Alignment(horizontal="center")
+                c.fill = PatternFill(fill_type=None)
+        ws.column_dimensions["A"].width = 18
+        for col in "CDEF":
+            ws.column_dimensions[col].width = 14
+        p = folder / ("%s号矿块 %s %s.xlsx" % (b.no, b.label, meta["date"]))
+        wb.save(str(p))
+        out.append(p)
+    return out
+
+
 def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
     """把报告表格画成 PNG（用于粘贴进 CAD 图）。返回像素尺寸 (w, h)。"""
     import matplotlib
