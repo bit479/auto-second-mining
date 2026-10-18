@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
@@ -42,7 +43,7 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.5"            # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.6"            # 界面上会显示——以后一眼就能看出跑的是哪版代码
 EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
 EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
@@ -833,6 +834,7 @@ class App:
 
         def run(name, cmd):
             self.log_line("== %s ==" % name)
+            _t0 = time.time()
             try:
                 p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, text=True,
@@ -842,9 +844,10 @@ class App:
                     self.log_line(line.rstrip())
                 p.wait(timeout=3600)
                 if p.returncode != 0:
-                    self.log_line("[失败] %s 退出码 %s" % (name, p.returncode))
+                    self.log_line("[失败] %s 退出码 %s（用时 %.1f 秒）"
+                                  % (name, p.returncode, time.time() - _t0))
                     return False
-                self.log_line("[完成] %s" % name)
+                self.log_line("[完成] %s（用时 %.1f 秒）" % (name, time.time() - _t0))
                 return True
             except Exception as ex:
                 self.log_line("[异常] %s: %s" % (name, ex))

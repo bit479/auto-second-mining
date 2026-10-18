@@ -59,6 +59,23 @@
 **交付里多了两样**（v1.5 起）：同内容的旧版 **`.xls` 报告**，以及 **`炮孔数据报告分表/`**
 文件夹（每块一份 xlsx，3DMine 分表版式：标题/表头/该块/小计/总计）。
 
+## 速度（v1.6 起）
+
+DXF → DWG 2010 不再只走 AutoCAD COM，而是**自动挑最快的**：
+
+| 顺序 | 转换器 | 特点 | 实测 |
+|---|---|---|---|
+| ① | **ODA File Converter**（装了才用） | 免费、**完全不依赖 AutoCAD** | ~1 秒 |
+| ② | **accoreconsole**（AutoCAD 自带的无界面内核） | 不开 GUI、不走 COM、独立进程 | **约 2 秒** |
+| ③ | AutoCAD COM（老路径） | 兜底 | 6~7 秒（AutoCAD 没开还要等启动 30~60 秒） |
+
+综合图扫描也一样：COM 失败/没缓存时改用 **accoreconsole 把 DWG 转 DXF + ezdxf 读**（约 3~4 秒）。
+
+想彻底不用 AutoCAD：装 ODA File Converter（Open Design Alliance 免费工具），装好后程序自动发现；
+装在别处就设环境变量 `ODA_FILE_CONVERTER=<ODAFileConverter.exe 路径>`。
+实测一条 1008 的完整流程：第 1 步（圈矿+报告+图+.3ds+.xls+分表）约 5.8 秒，
+第 2 步（DXF→DWG2010，accoreconsole）约 2.0 秒。
+
 ## Excel 工具（v1.3 起已整合进来）
 
 原来单独的 `Excel处理工具` 已经搬进本项目（`excel_tools\`），主界面下方多了一块

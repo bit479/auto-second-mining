@@ -14,6 +14,9 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 MIN_BLOCK_AREA = 5.0
+# 上限：整张图的外框/图廓也是闭合多段线（实测综合图里有一条 50 万 m² 的图框），
+# 不能当"历史矿块"。真实矿块最大也就几百~一千多 m²。
+MAX_BLOCK_AREA = 20000.0
 SKIP_LAYERS = {"爆区方格网", "点", "钻孔", "线条"}
 
 
@@ -60,6 +63,54 @@ def _scan_with_autocad(dwg: Path, out_json: Path) -> dict:
     return data
 
 
+def _scan_with_accore(dwg: Path) -> dict:
+    """DWG → DXF（accoreconsole，无界面）→ ezdxf 读多段线。不依赖 AutoCAD GUI/COM。"""
+    import shutil
+    import subprocess
+    import tempfile
+    from dxf2dwg import _find_accore
+
+    acc = _find_accore()
+    if acc is None:
+        raise RuntimeError("没找到 accoreconsole.exe")
+    with tempfile.TemporaryDirectory(prefix="comp_scan_") as td:
+        td = Path(td)
+        src = td / "c.dwg"
+        out = td / "c.dxf"
+        shutil.copy2(dwg, src)
+        scr = td / "e.scr"
+        scr.write_text("_DXFOUT\n%s\n16\n_QUIT\n" % out, encoding="ascii")
+        subprocess.run([str(acc), "/i", str(src), "/s", str(scr)],
+                       capture_output=True, text=True, timeout=600, errors="replace")
+        if not out.exists():
+            raise RuntimeError("accoreconsole 没生成 DXF")
+        import ezdxf
+        doc = ezdxf.readfile(str(out))
+        polys = []
+        for ent in doc.modelspace():
+            t = ent.dxftype()
+            if t not in ("LWPOLYLINE", "POLYLINE"):
+                continue
+            layer = ent.dxf.layer
+            if layer in SKIP_LAYERS:
+                continue
+            try:
+                color = int(ent.dxf.color)
+            except Exception:
+                color = 7
+            try:
+                if t == "LWPOLYLINE":
+                    pts = [[round(p[0], 3), round(p[1], 3)] for p in ent.get_points()]
+                else:
+                    pts = [[round(v.dxf.location.x, 3), round(v.dxf.location.y, 3)]
+                           for v in ent.vertices]
+            except Exception:
+                continue
+            if len(pts) >= 3:
+                polys.append({"layer": layer, "color": color, "pts": pts})
+    return {"dwg": str(dwg), "polylines": polys}
+
+
 def load_composite_blocks(dwg, cache_dir=None):
     """返回综合图里的历史矿块多边形列表 [(layer, color, polygon), ...]。"""
     dwg = Path(dwg)
@@ -73,9 +124,18 @@ def load_composite_blocks(dwg, cache_dir=None):
         except Exception as exc:
             # 最常见原因：AutoCAD 没开、或者正忙（弹着对话框/正在命令中），COM 会拒绝呼叫。
             print("[综合图] 扫描失败：%s" % exc)
-            print("         （不影响出成果——这一步只是「与综合图合并」，本次会跳过；"
-                  "把 AutoCAD 打开/切到空闲后重跑即可生成缓存）")
-            return []
+            # 换 accoreconsole（AutoCAD 自带的**无界面内核**）把 DWG 转成 DXF，再用 ezdxf 读——
+            # 不开 GUI、不走 COM，冷启动也只要几秒（用户 2026-10-18：嫌 COM 慢）
+            try:
+                print("[综合图] 改用 accoreconsole 无界面内核扫描 ...")
+                data = _scan_with_accore(dwg)
+                cache.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                print("[综合图] 已用 accoreconsole 扫完并生成缓存：%s" % cache.name)
+            except Exception as exc2:
+                print("[综合图] accoreconsole 也失败：%s" % exc2)
+                print("         （不影响出成果——这一步只是「与综合图合并」，本次会跳过；"
+                      "把 AutoCAD 打开/切到空闲后重跑即可生成缓存）")
+                return []
     out = []
     for p in data.get("polylines", []):
         pts = p["pts"]
@@ -84,7 +144,7 @@ def load_composite_blocks(dwg, cache_dir=None):
         if pts[0] != pts[-1]:
             pts = pts + [pts[0]]
         poly = Polygon(pts).buffer(0)
-        if poly.area >= MIN_BLOCK_AREA:
+        if MIN_BLOCK_AREA <= poly.area <= MAX_BLOCK_AREA:
             out.append((p.get("layer", ""), p.get("color", 7), poly))
     return out
 
