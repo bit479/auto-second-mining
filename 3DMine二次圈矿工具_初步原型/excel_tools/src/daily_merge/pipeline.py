@@ -123,10 +123,21 @@ def run(options: DailyMergeOptions) -> dict:
         "warnings": list(plan.warnings),
     }
 
+    # 0) 先查"源文件里到底装的是哪一天"：复制文件夹做模板很常见，
+    #    xls/mdb 忘了重新导出 → 里面的孔是前一天的，判重会全跳过（新增 0 行）。
+    blocked = _date_mismatch(plan)
+    for kind, (dates, total) in blocked.items():
+        detail = "、".join("%s×%d" % (d, n) for d, n in dates.most_common())
+        report["warnings"].append(
+            "单日 %s 里没有任何「%s」的孔（实际是 %s，共 %d 个），与目录日期不一致 —— "
+            "很可能是复制文件夹当模板后没有重新导出。这一栏**已跳过**，请重新导出后再跑。"
+            % (KIND_LABELS[kind], plan.day_code, detail, total))
+    pairs = [p for p in plan.pairs if p[0] not in blocked]
+
     # 1) 先全面预演一遍，确认哪些总表真的需要改动
     preview_options = replace(options, dry_run=True)
     preview: dict[str, dict] = {}
-    for kind, src, dst in plan.pairs:
+    for kind, src, dst in pairs:
         try:
             preview[kind] = _merge_one(kind, src, dst, preview_options)
         except Exception as exc:  # noqa: BLE001 - 单类失败不阻断其余
@@ -141,10 +152,11 @@ def run(options: DailyMergeOptions) -> dict:
             report["totals_check"] = {"checked": False, "reason": "%s" % exc}
 
     if options.dry_run:
-        report["results"] = preview
+        report["results"] = dict(preview)
+        report["results"].update(_blocked_results(plan, blocked))
         return report
 
-    pending = [p for p in plan.pairs if preview.get(p[0], {}).get("added")]
+    pending = [p for p in pairs if preview.get(p[0], {}).get("added")]
 
     # 2) 备份"确实会被改动"的总表（无改动就完全不落备份文件）
     #    矿块图的目标是文件夹，而且复制时自带 <原名>.bak 备份，这里不参与
@@ -156,7 +168,7 @@ def run(options: DailyMergeOptions) -> dict:
 
     # 3) 真正写盘；没有改动的直接沿用预演结果
     changed = {p[0] for p in pending}
-    for kind, src, dst in plan.pairs:
+    for kind, src, dst in pairs:
         if kind in report["errors"]:
             continue
         if kind not in changed:
@@ -167,6 +179,9 @@ def run(options: DailyMergeOptions) -> dict:
         except Exception as exc:  # noqa: BLE001
             report["errors"][kind] = "%s" % exc
 
+    # 被日期检查拦下的那几类，明确给一条"跳过"结果（而不是空着让人以为并过了）
+    report["results"].update(_blocked_results(plan, blocked))
+
     # 4) 收集各类并入返回的提示（不阻断流程，但要让用户看见）
     for res in report["results"].values():
         for notice in res.get("notices", []) or []:
@@ -175,6 +190,74 @@ def run(options: DailyMergeOptions) -> dict:
 
     report["verify"] = verify(plan)
     return report
+
+
+def _blocked_results(plan: DailyMergePlan, blocked: dict[str, tuple]) -> dict[str, dict]:
+    """把"日期对不上"的类别表示成一条 skipped 结果，供汇总/界面显示。"""
+    out: dict[str, dict] = {}
+    for kind, (dates, _total) in blocked.items():
+        out[kind] = {
+            "kind": kind,
+            "src": plan.src.get(kind),
+            "dst": plan.dst.get(kind),
+            "written": False,
+            "skipped": True,
+            "added": 0,
+            "reason": "单日文件里的孔不是「%s」的（实际 %s），已跳过"
+                      % (plan.day_code,
+                         "、".join("%s×%d" % (d, n) for d, n in dates.most_common())),
+        }
+    return out
+
+
+def _source_dates(kind: str, path: str):
+    """统计单日文件里孔的日期段（取工程号第三段），返回 Counter。"""
+    import re
+    from collections import Counter
+
+    if kind == KIND_XLS:
+        info = db_xls.read_sheets(path).get("定位表")
+        holes = [str(r.get("工程号")) for r in info["rows"]] if info else []
+    elif kind == KIND_MDB:
+        conn = db_mdb.connect(path, write=False)
+        try:
+            holes = [str(r.get("工程号"))
+                     for r in db_mdb.read_table_rows(conn, "定位表", ["工程号"])]
+        finally:
+            conn.close()
+    else:
+        return Counter()
+
+    pattern = re.compile(r"[A-Za-z]{2,3}-\d+-(\d{3,4})-")
+    dates = Counter()
+    for hole in holes:
+        match = pattern.search(hole)
+        if match:
+            dates[match.group(1)] += 1
+    return dates
+
+
+def _date_mismatch(plan: DailyMergePlan) -> dict[str, tuple]:
+    """找"源文件里一个当天的孔都没有"的类别 —— 这种基本是源文件没重新导出。
+
+    只在**完全没有**当天数据时才拦；某天里夹着前几天没爆完的孔（很常见）不拦。
+    """
+    day_digits = "".join(ch for ch in (plan.day_code or "") if ch.isdigit())
+    if not day_digits:
+        return {}
+    blocked: dict[str, tuple] = {}
+    for kind in (KIND_XLS, KIND_MDB):
+        path = plan.src.get(kind)
+        if not path or not os.path.isfile(path):
+            continue
+        try:
+            dates = _source_dates(kind, path)
+        except Exception:  # noqa: BLE001 - 读不出来就别拦，交给后面的并入去报错
+            continue
+        if not dates or day_digits in dates:
+            continue
+        blocked[kind] = (dates, sum(dates.values()))
+    return blocked
 
 
 # --------------------------------------------------------------------------
@@ -317,6 +400,9 @@ def summarize(report: dict) -> list[str]:
         label = KIND_LABELS[kind]
         if kind == KIND_DWG:
             lines.append(map_copy.describe(res))
+            continue
+        if res.get("skipped") and "tables" not in res:
+            lines.append("[跳过] %s：%s" % (label, res.get("reason", "已跳过")))
             continue
         if kind == KIND_REPORT:
             if res.get("skipped"):
