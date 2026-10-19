@@ -22,22 +22,20 @@ from .discover import (DailyMergeOptions, DailyMergePlan, find_map_folder,
 from .schema import (DB_KEY_COLUMNS, DB_TABLES, KIND_DWG, KIND_LABELS,
                      KIND_MDB, KIND_REPORT, KIND_XLS, MERGE_KINDS,
                      map_target_name, normalize_key)
+from ..excel_core.bak_store import (BAK_DIRNAME, bak_dir, collect_bak_files,
+                                    unique_path)
 
 __all__ = ["DailyMergeOptions", "DailyMergePlan", "resolve_plan", "run",
            "backup_file", "verify", "summarize", "restore"]
 
 
 def backup_file(path: str, day_code: str = "") -> str:
-    """把总表备份成 ``<原名>_并入<日>.bak``（已存在则加序号，绝不覆盖）。"""
-    stem, ext = os.path.splitext(path)
+    """把总表备份成 ``bak/<原名>_并入<日>.bak``（已存在则加序号，绝不覆盖）。"""
+    stem = os.path.splitext(os.path.basename(path))[0]
     tag = "_并入%s" % day_code if day_code else "_备份"
-    candidate = "%s%s.bak" % (stem, tag)
-    index = 2
-    while os.path.exists(candidate):
-        candidate = "%s%s-%d.bak" % (stem, tag, index)
-        index += 1
+    candidate = unique_path(bak_dir(path, create=True), "%s%s.bak" % (stem, tag))
     shutil.copy2(path, candidate)
-    return candidate
+    return str(candidate)
 
 
 def restore(master_dir: str, day_code: str = None) -> dict:
@@ -51,36 +49,54 @@ def restore(master_dir: str, day_code: str = None) -> dict:
     if not master_dir or not os.path.isdir(master_dir):
         raise FileNotFoundError("总表目录不存在：%s" % master_dir)
 
+    # 先把散落在根目录的旧 .bak 收进 bak/，再统一从 bak/ 找
+    collect_bak_files(master_dir)
+    map_dir = find_map_folder(master_dir)
+    if map_dir:
+        collect_bak_files(map_dir)
+
     restored: dict[str, str] = {}
     for kind, master in find_master_files(master_dir).items():
         if not master or not os.path.isfile(master):
             continue
         stem, ext = os.path.splitext(master)
+        base = os.path.basename(stem)
         if day_code:
-            pattern = "%s_并入%s*.bak" % (stem, day_code)
+            pattern = "%s_并入%s*.bak" % (base, day_code)
         else:
-            pattern = "%s_并入*.bak" % stem
-        candidates = sorted(glob.glob(pattern), key=os.path.getmtime)
+            pattern = "%s_并入*.bak" % base
+        candidates = []
+        for root in (os.path.join(os.path.dirname(master), BAK_DIRNAME),
+                     os.path.dirname(master)):
+            candidates += glob.glob(os.path.join(root, pattern))
+        candidates = sorted(set(candidates), key=os.path.getmtime)
         if not candidates:
             continue
         source = candidates[-1]                       # 最近的备份
-        keep = "%s_还原前%s.bak" % (stem, time.strftime("%Y%m%d-%H%M%S"))
+        keep = unique_path(
+            bak_dir(master, create=True),
+            "%s_还原前%s.bak" % (base, time.strftime("%Y%m%d-%H%M%S")))
         shutil.copy2(master, keep)
         shutil.copy2(source, master)
         restored[kind] = "%s  <-  %s" % (os.path.basename(master), os.path.basename(source))
 
     # 矿块图：只在明确给了日期代号时才还原 —— 6、文件夹里还躺着别的日期的 .bak，别误动
     if day_code:
-        map_dir = find_map_folder(master_dir)
         if map_dir:
-            for source in sorted(glob.glob(os.path.join(map_dir, "*%s.bak" % day_code)),
-                                 key=os.path.getmtime):
-                stem = source[: -len(".bak")]
-                target = stem + ".dwg"
+            candidates = []
+            for root in (os.path.join(map_dir, BAK_DIRNAME), map_dir):
+                candidates += glob.glob(os.path.join(root, "*%s*.bak" % day_code))
+            for source in sorted(set(candidates), key=os.path.getmtime):
+                base = os.path.basename(source)[: -len(".bak")]
+                target = os.path.join(map_dir, base if base.lower().endswith(".dwg")
+                                      else base + ".dwg")
                 if not os.path.isfile(target):
                     continue
-                shutil.copy2(target, "%s_还原前%s.bak"
-                             % (stem, time.strftime("%Y%m%d-%H%M%S")))
+                name_stem = os.path.splitext(os.path.basename(target))[0]
+                keep = unique_path(
+                    bak_dir(map_dir, create=True),
+                    "%s_还原前%s.bak" % (name_stem, time.strftime("%Y%m%d-%H%M%S")))
+                shutil.copy2(target, keep)
                 shutil.copy2(source, target)
                 restored[KIND_DWG] = "%s  <-  %s" % (os.path.basename(target),
                                                      os.path.basename(source))
@@ -112,6 +128,14 @@ def run(options: DailyMergeOptions) -> dict:
     if not plan.executable:
         raise FileNotFoundError(
             "没有可执行的文件对，请检查单日目录 / 总表目录：\n  " + "\n  ".join(plan.missing))
+
+    # 用户 2026-10-19：把根目录里旧的 .bak 先收进 bak/，以后新备份也直接写进 bak/
+    if not options.dry_run:
+        if plan.master_dir:
+            collect_bak_files(plan.master_dir)
+        _map_dir = plan.dst.get(KIND_DWG) or find_map_folder(plan.master_dir)
+        if _map_dir and os.path.isdir(_map_dir):
+            collect_bak_files(_map_dir)
 
     report: dict[str, Any] = {
         "day_code": plan.day_code,

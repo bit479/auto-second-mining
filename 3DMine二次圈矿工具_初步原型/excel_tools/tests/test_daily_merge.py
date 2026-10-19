@@ -6,7 +6,7 @@
 2. 跑一次并入，逐行比对 xls / mdb 的追加行、检查报告块的公式平移；
 3. 检查矿块图是否复制进 ``6、…二次圈矿矿块图`` 且**去掉了「5、」前缀**；
 4. 再跑一次，确认"判重"生效（新增 0 行、报告不重复粘、矿块图不再复制）；
-5. 把目标图改脏再跑，确认它会先备份成 ``<原名>.bak`` 再覆盖；
+5. 把目标图改脏再跑，确认它会先备份成 ``bak/<原名>.bak`` 再覆盖；
 6. 从备份还原，确认总表回到并入前的孔数。
 
 用法::
@@ -171,6 +171,8 @@ def test_map(day_dir: str) -> None:
     backup = info.get("backup") or ""
     check(info["written"] and bool(backup) and os.path.isfile(backup),
           "目标图被改脏后：先备份成 %s 再覆盖" % (os.path.basename(backup) or "?"))
+    check(os.path.basename(os.path.dirname(backup)) == "bak",
+          "备份统一收进同目录的 bak/ 子文件夹")
     check(map_copy.files_identical(source, target), "覆盖后内容与单日图一致")
 
     # --no-map / with_map=False：整类不参与

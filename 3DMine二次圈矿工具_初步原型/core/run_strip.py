@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
                      write_report_split, write_report_xls, write_report_xlsx)
+from bak_housekeeping import collect_bak_files                 # noqa: E402
 from oreblocks import load_holes_xls                           # noqa: E402
 from pipeline import pick_zone, run_blast                      # noqa: E402
 import params as _params                                       # noqa: E402
@@ -221,6 +222,11 @@ def main() -> None:
         note("[错误] 写成果文件失败：%s" % exc)
         _write_runlog(out_dir, tag, xls, comp_dwg, P, meta, made, log, t0, ok=False)
         sys.exit(3)
+    # 用户 2026-10-19：.bak 不要散在成果目录/炮区目录里，统一收进各自的 bak/ 子文件夹
+    for _dir in (out_dir, xls.parent):
+        _moved = collect_bak_files(_dir)
+        if _moved:
+            note("已把 %d 个 .bak 收进 %s" % (len(_moved), _dir / "bak"))
     note("完成 -> %s" % out_dir)
     _write_runlog(out_dir, tag, xls, comp_dwg, P, meta, made, log, t0, ok=True)
 

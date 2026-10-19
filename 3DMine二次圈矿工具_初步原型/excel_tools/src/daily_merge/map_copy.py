@@ -20,6 +20,7 @@ import os
 import shutil
 
 from .schema import KIND_DWG, KIND_LABELS, map_target_name
+from ..excel_core.bak_store import bak_dir, unique_path
 
 __all__ = ["copy_map", "files_identical"]
 
@@ -35,15 +36,11 @@ def files_identical(left: str, right: str) -> bool:
 
 
 def _backup(path: str) -> str:
-    """把旧图备份成 ``<原名>.bak``（与 6、文件夹里既有的 1003.bak 习惯一致）。"""
-    stem = os.path.splitext(path)[0]
-    candidate = "%s.bak" % stem
-    index = 2
-    while os.path.exists(candidate):
-        candidate = "%s.bak-%d" % (stem, index)
-        index += 1
+    """把旧图备份成 ``bak/<原名>.bak``（同名已存在则加序号）。"""
+    name = os.path.basename(path)
+    candidate = unique_path(bak_dir(path, create=True), "%s.bak" % name)
     shutil.copy2(path, candidate)
-    return candidate
+    return str(candidate)
 
 
 def copy_map(src_file: str, dst_dir: str, *,

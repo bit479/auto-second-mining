@@ -19,6 +19,11 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    from bak_housekeeping import collect_bak_files
+except ImportError:                       # 作为 core 包导入时
+    from .bak_housekeeping import collect_bak_files
+
 LAYER_COLOR = {"0.500-1.000": 4, "1.000-1.500": 5,
                "1.500-3.000": 1, "3.000-999.000": 2}
 
@@ -139,6 +144,8 @@ def merge(comp_dwg: Path, tds: Path, out_dwg: Path = None, start: bool = False):
                 doc.Close(True)
             except Exception:
                 pass
+        # AutoCAD 保存 DWG 时会在旁边生成 .bak —— 统一收进 bak/ 子文件夹
+        collect_bak_files(out_dwg.parent)
 
 
 def preview(comp_dwg: Path, blocks, out_png: Path, cache_json: Path = None):

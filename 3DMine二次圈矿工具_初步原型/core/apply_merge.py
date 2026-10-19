@@ -20,6 +20,11 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    from bak_housekeeping import collect_bak_files
+except ImportError:                       # 作为 core 包导入时
+    from .bak_housekeeping import collect_bak_files
+
 
 def guess_original(merged: Path) -> Path:
     """从 `<原stem>_并入<tag>.dwg` 猜回原名。"""
@@ -66,6 +71,7 @@ def apply_merge(merged: Path, original: Path = None, dry_run: bool = False):
         except Exception:
             return False, "复制副本失败，且回滚失败！请手工把 %s 改回 %s（%s）" % (
                 backup.name, original.name, exc)
+    collect_bak_files(original.parent)
     return True, "已替换；原件备份 = %s" % backup
 
 
