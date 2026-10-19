@@ -110,7 +110,7 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
     for i, h in enumerate(head, 1):
         c = ws.cell(row=2, column=i, value=h)
         c.font = Font(bold=True)
-        c.alignment = Alignment(horizontal="center")
+        c.alignment = Alignment(horizontal="center", vertical="center")
         # 用户 2026-10-15：报告里**不要单元格底纹**（原来是浅蓝/浅灰）
         c.fill = PatternFill(fill_type=None)
 
@@ -179,6 +179,8 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
     for row in ws.iter_rows(min_row=2, max_row=last_row, min_col=1, max_col=6):
         for cell in row:
             cell.border = border
+            # 用户 2026-10-19：报告表按 Excel 默认风格，所有文字居中
+            cell.alignment = Alignment(horizontal="center", vertical="center")
             if cell.column >= 3:
                 cell.number_format = "0.000"
     for col, w in zip("ABCDEF", (14, 8, 12, 12, 14, 14)):
@@ -387,7 +389,7 @@ BLANK_NOTE = "（缺工程，待取样验证后再进行施工）"
 
 # 报告表（矢量）：列宽合计 40 m，与原来贴图宽度一致；行高/字高按图面比例定
 TABLE_COL_W = (6.0, 5.0, 7.0, 7.0, 8.0, 7.0)
-TABLE_ROW_H = 2.2
+TABLE_ROW_H = 1.3
 TABLE_TEXT_H = 0.8
 TABLE_TITLE_H = 1.6
 
@@ -448,11 +450,13 @@ def _draw_report_table(msp, x0, y_top, rows, stat_rows, title):
         s = str(s)
         w = _text_width(s, h)
         msp.add_text(s, dxfattribs=dict(attrib, height=h)).set_placement(
-            (cx - w / 2.0, cy - h * 0.36))
+            (cx - w / 2.0, cy - h * 0.5))
 
-    # 标题
+    # 标题（Excel 默认风格：跨整表居中）
     msp.add_text(title, dxfattribs=dict(attrib, height=TABLE_TITLE_H)
-                 ).set_placement((x0, y_top - TABLE_TITLE_H))
+                 ).set_placement(
+                     (x0 + (total_w - _text_width(title, TABLE_TITLE_H)) / 2.0,
+                      y_top - TABLE_TITLE_H))
     y = y_top - TABLE_TITLE_H - 1.2
 
     # 主表
@@ -460,10 +464,10 @@ def _draw_report_table(msp, x0, y_top, rows, stat_rows, title):
     for i in range(n + 1):
         yy = y - i * TABLE_ROW_H
         msp.add_line((x0, yy), (x0 + total_w, yy),
-                     dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+                     dxfattribs={"layer": "0", "color": 8, "lineweight": 13})
     for xx in xs:
         msp.add_line((xx, y), (xx, y - n * TABLE_ROW_H),
-                     dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+                     dxfattribs={"layer": "0", "color": 8, "lineweight": 13})
     for i, row in enumerate(rows):
         cy = y - (i + 0.5) * TABLE_ROW_H
         h = TABLE_TEXT_H
@@ -476,18 +480,21 @@ def _draw_report_table(msp, x0, y_top, rows, stat_rows, title):
     if stat_rows:
         # 炮孔品位统计：小标题 + 两行（列宽与主表一致）
         y -= 1.8
-        msp.add_text("炮孔品位统计（孔数）",
-                     dxfattribs=dict(attrib, height=TABLE_TITLE_H * 0.8)
-                     ).set_placement((x0, y - TABLE_TITLE_H * 0.8))
+        sub = "炮孔品位统计（孔数）"
+        sub_h = TABLE_TITLE_H * 0.8
+        msp.add_text(sub, dxfattribs=dict(attrib, height=sub_h)
+                     ).set_placement(
+                         (x0 + (total_w - _text_width(sub, sub_h)) / 2.0,
+                          y - sub_h))
         y -= TABLE_TITLE_H * 0.8 + 0.5
         m = len(stat_rows)
         for i in range(m + 1):
             yy = y - i * TABLE_ROW_H
             msp.add_line((x0, yy), (x0 + total_w, yy),
-                         dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+                         dxfattribs={"layer": "0", "color": 8, "lineweight": 13})
         for xx in xs:
             msp.add_line((xx, y), (xx, y - m * TABLE_ROW_H),
-                         dxfattribs={"layer": "0", "color": 8, "lineweight": 25})
+                         dxfattribs={"layer": "0", "color": 8, "lineweight": 13})
         for i, row in enumerate(stat_rows):
             cy = y - (i + 0.5) * TABLE_ROW_H
             for j, val in enumerate(row):

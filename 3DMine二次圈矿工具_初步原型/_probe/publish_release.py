@@ -75,7 +75,8 @@ def main() -> int:
              "v1.4": "v1.4 —— 单日并入时一并复制二次圈矿矿块图",
              "v1.5": "v1.5 —— 未闭合 .3ds 也能出图 + 交付加 .xls 与分表",
              "v1.6": "v1.6 —— DXF→DWG 提速（accoreconsole，约 2 秒）",
-             "v1.7": "v1.7 —— 小片归属 / 标注引线从块中心 / 手机端矢量表格"}.get(
+             "v1.7": "v1.7 —— 小片归属 / 标注引线从块中心 / 手机端矢量表格",
+             "v1.7.1": "v1.7.1 —— 报告表改 Excel 默认风格：细边框、全部居中、行高压缩"}.get(
                  TAG, "%s —— 二次圈矿工具" % TAG)
     st, res = api("https://api.github.com/repos/%s/releases" % REPO, tok,
                   {"tag_name": TAG, "name": title,
