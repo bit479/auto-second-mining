@@ -16,7 +16,7 @@ import shutil
 from dataclasses import replace
 from typing import Any
 
-from . import db_mdb, db_xls, map_copy, report_xlsx
+from . import db_mdb, db_xls, locks, map_copy, report_xlsx
 from .discover import (DailyMergeOptions, DailyMergePlan, find_map_folder,
                        find_master_files, resolve_plan)
 from .schema import (DB_KEY_COLUMNS, DB_TABLES, KIND_DWG, KIND_LABELS,
@@ -48,6 +48,13 @@ def restore(master_dir: str, day_code: str = None) -> dict:
 
     if not master_dir or not os.path.isdir(master_dir):
         raise FileNotFoundError("总表目录不存在：%s" % master_dir)
+
+    # 还原要覆盖总表 —— 先确认没被 Excel / Access 打开
+    masters = [(p, "总表") for p in find_master_files(master_dir).values() if p]
+    blocking, _stale = locks.check(masters)
+    if blocking:
+        raise locks.FilesInUseError(locks.format_message(
+            blocking, [], hint="还原会覆盖这些总表，请先保存并关闭。"))
 
     # 先把散落在根目录的旧 .bak 收进 bak/，再统一从 bak/ 找
     collect_bak_files(master_dir)
@@ -147,7 +154,12 @@ def run(options: DailyMergeOptions) -> dict:
         "warnings": list(plan.warnings),
     }
 
-    # 0) 先查"源文件里到底装的是哪一天"：复制文件夹做模板很常见，
+    # 0) 先确认没有文件还开着：总表被占 → 写失败/写一半；
+    #    单日文件被占 → 读到的可能还是上次保存的旧内容（改了没保存）。
+    for line in _check_files_closed(plan, options, report):
+        report["warnings"].append(line)
+
+    # 1) 查"源文件里到底装的是哪一天"：复制文件夹做模板很常见，
     #    xls/mdb 忘了重新导出 → 里面的孔是前一天的，判重会全跳过（新增 0 行）。
     blocked = _date_mismatch(plan)
     for kind, (dates, total) in blocked.items():
@@ -214,6 +226,35 @@ def run(options: DailyMergeOptions) -> dict:
 
     report["verify"] = verify(plan)
     return report
+
+
+def _check_files_closed(plan: DailyMergePlan, options: DailyMergeOptions,
+                        report: dict) -> list[str]:
+    """确认单日文件与总表都没被 Excel / Access / CAD 打开。
+
+    * 正式并入：被占就**抛出** FilesInUseError（一行也不写，备份也不做）；
+    * 预演（dry-run）：只提示，不中止 —— 看一眼计划通常无妨；
+    * ``require_closed=False``（``--allow-open``）：只提示，硬闯。
+    """
+    files: list[tuple[str, str]] = []
+    for kind, src, dst in plan.pairs:
+        files.append((src, "单日"))
+        if kind != KIND_DWG:           # 矿块图的目标是文件夹，不算文件
+            files.append((dst, "总表"))
+
+    blocking, stale = locks.check(files)
+    if blocking:
+        message = locks.format_message(blocking, stale)
+        if options.require_closed and not options.dry_run:
+            raise locks.FilesInUseError(message)
+        names = "、".join(item.name for item in blocking)
+        return ["有 %d 个文件还开着（预演照做，正式并入会被拦下）：%s —— 请先保存并关闭。"
+                % (len(blocking), names)]
+    if stale:
+        names = "、".join(item.name for item in stale)
+        return ["%d 个文件旁边有残留锁文件，但文件本身可写，判定为已关闭：%s"
+                % (len(stale), names)]
+    return []
 
 
 def _blocked_results(plan: DailyMergePlan, blocked: dict[str, tuple]) -> dict[str, dict]:

@@ -283,6 +283,7 @@ class DailyTab(ttk.Frame):
         self.dry_run_var = tk.BooleanVar(value=False)
         self.appendix_var = tk.BooleanVar(value=False)
         self.map_var = tk.BooleanVar(value=True)
+        self.require_closed_var = tk.BooleanVar(value=True)
 
         self.plan = None
         self._build_ui()
@@ -333,6 +334,13 @@ class DailyTab(ttk.Frame):
         ttk.Label(opts2, text="（目标已有同名图且内容相同就跳过；不同则先备份成 <原名>.bak 再覆盖）",
                   foreground="#888888").pack(side="left", padx=(6, 0))
 
+        opts3 = ttk.Frame(self)
+        opts3.pack(fill="x", **_PAD)
+        ttk.Checkbutton(opts3, text="并入前检查文件是否已保存并关闭（Excel / Access / CAD 占用就中止）",
+                        variable=self.require_closed_var).pack(side="left")
+        ttk.Label(opts3, text="（单日文件被打开时，磁盘上可能还是改动前的旧内容）",
+                  foreground="#888888").pack(side="left", padx=(6, 0))
+
         bar = ttk.Frame(self)
         bar.pack(fill="x", **_PAD)
         ttk.Button(bar, text="扫描识别", command=self.scan).pack(side="left")
@@ -374,6 +382,7 @@ class DailyTab(ttk.Frame):
             with_report_appendix=self.appendix_var.get(),
             with_map=self.map_var.get(),
             backup=self.backup_var.get(),
+            require_closed=self.require_closed_var.get(),
             dry_run=self.dry_run_var.get() if dry_run is None else dry_run,
         )
 

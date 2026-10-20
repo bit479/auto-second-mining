@@ -11,11 +11,11 @@
 闭合 → 与综合图能贴上的那段改成走历史矿块边界 → 界内按品位档 + Voronoi 算量分块定档。
 口径逐条写在 **[口径确认记录.md](口径确认记录.md)**（那份是唯一依据，以用户拍板为准）。
 
-## 现在什么状态（2026-10-19）
+## 现在什么状态（2026-10-20）
 
-**最新版**：[Release v1.7](https://github.com/bit479/auto-second-mining/releases/tag/v1.7)
-（发布说明 + 可直接下载的绿色包 `second-mining-tool-v1.7.zip`）。
-重新发版的脚本：`python _probe\publish_release.py`（说明取自 `_probe\release_notes_v1.md`）。
+**最新版**：[Release v1.9](https://github.com/bit479/auto-second-mining/releases/tag/v1.9)
+（发布说明 + 可直接下载的绿色包 `second-mining-tool-v1.9.zip`）。
+重新发版的脚本：`python _probe\publish_release.py`（说明取自 `_probe\release_notes_v1_9.md`）。
 
 17 个炮区**验收全绿**，跑 `python _probe\accept_all.py` 一条命令可复现：
 
@@ -24,7 +24,7 @@
 | 3940 | 0915 / 0922 / 1003 / 1004 / 1008 | 0.62 ~ 0.95 | −1.3% ~ +6.1%（基准 = 人工报告） | 全部与人工图一致（0915 ✓7、0922 ✓4、1003 3/2、1004 4/3、1008 ✓3） |
 | 3960 | 0825/0830/0902/0904/0908/0914/0919/0922/0922-2/1007/1008/1009 | 0.53 ~ 0.93 | **−2.9% ~ +6.8%**（基准 = 人工图算） | 全部与人工图一致 |
 
-四项自检（都进了 `accept_all.py`）：
+六类自检（都进了 `accept_all.py`）：
 
 1. **圈矿闸门**（`selftest.py`）两档：常规档（生产跑法）+ **严格档**（把综合图里"当日本身
    已经圈过的块"排掉，模拟新炮区的真实场景）；
@@ -35,6 +35,8 @@
    矿块号（不重号、不压矿块与报告表、**引线从矿块主体中心出发**）/ 报告表（**矢量 TEXT + LINE**，
    不引用外部图片，手机 CAD 也能看；Excel 默认风格：细边框、全部居中、紧凑行高）；
 4. **精确模式自检**：人工在 3DMine 里画好的几段 .3ds 拼成矿界，与人工 1008 图 IoU 0.962。
+5. **Excel 工具自检**：报告汇总 / 单日并入 / 格式自适应 / 文件占用检测（v1.8）。
+6. **数据库生成自检**：坐标 TXT + 粘贴品位表 → `.xls/.mdb`，0915 的 47 孔实跑 11/11。
 
 ## 怎么用
 
@@ -100,8 +102,31 @@ DXF → DWG 2010 不再只走 AutoCAD COM，而是**自动挑最快的**：
 
 命令行入口：`python excel_tools\main.py --help`（`--gui --tab report|daily` 开界面、
 `--daily --day-dir … [--dry-run|--restore]` 并入/还原、`-i/-d/-p/-o` 报告汇总）。
-它自己的三项自检也进了 `accept_all.py`（`跑验收.bat` 会一起跑）：
-`python excel_tools\tests\test_by_total.py | test_merge.py | test_daily_merge.py`。
+它自己的五项自检也进了 `accept_all.py`（`跑验收.bat` 会一起跑）：
+`python excel_tools\tests\test_by_total.py | test_merge.py | test_daily_merge.py | test_formats.py | test_locks.py`。
+
+## 新建炮孔数据库（v1.9 起）
+
+主界面「Excel 工具」下面新增 **"从坐标 TXT + 品位表生成 .xls/.mdb…"**：
+把一个坐标 TXT（也可以直接把 `BS-…txt` 拖进主窗口）和一段品位表交给程序，
+就能生成 3DMine 可直接打开的 `1、…xls` 和 `2、…mdb`。
+
+![新建数据库窗口](sample_data/output/v1.9_数据库生成界面.png)
+
+步骤：
+
+1. 选坐标 TXT：每行 `工程号,,开孔坐标E,开孔坐标N,开孔坐标R`；
+2. 平台/日期自动从 `BS-3940-0915` 识别；输出目录默认 TXT 所在文件夹；
+3. 把品位表整段粘到下面——支持从 Excel 直接粘贴，也支持 Markdown 表格；
+4. 点 **解析预览**：会报"缺哪些工程号 / 多出哪些 / 同号品位冲突"；
+5. 点 **生成 .xls + .mdb**。
+
+默认台阶高度 **10 m**：孔底高程 = 平台高程 − 10，最大孔深 = 开孔坐标R − 孔底高程。
+`.xls` 写精确孔深，`.mdb` 按 3DMine 现有库的习惯取整到整米；`.mdb` 用
+`assets\3dmine_template.mdb` 空库模板生成，保留 `config_table_3dmine` /
+`style_table_3dmine` / `constraint_table_3dmine` 元数据。
+
+目标 `.xls/.mdb` 已存在时，界面会确认；确认后先备份到同目录 `bak\` 再覆盖。
 
 ### 双击就能用的另外两个 .bat
 

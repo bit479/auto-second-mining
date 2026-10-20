@@ -49,6 +49,14 @@ def is_bak_name(name: str) -> bool:
     return low.endswith(".bak") or ".bak-" in low
 
 
+def backup_file(path, tag: str = "") -> Path:
+    """把 path 复制成 ``同目录/bak/<原名><tag>.bak``，返回新路径。"""
+    p = Path(path)
+    target = unique_path(bak_dir(p, create=True), p.name + tag + ".bak")
+    shutil.copy2(p, target)
+    return target
+
+
 def collect_bak_files(folder, quiet: bool = False) -> list:
     """把 folder 第一层的 .bak 全部移进 folder/bak/，返回 [(原路径, 新路径)]。"""
     folder = Path(folder)

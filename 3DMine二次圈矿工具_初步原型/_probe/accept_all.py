@@ -138,7 +138,8 @@ if XL.exists():
     for name, script in (("报告汇总(total口径)", "tests/test_by_total.py"),
                          ("报告汇总(detail口径)", "tests/test_merge.py"),
                          ("单日数据并入总表", "tests/test_daily_merge.py"),
-                         ("xls/xlsx 格式自适应", "tests/test_formats.py")):
+                         ("xls/xlsx 格式自适应", "tests/test_formats.py"),
+                         ("文件占用检测", "tests/test_locks.py")):
         p = subprocess.run([sys.executable, "-X", "utf8", str(XL / script)],
                            cwd=str(XL), capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
@@ -147,7 +148,19 @@ if XL.exists():
         emit("== ⑤ Excel 工具自检：%s" % name)
         emit(out.splitlines()[-1] if out else "(没有输出)")
         xl_ok = xl_ok and p.returncode == 0
-    results.append(("⑤ Excel 工具自检（4 项）", xl_ok, 0 if xl_ok else 1))
+    results.append(("⑤ Excel 工具自检（5 项）", xl_ok, 0 if xl_ok else 1))
+
+# ⑥ 数据库生成：TXT 坐标 + 粘贴品位表 -> xls/mdb
+mkdb = PROBE / "test_make_database.py"
+if mkdb.exists():
+    p = subprocess.run([sys.executable, "-X", "utf8", str(mkdb)],
+                       capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+    emit("")
+    emit("== ⑥ 数据库生成自检（TXT + 品位表）")
+    emit(out.splitlines()[-1] if out else "(没有输出)")
+    results.append(("⑥ 数据库生成（TXT + 品位表）", p.returncode == 0, p.returncode))
 
 emit("")
 emit("=" * 78)

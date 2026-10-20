@@ -123,6 +123,26 @@ pip install -r requirements.txt
 > `openpyxl does not support the old .xls file format` 和
 > `formatting_info=True not yet implemented` —— 两条都是"按扩展名选库"造成的。
 
+### 并入前先确认文件都关掉了
+
+**为什么要查**：总表被 Excel 打开着根本写不进去；更隐蔽的是**单日文件**——
+Excel 里改了没保存，磁盘上还是旧内容，并入进去就是旧数据，事后完全看不出来。
+
+**怎么判**（两条一起用）：
+
+| 手段 | 说明 |
+|---|---|
+| 写探测 | `os.open(路径, O_RDWR)` 打不开 → 被 Excel / Access / 3DMine / AutoCAD 占着写权限。只开关、不写字节，对文件零影响 |
+| 锁文件 | Excel 留 `~$<文件名>`、Access 留 `<文件名>.ldb`、CAD 留 `<文件名>.dwl` / `.dwl2`；只作辅助证据 |
+
+* 写探测失败 → **中止**，列出是哪几个文件、为什么，一行都不写、连备份都不做；
+* 只有锁文件但能写 → 判为"程序崩溃留下的残留锁"，**不拦**，只在日志里提一句；
+* `--dry-run` 只提示不中止（看一眼计划通常无妨）；
+* 确认没有未保存的改动时可以 `--allow-open` 硬闯。
+
+> 没做"自动保存并退出"：本机没有 Office COM（pywin32 未装），强行结束 Excel/Access
+> 有丢数据的风险，所以一律拦下来让人自己保存关闭。
+
 ### 并入细则
 
 * **判重**：按工程号判重（`pit_blast` 按 `(工程号, 从)`，因为 Access 上有唯一索引），
@@ -161,6 +181,7 @@ pip install -r requirements.txt
 | `--with-appendix` | 报告并入时连同附录一起搬 |
 | `--no-backup` | 写入前不备份 |
 | `--dry-run` | 只计算不写盘 |
+| `--allow-open` | 文件被 Excel/Access/CAD 打开时也强行继续（默认中止） |
 | `--restore` | 从 `bak/*_并入<日>.bak` 还原总表（给了 `--day` 时连矿块图的 `bak/<原名>.bak` 一起还原） |
 
 ---
@@ -225,12 +246,14 @@ Excel处理工具/
 │       ├── db_mdb.py           炮孔数据库 .mdb 追加（pyodbc）
 │       ├── report_xlsx.py      报告汇总块粘贴 + 公式平移 + 合计自检
 │       ├── map_copy.py         二次圈矿矿块图复制进 6、文件夹（去前缀/判重/备份）
-│       └── pipeline.py         编排：预演 → 备份 → 三对并入 → 复核 → 还原
+│       ├── locks.py            并入前检测文件是否被 Excel/Access/CAD 打开
+│       └── pipeline.py         编排：查占用 → 预演 → 备份 → 三对并入 → 复核 → 还原
 └── tests/
     ├── test_by_total.py        自检①：total 口径（1011），14 项检查
     ├── test_merge.py           自检②：detail 口径，与人工成果逐项比对
     ├── test_daily_merge.py     自检③：单日并入 + 矿块图复制，35 项检查
-    └── test_formats.py         自检④：xls/xlsx 格式自适应，26 项检查
+    ├── test_formats.py         自检④：xls/xlsx 格式自适应，26 项检查
+    └── test_locks.py           自检⑤：文件占用检测，13 项检查
 ```
 
 ### 基础能力层可以直接复用
@@ -258,6 +281,7 @@ python tests/test_by_total.py      # total 口径：对齐 1011 人工成果（1
 python tests/test_merge.py         # detail 口径：与人工成果逐行比对
 python tests/test_daily_merge.py   # 单日并入 + 矿块图复制：35 项检查
 python tests/test_formats.py       # xls/xlsx 格式自适应：26 项检查
+python tests/test_locks.py         # 文件占用检测：13 项检查
 ```
 
 `test_by_total.py` 覆盖：品位档边界（含 `0.500` / `1.000` / `1.500` / `3.000` 的归属）、
@@ -272,6 +296,7 @@ python tests/test_formats.py       # xls/xlsx 格式自适应：26 项检查
 共 14 项检查，14 项通过      ← test_by_total.py
 共 35 项检查，35 项通过      ← test_daily_merge.py
 共 26 项检查，26 项通过      ← test_formats.py
+共 13 项检查，13 项通过      ← test_locks.py
 结论：全部一致 ✓
 ```
 
@@ -280,8 +305,9 @@ python tests/test_formats.py       # xls/xlsx 格式自适应：26 项检查
 ## 六、已知限制
 
 * **`.xls` 写入有 65536 行 / 256 列上限**（BIFF8 固有），炮孔数据远未触及。
-* **`.mdb` 写入需要 Access ODBC 驱动**；若 3DMine 正打开着该库，先关掉再并入。
+* **`.mdb` 写入需要 Access ODBC 驱动**；若 3DMine 正打开着该库，工具会在并入前拦下并提示，
+  关掉再跑即可（`--allow-open` 可硬闯）。
 * **`.xlsx` 报告写回由 openpyxl 重写整份文件**，图表、图片、枢轴表等复杂对象不保证保留
-  （总表是纯数据表，不受影响）。并入前请确保文件没在 Excel / WPS 里打开。
+  （总表是纯数据表，不受影响）。并入前工具会自动检查并拦下被打开的文件。
 * **`.xls` 与 `.mdb` 是两套独立数据**：`.mdb` 里 `最大孔深` 等字段的精度与 `.xls` 不同
   （3DMine 导出时的差异），工具按各自来源原样追加，不做交叉修正。

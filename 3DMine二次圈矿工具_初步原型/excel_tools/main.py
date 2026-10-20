@@ -110,6 +110,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="写入前不备份总表（默认备份成 *_并入<日>.bak）")
     g2.add_argument("--dry-run", action="store_true",
                     help="只计算不写盘，用于预演")
+    g2.add_argument("--allow-open", action="store_true",
+                    help="文件被 Excel/Access/CAD 打开时也强行继续（默认会中止并提示先保存关闭）")
     g2.add_argument("--restore", action="store_true",
                     help="从 *_并入<日>.bak 还原三份总表")
 
@@ -165,6 +167,7 @@ def run_merge(args: argparse.Namespace) -> int:
 def run_daily(args: argparse.Namespace) -> int:
     from src.daily_merge.pipeline import (DailyMergeOptions, resolve_plan,
                                           restore, run, summarize)
+    from src.daily_merge.locks import FilesInUseError
     from src.daily_merge.schema import KIND_DWG, KIND_MDB, KIND_REPORT, KIND_XLS
 
     if args.restore:
@@ -174,6 +177,10 @@ def run_daily(args: argparse.Namespace) -> int:
             return 2
         try:
             done = restore(master_dir, args.day)
+        except FilesInUseError as exc:
+            print()
+            print(str(exc))
+            return 3
         except Exception as exc:  # noqa: BLE001
             print("[失败] %s" % exc)
             return 1
@@ -204,6 +211,7 @@ def run_daily(args: argparse.Namespace) -> int:
         with_map=not args.no_map,
         backup=not args.no_backup,
         dry_run=args.dry_run,
+        require_closed=not args.allow_open,
     )
 
     try:
@@ -227,6 +235,10 @@ def run_daily(args: argparse.Namespace) -> int:
 
     try:
         report = run(options)
+    except FilesInUseError as exc:
+        print()
+        print(str(exc))
+        return 3
     except Exception as exc:  # noqa: BLE001
         print("[失败] %s" % exc)
         return 1

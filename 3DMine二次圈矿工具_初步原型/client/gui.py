@@ -43,7 +43,7 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.7.2"          # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.9"            # 界面上会显示——以后一眼就能看出跑的是哪版代码
 EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
 EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
@@ -95,7 +95,7 @@ class App:
 
         if DND_OK:
             tk.Label(frm, text="（可以把文件从资源管理器直接拖进来："
-                              "数据库 Excel / 综合图 DWG / 人工圈矿图 DWG / 轮廓 .3ds / 输出文件夹）",
+                              "数据库 Excel / 坐标 TXT / 综合图 DWG / 人工圈矿图 DWG / 轮廓 .3ds / 输出文件夹）",
                      fg="#0a6", anchor="w").pack(fill="x", pady=(0, 4))
         else:
             tk.Label(frm, text="（想支持「拖进来」就装一下：pip install tkinterdnd2）",
@@ -233,6 +233,13 @@ class App:
                   command=lambda: self.merge_day(dry=True)).pack(side="left")
         tk.Button(xt, text="正式并入", padx=10,
                   command=lambda: self.merge_day(dry=False)).pack(side="left", padx=6)
+        xt2 = tk.Frame(xt)
+        xt2.pack(fill="x", pady=(6, 0))
+        tk.Label(xt2, text="新建炮孔数据库：", fg="#0a6").pack(side="left")
+        tk.Button(xt2, text="从坐标 TXT + 品位表生成 .xls/.mdb…", padx=10,
+                  command=self.open_db_builder).pack(side="left", padx=6)
+        tk.Label(xt2, text="（也可以直接把 BS-…txt 拖进窗口）",
+                 fg="#666").pack(side="left")
 
         # ---- 日志 ----
         tk.Label(root, text="运行日志：", anchor="w").pack(fill="x", padx=10)
@@ -280,6 +287,7 @@ class App:
             return
         notes = []
         outlines = []
+        db_txt = None
         for p in paths:
             if p.is_dir():
                 self.var_out.set(str(p))
@@ -303,6 +311,9 @@ class App:
                     notes.append("人工圈矿图 ← %s（点「用人工图标定本炮区…」会直接用它）" % p.name)
             elif ext == ".3ds":
                 outlines.append(str(p))
+            elif ext == ".txt" and "BS-" in p.name.upper():
+                db_txt = p
+                notes.append("坐标 TXT ← %s（打开新建数据库窗口）" % p.name)
             else:
                 notes.append("（没认出来，忽略）%s" % p.name)
         if outlines:
@@ -312,6 +323,8 @@ class App:
         self.refresh_params()
         if outlines:
             self.var_outline.set(";".join(outlines))
+        if db_txt is not None:
+            self.open_db_builder(db_txt)
         self.log_line("拖入 %d 个对象：" % len(paths))
         for n in notes:
             self.log_line("   " + n)
@@ -522,6 +535,14 @@ class App:
                 pass
 
     # ---------- Excel 工具（整合进来的"炮孔数据工具"）----------
+    def open_db_builder(self, txt=None):
+        """打开「TXT 坐标 + 粘贴品位表 -> .xls/.mdb」窗口。"""
+        try:
+            from db_builder import DbBuilder
+            DbBuilder(self.root, txt)
+        except Exception as exc:
+            messagebox.showerror("打不开新建数据库窗口", str(exc))
+
     def open_excel_tool(self, tab: str = "report"):
         """打开完整窗口：报告汇总（tab=report）/ 单日并入总表（tab=daily）。"""
         if not EXCEL_MAIN.exists():

@@ -109,6 +109,7 @@ class DailyMergeOptions:
     with_map: bool = True             # 是否顺手把矿块图复制进 6、文件夹
     backup: bool = True               # 写入前把总表备份成 *_并入<日>.bak
     dry_run: bool = False             # 只算不写
+    require_closed: bool = True       # 文件被 Excel/Access/CAD 打开时中止（--allow-open 可关）
     require_all: bool = False         # 三类缺一即报错（默认缺哪类跳过哪类）
 
 
