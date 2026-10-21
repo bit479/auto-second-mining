@@ -542,7 +542,10 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None,
     if method == "hull":
         # 直边条带：直接用"孔簇凸包 + 外推"（人工图是一段段直边条带；
         # Voronoi 领地那种锯齿边虽然能挡住邻孔，但形状不像）
-        poly = hull.buffer(float(extrude), join_style="mitre").buffer(0)
+        # 圆角外推：细长孔簇用 mitre 会在锐角处拉出 8~10 m 的尖刺
+        #（1007 的 P1 实测），看起来像图形撕裂。
+        poly = hull.buffer(float(extrude), join_style="mitre",
+                           mitre_limit=1.5).buffer(0)
         simp = SIMPLIFY_M if simplify is None else float(simplify)
         if simp > 0:
             sp = poly.simplify(simp, preserve_topology=True)
@@ -550,7 +553,7 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None,
                 poly = sp
         LAST_RING["warn"] = []
         return poly
-    cap = hull.buffer(float(extrude), join_style="mitre")
+    cap = hull.buffer(float(extrude), join_style="mitre", mitre_limit=1.5)
     cellmap = _cells_within(all_holes, cap)
     parts = [cellmap[h.hid] for h in zone if h.hid in cellmap]
     if not parts:
