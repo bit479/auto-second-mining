@@ -505,7 +505,7 @@ def _draw_report_table(msp, x0, y_top, rows, stat_rows, title):
 
 def write_dxf(blocks, holes_all, cells, meta, path: Path,
               report_png: Path = None, report_px=None,
-              pending=None, composite_blocks=None, merge_gap: float = 8.0,
+              pending=None, composite_blocks=None, merge_gap: float = 4.5,
               check_merge: bool = True, merge_candidates=None,
               draw_composite: bool = False) -> None:
     from ezdxf import new
@@ -778,7 +778,7 @@ def _nearest_on_boundary(poly: Polygon, tx: float, ty: float):
 
 # ---------------------------------------------------------------- 3ds
 def write_3ds(blocks, meta, path: Path,
-              composite_blocks=None, merge_gap: float = 8.0,
+              composite_blocks=None, merge_gap: float = 4.5,
               merge_candidates=None) -> None:
     """照 3DMine 选择集格式：每个矿块一条字符串，表头末字段为品位类型名。"""
     lines = ["%s, 3DMine String File" % path, "file_version=3DMine_2009"]

@@ -28,20 +28,23 @@ for p in j["polylines"]:
     poly=Polygon(p["pts"]).buffer(0)
     if _bl.is_block(poly,p["layer"],allh): mb.append((p["layer"],poly))
 fig,ax=plt.subplots(figsize=(15,13))
+lab_man = lab_auto = lab_ring = True
 for lay,poly in mb:
-    x,y=poly.exterior.xy; ax.plot(x,y,color="#d62728",lw=2.0)
+    x,y=poly.exterior.xy; ax.plot(x,y,color="#d62728",lw=2.0,label="人工矿块" if lab_man else None); lab_man=False
     c=poly.representative_point(); ax.annotate("人工%.0f"%poly.area,(c.x,c.y),color="#d62728",fontsize=10)
 for b in res["blocks"]:
     for g in ([b.polygon] if b.polygon.geom_type=="Polygon" else list(b.polygon.geoms)):
-        x,y=g.exterior.xy; ax.plot(x,y,color="green",lw=1.5)
+        x,y=g.exterior.xy; ax.plot(x,y,color="green",lw=1.8,label="自动出图矿块" if lab_auto else None); lab_auto=False
         c=g.representative_point(); ax.annotate("自动%.0f(g%.2f)"%(b.polygon.area,b.grade),(c.x,c.y),color="green",fontsize=10)
 for rr in res["rings"]:
     for g in ([rr] if rr.geom_type=="Polygon" else list(rr.geoms)):
-        x,y=g.exterior.xy; ax.plot(x,y,color="blue",lw=1.0,ls="--")
+        x,y=g.exterior.xy; ax.plot(x,y,color="#999999",lw=0.8,ls="--",
+                                  label="矿界 ring（仅算量，不出图）" if lab_ring else None); lab_ring=False
 for h in allh:
     ax.plot(h.x,h.y,"o",color=("orange" if h.grade>=0.5 else "black"),ms=5)
     ax.annotate(h.short.split("-")[-1]+"/%.2f"%h.grade,(h.x,h.y),fontsize=8)
 ax.set_aspect("equal"); ax.grid(alpha=.3)
+ax.legend(loc="best", fontsize=9)
 ax.set_title("%s-%s  人工(红) vs 自动(绿)  外推=%.1f 块数 %d  警告:%s" % (plat,date,P["extrude_m"],len(res["blocks"]),res["warn"]))
 out=ROOT/"sample_data"/"output"/("审图_%s-%s.png" % (plat,date))
 fig.savefig(out,dpi=115,bbox_inches="tight"); print("->",out)

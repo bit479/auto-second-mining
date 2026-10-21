@@ -153,26 +153,23 @@ def merge_outline(block_poly: Polygon, comp_blocks, max_gap: float = 4.5):
     """当日矿块与综合图历史矿块：间距 ≤ max_gap 的并成一块。返回 (合并后多边形, 并入的历史块数)。"""
     if block_poly is None:
         return None, 0
+    # 只并"与当日矿块直接相接/间距≤gap"的历史块，**不沿历史块链式传播**。
+    # 旧做法会从 1 块开始一路吞并综合图里的 9 块（0915 实测），
+    # 把成品图拉成一大片——用户 2026-10-21："图形太过撕裂"。
     group = [block_poly]
     n = 0
-    changed = True
-    while changed:
-        changed = False
-        cur = unary_union(group)
-        for item in comp_blocks:
-            p = item[2]
-            if any(p is g for g in group):
-                continue
-            if cur.distance(p) <= max_gap:
-                group.append(p)
-                n += 1
-                changed = True
+    for item in comp_blocks:
+        p = item[2]
+        if block_poly.distance(p) <= max_gap:
+            group.append(p)
+            n += 1
     merged = unary_union(group)
     # 合并后把"断口"补上：先外扩 gap/2 再收回来，使几块连成一条闭合轮廓
     if merged.geom_type == "MultiPolygon":
         d = max_gap / 2.0 + 0.1
-        closed = merged.buffer(d, join_style="mitre").buffer(
-            -d, join_style="mitre")
+        # 圆角闭合：综合图历史块的接缝不要生成尖刺（用户 2026-10-21：线条要流畅）
+        closed = merged.buffer(d, join_style="round").buffer(
+            -d, join_style="round")
         if not closed.is_empty:
             merged = closed
     return merged, n

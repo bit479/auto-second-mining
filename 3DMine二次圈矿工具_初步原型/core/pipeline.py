@@ -113,7 +113,9 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                 b1 = block_of_cluster(grp, ring, allh,
                                       density_waste=P.get("density_waste", 2.65),
                                       density_ore=P.get("density_ore", 2.7),
-                                      extrude=P["extrude_m"])
+                                      extrude=P["extrude_m"],
+                                      block_simplify=P.get("block_simplify_m", 0.3),
+                                      block_smooth=P.get("block_smooth_m", 0.3))
                 if b1 is not None:
                     blocks.append(b1)
         order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
@@ -156,7 +158,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                  all_holes=allh,
                                  density_waste=P.get("density_waste", 2.65),
                                  density_ore=P.get("density_ore", 2.7),
-                                 block_simplify=P.get("block_simplify_m", 0.3))
+                                 block_simplify=P.get("block_simplify_m", 0.3),
+                                 block_smooth=P.get("block_smooth_m", 0.3))
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(blocks, 1):

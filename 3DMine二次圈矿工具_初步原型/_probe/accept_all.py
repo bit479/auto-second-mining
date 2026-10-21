@@ -174,6 +174,18 @@ if shape.exists():
     emit(out.splitlines()[-1] if out else "(没有输出)")
     results.append(("⑦ 自动矿块形状（连通/抽稀）", p.returncode == 0, p.returncode))
 
+# ⑧ 综合图参考：只并直接相接的历史块
+comp_test = PROBE / "test_composite_merge.py"
+if comp_test.exists():
+    p = subprocess.run([sys.executable, "-X", "utf8", str(comp_test)],
+                       capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+    emit("")
+    emit("== ⑧ 综合图参考自检（直接相接 / 不链式吞并）")
+    emit(out.splitlines()[-1] if out else "(没有输出)")
+    results.append(("⑧ 综合图参考（直接相接）", p.returncode == 0, p.returncode))
+
 emit("")
 emit("=" * 78)
 emit("== 汇总")

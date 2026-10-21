@@ -204,6 +204,7 @@ def main() -> None:
                   report_png=png_used, report_px=(pw, ph),
                   pending=[("L1", g) for g in pending], composite_blocks=comp,
                   merge_candidates=cands,
+                  merge_gap=float(P.get("merge_gap_m", 4.5)),
                   # 用了人工画的 .3ds（人工圈矿 / 精确模式）：**不并综合图、不画综合图参照线**——
                   # 成果图必须严格就是我画的那几条线（用户 2026-10-15）
                   check_merge=not (P.get("manual_blocks") or P.get("outline_files")))
@@ -211,7 +212,8 @@ def main() -> None:
         _keep_comp = None if (P.get("manual_blocks") or P.get("outline_files")) else comp
         _keep_cands = None if (P.get("manual_blocks") or P.get("outline_files")) else cands
         write_3ds(blocks, meta, tds,
-                  composite_blocks=_keep_comp, merge_candidates=_keep_cands)
+                  composite_blocks=_keep_comp, merge_candidates=_keep_cands,
+                  merge_gap=float(P.get("merge_gap_m", 4.5)))
         made.append(tds)
     except PermissionError as exc:
         note("[错误] 有成果文件正被占用（多半是 Excel/CAD 开着同名文件）：%s" % exc)

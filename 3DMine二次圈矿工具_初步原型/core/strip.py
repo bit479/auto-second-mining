@@ -482,7 +482,7 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
 
 def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
                      density_ore: float = 2.7, extrude: float = EXTRUDE_M,
-                     block_simplify: float = 0.3):
+                     block_simplify: float = 0.3, block_smooth: float = 0.5):
     """clusters 模式用：**一个孔簇 = 一块**（不再簇内二次分组）。
 
     块范围 = 该簇的矿界；块内所有孔的单元（含圈进来的废孔）按用户口径算量：
@@ -519,6 +519,7 @@ def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
     poly = _safe_union([c.polygon for c in cs]).buffer(0)
     poly, _ = connect_ring_parts(poly, extrude)
     poly = simplify_block_outline(poly, hs, block_simplify)
+    poly = smooth_block_outline(poly, hs, block_smooth, 0.5)
     b.polygon = poly
     return b
 
@@ -639,6 +640,33 @@ def simplify_block_outline(poly, holes, tol: float = 0.3):
     if sp.is_empty or sp.geom_type not in ("Polygon", "MultiPolygon"):
         return poly
     if abs(sp.area - poly.area) > 0.02 * max(poly.area, 1e-9):
+        return poly
+    probe = sp.buffer(1e-6)
+    if any(not probe.contains(Point(h.x, h.y)) for h in holes):
+        return poly
+    return sp
+
+
+def smooth_block_outline(poly, holes, radius: float = 0.5,
+                         simplify: float = 0.5):
+    """圆滑矿块轮廓：轻量 buffer 外扩/内收去掉尖角，再抽稀。
+
+    只用在小半径（默认 0.3 m），避免把 1.2 m 宽的连接颈收断；
+    结果必须是单体 Polygon、面积变化 ≤2%、矿孔仍在内，否则保留原轮廓。
+    """
+    if poly is None or poly.is_empty or poly.geom_type != "Polygon":
+        return poly
+    if radius is None or float(radius) <= 0:
+        return poly
+    try:
+        sp = poly.buffer(float(radius), join_style="round").buffer(
+            -float(radius), join_style="round")
+        sp = sp.simplify(float(simplify), preserve_topology=True)
+    except Exception:
+        return poly
+    if sp.is_empty or sp.geom_type != "Polygon":
+        return poly
+    if abs(sp.area - poly.area) > 0.03 * max(poly.area, 1e-9):
         return poly
     probe = sp.buffer(1e-6)
     if any(not probe.contains(Point(h.x, h.y)) for h in holes):
@@ -1221,7 +1249,7 @@ def average_blocks(ore, outline, density: float,
                    merge_target: str = "avg", merge_gap: float = 0.0,
                    same_block=None, all_holes=None,
                    density_waste: float = 2.65, density_ore: float = 2.7,
-                   block_simplify: float = 0.3):
+                   block_simplify: float = 0.3, block_smooth: float = 0.5):
     """分块定档（人工口径）：
 
       ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
@@ -1371,6 +1399,7 @@ def average_blocks(ore, outline, density: float,
             b.metal_hg = ton * grade / 100.0
             b.acct_holes = [c.hole for c in cs]
         b.polygon = simplify_block_outline(b.polygon, pts, block_simplify)
+        b.polygon = smooth_block_outline(b.polygon, pts, block_smooth, 0.5)
         out.append(b)
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     out.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))

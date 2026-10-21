@@ -79,7 +79,8 @@ def main() -> int:
              "v1.7.1": "v1.7.1 —— 报告表改 Excel 默认风格：细边框、全部居中、行高压缩",
              "v1.7.2": "v1.7.2 —— .bak 统一收进同目录的 bak/ 子文件夹",
              "v1.9": "v1.9 —— 坐标 TXT + 品位表一键生成 3DMine 炮孔数据库",
-             "v1.10": "v1.10 —— 自动圈矿断块连通 + 轮廓抽稀"}.get(
+             "v1.10": "v1.10 —— 自动圈矿断块连通 + 轮廓抽稀",
+             "v1.11": "v1.11 —— 矿块线条圆滑 + 综合图 4.5m 直接相接"}.get(
                  TAG, "%s —— 二次圈矿工具" % TAG)
     st, res = api("https://api.github.com/repos/%s/releases" % REPO, tok,
                   {"tag_name": TAG, "name": title,
