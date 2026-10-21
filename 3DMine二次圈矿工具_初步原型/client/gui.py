@@ -43,7 +43,7 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.9"            # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.10"           # 界面上会显示——以后一眼就能看出跑的是哪版代码
 EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
 EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
@@ -173,7 +173,7 @@ class App:
             row=8, column=1, padx=4, pady=(8, 0), sticky="w")
         tk.Button(pf, text="刷新参数", command=self.refresh_params).grid(
             row=8, column=2, padx=4, pady=(8, 0), sticky="w")
-        tk.Label(pf, text="（默认 外推3.0 / 连接15 / 最小块段40 / 接图8 / 贴合0.5；"
+        tk.Label(pf, text="（默认 外推3.0 / 连接15 / 最小块段40 / 接图8 / 贴合0.5 / 块轮廓抽稀0.3；"
                           "1003 外推 2.5，各炮区另有个别覆盖）",
                  fg="#666").grid(row=9, column=0, columnspan=7, sticky="w", pady=(6, 0))
 

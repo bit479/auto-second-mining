@@ -481,7 +481,8 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
 
 
 def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
-                     density_ore: float = 2.7):
+                     density_ore: float = 2.7, extrude: float = EXTRUDE_M,
+                     block_simplify: float = 0.3):
     """clusters 模式用：**一个孔簇 = 一块**（不再簇内二次分组）。
 
     块范围 = 该簇的矿界；块内所有孔的单元（含圈进来的废孔）按用户口径算量：
@@ -512,7 +513,13 @@ def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
                       (density_waste if c.hole.grade < 0.5 else density_ore) for c in cs)
     b.grade = grade
     b.metal_hg = b.tonnage_t * grade / 100.0
-    b.polygon = _safe_union([c.polygon for c in cs])
+    # 簇模式：一个簇 = 一块。出图轮廓用**各孔 Voronoi 单元并集**（与体积同口径），
+    # 再把因细缝断开的片用窄走廊连起来——只用 ring 会把外推缓冲也算进矿块，
+    # 形状会比人工图胖一圈（2026-10-21 试过，0922/1007 偏大）。
+    poly = _safe_union([c.polygon for c in cs]).buffer(0)
+    poly, _ = connect_ring_parts(poly, extrude)
+    poly = simplify_block_outline(poly, hs, block_simplify)
+    b.polygon = poly
     return b
 
 
@@ -555,6 +562,88 @@ def isolated_ring(zone, all_holes, extrude: float, simplify: float = None,
             poly = sp
     LAST_RING["warn"] = []
     return poly
+
+
+def connect_ring_parts(ring, extrude: float, max_gap: float = None):
+    """把同一个矿界里断开的几片，用窄走廊按最短断口连成一片。
+
+    背景（2026-10-21）：3960-0922 的 1 号块被 Voronoi 切成 3 片，断口只有
+    1.06/1.55 m；3960-1007 断口 4.73 m。人工图都是**一个连通块**，
+    但自动图留下几个孤岛，看起来像少圈了几块。
+
+    规则：
+      * 只在**同一个 ring/矿块**内部连接，不跨块；
+      * 每次取当前最近的两片（最小生成树的贪心），断口 ≤ max_gap；
+      * 走廊宽度 = clamp(0.6×外推, 2.0, 4.0) m，端点平头；
+      * 连好后重新 `buffer(0)`，保证是有效多边形。
+    """
+    if ring is None or ring.is_empty or ring.geom_type != "MultiPolygon":
+        return ring, []
+    parts = list(ring.geoms)
+    if len(parts) < 2:
+        return ring, []
+    limit = float(max_gap) if max_gap is not None else max(15.0, float(extrude) * 2.5)
+    # 断口走廊只负责"连成一片"，宽度取窄一点（人工图的颈部也就是 1~2 m），
+    # 避免把矿块面积撑大（1007 的 4.73 m 断口实测）。
+    width = min(3.0, max(1.2, float(extrude) * 0.35))
+    # 先按 Prim 求"最小生成树"的断口边，再一次性加走廊——避免合并后仍是
+    # MultiPolygon 时反复合并不收敛（2026-10-21 实测会卡死）。
+    in_tree = {0}
+    edges = []
+    while len(in_tree) < len(parts):
+        best = None
+        for i in sorted(in_tree):
+            for j in range(len(parts)):
+                if j in in_tree:
+                    continue
+                d = parts[i].distance(parts[j])
+                if best is None or d < best[0]:
+                    best = (d, i, j)
+        if best is None:
+            break
+        d, i, j = best
+        edges.append((d, i, j))
+        in_tree.add(j)
+    geoms = list(parts)
+    joined = []
+    for d, i, j in edges:
+        if d < 1e-6 or d > limit:
+            continue
+        p1, p2 = nearest_points(parts[i], parts[j])
+        geoms.append(LineString([(p1.x, p1.y), (p2.x, p2.y)]).buffer(
+            width / 2.0, cap_style=2, join_style=2))
+        joined.append(d)
+    out = unary_union(geoms).buffer(0)
+    if out.geom_type == "MultiPolygon":
+        # 有些片只是"点接触/数值上分开"（0922 的 5 片里有 4 处 distance=0），
+        # union 不会把它们并成一个 Polygon；用 0.01 m 的 snap buffer 合上。
+        snapped = out.buffer(0.01).buffer(-0.01)
+        if snapped.geom_type == "Polygon" and abs(snapped.area - out.area) < 0.2:
+            out = snapped
+    return out, joined
+
+
+def simplify_block_outline(poly, holes, tol: float = 0.3):
+    """矿块轮廓抽稀：去掉 Voronoi 的细小锯齿，让边界接近人工图的直线段。
+
+    保护条件（任一不满足就保留原轮廓）：
+      * 面积变化 ≤ 2%；
+      * 块内所有矿孔仍在抽稀后的多边形内（留 1e-6 容差）。
+    """
+    if poly is None or poly.is_empty or tol is None or float(tol) <= 0:
+        return poly
+    try:
+        sp = poly.simplify(float(tol), preserve_topology=True)
+    except Exception:
+        return poly
+    if sp.is_empty or sp.geom_type not in ("Polygon", "MultiPolygon"):
+        return poly
+    if abs(sp.area - poly.area) > 0.02 * max(poly.area, 1e-9):
+        return poly
+    probe = sp.buffer(1e-6)
+    if any(not probe.contains(Point(h.x, h.y)) for h in holes):
+        return poly
+    return sp
 
 
 def _finish_ring(poly, ore, extrude, simplify, repair_tip=None):
@@ -1131,7 +1220,8 @@ def average_blocks(ore, outline, density: float,
                    min_fragment: float = MIN_FRAGMENT_M2,
                    merge_target: str = "avg", merge_gap: float = 0.0,
                    same_block=None, all_holes=None,
-                   density_waste: float = 2.65, density_ore: float = 2.7):
+                   density_waste: float = 2.65, density_ore: float = 2.7,
+                   block_simplify: float = 0.3):
     """分块定档（人工口径）：
 
       ① 每个矿孔一个 Voronoi 单元，裁剪到矿界；
@@ -1280,6 +1370,7 @@ def average_blocks(ore, outline, density: float,
             b.grade = grade
             b.metal_hg = ton * grade / 100.0
             b.acct_holes = [c.hole for c in cs]
+        b.polygon = simplify_block_outline(b.polygon, pts, block_simplify)
         out.append(b)
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     out.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))

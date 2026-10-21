@@ -16,7 +16,8 @@ import math
 
 from oreblocks import load_holes_xls
 from strip import (LAST_RING, average_blocks, block_of_cluster,
-                   blocks_from_outline_files, class_clusters, isolated_ring,
+                   blocks_from_outline_files, class_clusters, connect_ring_parts,
+                   isolated_ring,
                    join_to_composite, ring_from_outline_files, zone_outline)
 
 
@@ -95,13 +96,24 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                          method="hull")
                 if ring is None or ring.is_empty:
                     continue
+                ring, joined = connect_ring_parts(ring, P["extrude_m"])
+                if joined:
+                    warns.append("矿界原本碎成 %d 片，已按 %s m 断口连成一片"
+                                 % (len(joined) + 1,
+                                    "/".join("%.2f" % d for d in joined)))
                 ring = join_to_composite(ring, comp_blocks, seam)
+                ring, joined2 = connect_ring_parts(ring, P["extrude_m"])
+                if joined2:
+                    warns.append("接综合图后仍有 %d 处断口，已按 %s m 连成一片"
+                                 % (len(joined2),
+                                    "/".join("%.2f" % d for d in joined2)))
                 rings.append(ring)
                 warns += list(LAST_RING.get("warn") or [])
                 # 一个簇 = 一块（不再簇内二次分组）
                 b1 = block_of_cluster(grp, ring, allh,
                                       density_waste=P.get("density_waste", 2.65),
-                                      density_ore=P.get("density_ore", 2.7))
+                                      density_ore=P.get("density_ore", 2.7),
+                                      extrude=P["extrude_m"])
                 if b1 is not None:
                     blocks.append(b1)
         order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
@@ -143,7 +155,8 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                  same_block=P.get("same_block") or [],
                                  all_holes=allh,
                                  density_waste=P.get("density_waste", 2.65),
-                                 density_ore=P.get("density_ore", 2.7))
+                                 density_ore=P.get("density_ore", 2.7),
+                                 block_simplify=P.get("block_simplify_m", 0.3))
     order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
     blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(blocks, 1):

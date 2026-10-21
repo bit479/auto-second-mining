@@ -162,6 +162,18 @@ if mkdb.exists():
     emit(out.splitlines()[-1] if out else "(没有输出)")
     results.append(("⑥ 数据库生成（TXT + 品位表）", p.returncode == 0, p.returncode))
 
+# ⑦ 自动矿块形状：连通 + 抽稀 + 面积口径
+shape = PROBE / "test_block_shape.py"
+if shape.exists():
+    p = subprocess.run([sys.executable, "-X", "utf8", str(shape)],
+                       capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+    emit("")
+    emit("== ⑦ 自动矿块形状自检（连通/抽稀）")
+    emit(out.splitlines()[-1] if out else "(没有输出)")
+    results.append(("⑦ 自动矿块形状（连通/抽稀）", p.returncode == 0, p.returncode))
+
 emit("")
 emit("=" * 78)
 emit("== 汇总")
