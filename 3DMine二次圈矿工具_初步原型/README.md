@@ -135,7 +135,9 @@ DXF → DWG 2010 不再只走 AutoCAD COM，而是**自动挑最快的**：
 5. 点 **生成 .xls + .mdb**。
 
 默认台阶高度 **10 m**：孔底高程 = 平台高程 − 10，最大孔深 = 开孔坐标R − 孔底高程。
-`.xls` 写精确孔深，`.mdb` 按 3DMine 现有库的习惯取整到整米；`.mdb` 用
+**孔深一律按整数写库**：定位表「最大孔深」、测斜表「深度」、pit_blast「至」三处
+都是四舍五入取整（9.5→10、8.5→9，Excel 那种四舍五入，不是 Python `round` 的银行家舍入），
+坐标 E/N/R 仍保留 3 位小数。`.mdb` 用
 `assets\3dmine_template.mdb` 空库模板生成，保留 `config_table_3dmine` /
 `style_table_3dmine` / `constraint_table_3dmine` 元数据。
 

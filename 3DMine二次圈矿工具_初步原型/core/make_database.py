@@ -12,12 +12,15 @@
   * ``2、<平台>平台炮孔数据库<日期>.mdb``（3DMine 兼容，含 config/style/constraint 元数据）
 
 台阶高度默认 10 m：孔底高程 = 平台高程 - 台阶高度，最大孔深 = 开孔坐标R - 孔底高程。
+
+**孔深按整数写库**：定位表的「最大孔深」、测斜表的「深度」、pit_blast 的「至」
+三处都是同一个孔深，一律**四舍五入取整**（9.5→10、8.5→9，不是 Python 内置 round 的
+"银行家舍入"）；坐标 E/N/R 仍保留 3 位小数。
 """
 from __future__ import annotations
 
 import argparse
 import gc
-import math
 import os
 import re
 import shutil
@@ -25,6 +28,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -58,6 +62,16 @@ class ParsedGrades:
 def _clean(s: str) -> str:
     return (s.replace("&#x20;", " ").replace("&nbsp;", " ")
              .replace("\u00a0", " ").replace("\u3000", " ").strip())
+
+
+def round_int(value: float) -> int:
+    """四舍五入到整数。
+
+    不能用内置 ``round()`` —— 它是"银行家舍入"（``round(8.5) == 8``），
+    和 Excel / 3DMine 里的四舍五入对不上。这里用 Decimal 的 ROUND_HALF_UP：
+    8.5→9、9.5→10、9.499→9。
+    """
+    return int(Decimal(str(float(value))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def parse_txt(path) -> list[Hole]:
@@ -183,6 +197,8 @@ def _write_xls(holes, grades: ParsedGrades, path: Path, dec: int):
     cell = xlwt.easyxf("align: horiz center, vert center;" + thin)
     num3 = xlwt.easyxf("align: horiz center, vert center;" + thin,
                        num_format_str="0.000")
+    num0 = xlwt.easyxf("align: horiz center, vert center;" + thin,
+                       num_format_str="0")
     numg = xlwt.easyxf("align: horiz center, vert center;" + thin,
                        num_format_str="0." + "0" * max(2, dec))
 
@@ -196,7 +212,7 @@ def _write_xls(holes, grades: ParsedGrades, path: Path, dec: int):
         ws.write(r, 2, hole.n, num3)
         ws.write(r, 3, hole.r, num3)
         ws.write(r, 4, "直线", cell)
-        ws.write(r, 5, hole.depth, num3)
+        ws.write(r, 5, round_int(hole.depth), num0)
     for col, w in enumerate((22, 14, 14, 14, 10, 12)):
         ws.col(col).width = w * 256
 
@@ -205,7 +221,7 @@ def _write_xls(holes, grades: ParsedGrades, path: Path, dec: int):
         ws.write(0, i, h, head)
     for r, hole in enumerate(holes, 1):
         ws.write(r, 0, hole.hid, cell)
-        ws.write(r, 1, hole.depth, num3)
+        ws.write(r, 1, round_int(hole.depth), num0)
         ws.write(r, 2, 0.0, num3)
         ws.write(r, 3, -90.0, num3)
     for col, w in enumerate((22, 12, 12, 12)):
@@ -217,7 +233,7 @@ def _write_xls(holes, grades: ParsedGrades, path: Path, dec: int):
     for r, hole in enumerate(holes, 1):
         ws.write(r, 0, hole.hid, cell)
         ws.write(r, 1, 0.0, num3)
-        ws.write(r, 2, hole.depth, num3)
+        ws.write(r, 2, round_int(hole.depth), num0)
         ws.write(r, 3, grades.grades[hole.hid], numg)
     for col, w in enumerate((22, 10, 10, 12)):
         ws.col(col).width = w * 256
@@ -239,14 +255,14 @@ def _write_mdb(holes, grades: ParsedGrades, path: Path, template: Path):
         cur.executemany(
             "INSERT INTO [定位表] ([工程号],[开孔坐标E],[开孔坐标N],[开孔坐标R],"
             "[轨迹类型],[最大孔深]) VALUES (?,?,?,?,?,?)",
-            [(h.hid, h.e, h.n, h.r, "直线", float(math.floor(h.depth + 0.5)))
+            [(h.hid, h.e, h.n, h.r, "直线", float(round_int(h.depth)))
              for h in holes])
         cur.executemany(
             "INSERT INTO [测斜表] ([工程号],[深度],[方位角],[倾角]) VALUES (?,?,?,?)",
-            [(h.hid, float(math.floor(h.depth + 0.5)), 0.0, -90.0) for h in holes])
+            [(h.hid, float(round_int(h.depth)), 0.0, -90.0) for h in holes])
         cur.executemany(
             "INSERT INTO [pit_blast] ([工程号],[从],[至],[Au]) VALUES (?,?,?,?)",
-            [(h.hid, 0.0, float(math.floor(h.depth + 0.5)), grades.grades[h.hid])
+            [(h.hid, 0.0, float(round_int(h.depth)), grades.grades[h.hid])
              for h in holes])
         cn.commit()
         for table in ("定位表", "测斜表", "pit_blast"):
@@ -303,6 +319,13 @@ def build(txt_path, grades_text: str, out_dir=None, platform: str = "",
         if h.depth <= 0:
             raise ValueError("%s 计算出的孔深 %.3f ≤ 0，请检查平台高程/台阶高度"
                              % (h.hid, h.depth))
+
+    # 三处孔深都要写成整数，取整后不能变成 0（0.4 m 的孔没有意义）
+    zeroed = [(h.hid, h.depth) for h in holes if round_int(h.depth) <= 0]
+    if zeroed:
+        more = " 等 %d 个" % len(zeroed) if len(zeroed) > 8 else ""
+        raise ValueError("这些孔四舍五入后的孔深为 0：%s%s（请检查平台高程/台阶高度）"
+                         % ("、".join("%s(%.3f)" % (hid, d) for hid, d in zeroed[:8]), more))
 
     grades = parse_grades(grades_text, holes)
     if grades.duplicates:
