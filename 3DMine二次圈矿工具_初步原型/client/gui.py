@@ -43,7 +43,7 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.12"           # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.12.1"         # 界面上会显示——以后一眼就能看出跑的是哪版代码
 EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
 EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
@@ -58,6 +58,21 @@ def parse_platform_date(fname: str):
     rest = s[m.end():] if m else s
     d = re.search(r"(\d{4})(?=\.\w+$|[^0-9]|$)", rest)
     return platform, (d.group(1) if d else "")
+
+
+def is_coord_txt(path) -> bool:
+    """这个 .txt 是不是"坐标文件"（工程号,,开孔坐标E,开孔坐标N,开孔坐标R）。
+
+    不能靠文件名里的 `BS-` 判断 —— 中心矿段的取样文件叫「3570取样1023.txt」，
+    里面工程号是 `zx-3570-1023-p1`。所以改成看**内容形态**。
+    """
+    try:
+        if str(CORE) not in sys.path:
+            sys.path.insert(0, str(CORE))
+        from make_database import looks_like_coord_txt
+        return looks_like_coord_txt(path)
+    except Exception:
+        return False
 
 
 def _acad_running() -> bool:
@@ -278,6 +293,7 @@ class App:
         * .dwg 名字带"综合"  → 综合图
         * .dwg 其它          → 记成"人工圈矿图"，点「用人工图标定本炮区…」时直接用，不再弹选择框
         * .3ds              → 精确模式轮廓文件（可一次拖好几个，分号分隔）
+        * .txt 坐标文件      → 打开「新建炮孔数据库」窗口（按内容形态认，不看 BS- 前缀）
         """
         try:
             paths = [Path(p) for p in self.root.tk.splitlist(event.data)]
@@ -311,7 +327,7 @@ class App:
                     notes.append("人工圈矿图 ← %s（点「用人工图标定本炮区…」会直接用它）" % p.name)
             elif ext == ".3ds":
                 outlines.append(str(p))
-            elif ext == ".txt" and "BS-" in p.name.upper():
+            elif ext == ".txt" and is_coord_txt(p):
                 db_txt = p
                 notes.append("坐标 TXT ← %s（打开新建数据库窗口）" % p.name)
             else:

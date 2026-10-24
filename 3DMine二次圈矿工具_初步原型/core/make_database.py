@@ -74,6 +74,41 @@ def round_int(value: float) -> int:
     return int(Decimal(str(float(value))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+# 工程号形态：<前缀 2~4 个字母>-<平台号 3~4 位>-<日期 3~4 位>-<孔号>
+# 北部山头 BS-3940-0915-P1 / 南部山头 NS-3970-0708-P1 / 中心矿段 zx-3570-1023-p1
+_HID_RE = re.compile(r"^([A-Za-z]{2,4})-(\d{3,4})-(\d{3,4})-")
+
+
+def looks_like_coord_txt(path) -> bool:
+    """判断一个 .txt 是不是"坐标文件"（工程号,,开孔坐标E,开孔坐标N,开孔坐标R）。
+
+    **只看内容形态，不看文件名前缀**：中心矿段的取样文件叫「3570取样1023.txt」，
+    里面工程号是 ``zx-3570-1023-p1``，一个 ``BS-`` 都没有。
+    """
+    try:
+        with Path(path).open(encoding="utf-8-sig", errors="replace") as fh:
+            for _ in range(8):
+                line = fh.readline()
+                if not line:
+                    break
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                cells = [_clean(x) for x in s.split(",")]
+                if len(cells) < 5 or not cells[0]:
+                    continue
+                try:
+                    float(cells[2])
+                    float(cells[3])
+                    float(cells[4])
+                except ValueError:
+                    continue
+                return True
+    except OSError:
+        return False
+    return False
+
+
 def parse_txt(path) -> list[Hole]:
     """读坐标 TXT；返回按文件顺序排列的 Hole 列表。"""
     p = Path(path)
@@ -143,8 +178,13 @@ def parse_grades(text: str, holes: list[Hole]) -> ParsedGrades:
         cells = _split_line(line)
         if not cells or _is_separator(cells):
             continue
+        # 先按"这一格是不是 TXT 里真有的工程号"找（不分前缀、不分大小写）；
+        # 找不到再按工程号形态认，记成"品位表里多出来的"。
         hid_i = next((i for i, c in enumerate(cells)
-                      if re.match(r"^BS-", c, re.IGNORECASE)), None)
+                      if _clean(c).upper() in canonical), None)
+        if hid_i is None:
+            hid_i = next((i for i, c in enumerate(cells)
+                          if _HID_RE.match(_clean(c))), None)
         if hid_i is None:
             continue
         raw_hid = cells[hid_i]
@@ -177,8 +217,38 @@ def parse_grades(text: str, holes: list[Hole]) -> ParsedGrades:
 
 
 def parse_tag_from_txt(path) -> tuple[str, str]:
-    m = re.search(r"BS-(\d{3,4})-(\d{4})", Path(path).stem)
-    return (m.group(1), m.group(2)) if m else ("", "")
+    """从文件名或文件内容里认「平台号 + 日期」。
+
+    认得的写法：
+    * ``BS-3940-0915-P1-P47.txt`` / ``NS-3970-0708.txt``（文件名里就有）
+    * ``3570取样1023.txt``（文件名里没有，读第一行工程号 ``zx-3570-1023-p1``）
+    * 实在认不出，就按文件名里的数字猜（``3570取样1023`` → 3570 / 1023）
+    """
+    p = Path(path)
+    m = re.search(r"([A-Za-z]{2,4})-(\d{3,4})-(\d{3,4})", p.stem)
+    if m:
+        return m.group(2), m.group(3)
+
+    try:
+        with p.open(encoding="utf-8-sig", errors="replace") as fh:
+            for _ in range(8):
+                line = fh.readline()
+                if not line:
+                    break
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                m = _HID_RE.match(s)
+                if m:                       # 只看第一条数据行
+                    return m.group(2), m.group(3)
+                break
+    except OSError:
+        pass
+
+    digits = re.findall(r"\d{3,4}", p.stem)
+    if len(digits) >= 2:
+        return digits[0], digits[1]
+    return "", ""
 
 
 def default_output_paths(out_dir, platform: str, date: str) -> tuple[Path, Path]:

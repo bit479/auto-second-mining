@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CORE = ROOT / "core"
 sys.path.insert(0, str(CORE))
 
-from make_database import build, parse_grades, round_int  # noqa: E402
+from make_database import (build, looks_like_coord_txt, parse_grades,  # noqa: E402
+                           parse_tag_from_txt, parse_txt, round_int)
 
 PLATFORM = "3940"
 BENCH = 10.0            # 孔底高程 = 3940 - 10 = 3930
@@ -160,6 +161,28 @@ def main():
         short = "\n".join(make_grades().splitlines()[:-1]) + "\n"
         g = parse_grades(short, holes)
         check(g.missing == ["BS-3940-0101-P5"], "少一行时指出缺 P5：%s" % g.missing)
+
+        print("\n[6] 换前缀：中心矿段 zx- / 文件名里没有 BS-")
+        zx_dir = td / "zx"
+        zx_dir.mkdir()
+        zx_txt = zx_dir / "3570取样1023.txt"
+        zx_txt.write_text(
+            "\n".join("zx-3570-1023-p%d,,467945.599,4350279.965,3569.073" % (i + 1)
+                      for i in range(3)) + "\n", encoding="utf-8")
+        check(looks_like_coord_txt(zx_txt), "按内容认得出是坐标 TXT（不靠文件名）")
+        tag = parse_tag_from_txt(zx_txt)
+        check(tag == ("3570", "1023"), "平台/日期从工程号里认出：%s" % (tag,))
+
+        rep = zx_dir / "BS-3940-1008_报告.txt"
+        rep.write_text("炮孔数据报告\n类型,体号,体积\n", encoding="utf-8")
+        check(not looks_like_coord_txt(rep), "报告类 txt 不会被当成坐标文件")
+
+        zx_holes = parse_txt(zx_txt)
+        zx_grades = parse_grades(
+            "| 工程号 | Au |\n| --- | --- |\n| zx-3570-1023-p1 | 1.23 |\n"
+            "| zx-3570-1023-p2 | 1.56 |\n| zx-3570-1023-p3 | 1.78 |\n", zx_holes)
+        check(not zx_grades.missing and len(zx_grades.grades) == 3,
+              "小写 zx- 工程号的品位能对上（%d/3）" % len(zx_grades.grades))
     finally:
         shutil.rmtree(td, ignore_errors=True)
 
