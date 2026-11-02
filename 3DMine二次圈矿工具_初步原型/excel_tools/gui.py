@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.blast_report import naming  # noqa: E402
 from src.blast_report.builder import MergeOptions, merge_reports  # noqa: E402
+from src.blast_report.profiles import load_registry  # noqa: E402
 from src.blast_report.schema import (DEFAULT_MODE, MODE_DETAIL,  # noqa: E402
                                      MODE_LABELS, MODE_TOTAL)
 from src.excel_core.reader import find_input_files, natural_key_compat  # noqa: E402
@@ -65,6 +66,8 @@ _PAD = {"padx": 8, "pady": 4}
 class ReportTab(ttk.Frame):
     """选文件 → 定输出 → 一键汇总。"""
 
+    AUTO_GRADE_LABEL = "自动识别（按路径 / 源报告档位）"
+
     def __init__(self, master):
         super().__init__(master)
         self.root = master.winfo_toplevel()
@@ -75,6 +78,10 @@ class ReportTab(ttk.Frame):
         self.appendix_var = tk.BooleanVar(value=True)
         self.formula_var = tk.BooleanVar(value=True)
         self.mode_var = tk.StringVar(value=DEFAULT_MODE)
+
+        # 品位分级（矿段）：显示名 -> 配置里的 key
+        self.grade_names = {name: key for key, name in load_registry().choices()}
+        self.grade_var = tk.StringVar(value=self.AUTO_GRADE_LABEL)
 
         self._build_ui()
 
@@ -100,12 +107,25 @@ class ReportTab(ttk.Frame):
                           ("清空", self.clear)):
             ttk.Button(btns, text=text, command=cmd, width=10).pack(pady=3)
 
-        mode_box = ttk.LabelFrame(self, text="汇总方式")
+        mode_box = ttk.LabelFrame(self, text="汇总方式与品位分级")
         mode_box.pack(fill="x", **_PAD)
-        ttk.Radiobutton(mode_box, text="按每个文件的「总计」行当一个矿块",
+        row1 = ttk.Frame(mode_box)
+        row1.pack(fill="x")
+        ttk.Radiobutton(row1, text="按每个文件的「总计」行当一个矿块",
                         value=MODE_TOTAL, variable=self.mode_var).pack(side="left", padx=(8, 20), pady=6)
-        ttk.Radiobutton(mode_box, text="按明细行汇总（旧）",
+        ttk.Radiobutton(row1, text="按明细行汇总（旧）",
                         value=MODE_DETAIL, variable=self.mode_var).pack(side="left", pady=6)
+
+        row2 = ttk.Frame(mode_box)
+        row2.pack(fill="x")
+        ttk.Label(row2, text="品位分级（矿段）：").pack(side="left", padx=(8, 4), pady=(0, 6))
+        self.grade_combo = ttk.Combobox(
+            row2, textvariable=self.grade_var, state="readonly", width=28,
+            values=[self.AUTO_GRADE_LABEL] + list(self.grade_names))
+        self.grade_combo.pack(side="left", pady=(0, 6))
+        ttk.Label(row2, text="（换矿段就换分级：金斗山 0.5-1/1-1.5/1.5-3/≥3，"
+                             "中心矿段 0.5-0.8/0.8-1/≥1）",
+                  foreground="#888888").pack(side="left", padx=6, pady=(0, 6))
 
         out = ttk.LabelFrame(self, text="输出")
         out.pack(fill="x", **_PAD)
@@ -230,6 +250,8 @@ class ReportTab(ttk.Frame):
 
         self.run_btn.configure(state="disabled")
         self.log_line("[方式] %s" % MODE_LABELS.get(self.mode_var.get(), self.mode_var.get()))
+        self.log_line("[矿段] %s" % (self.grade_names.get(self.grade_var.get())
+                                    or "自动识别（按输入路径 / 源报告档位）"))
         self.log_line("[开始] 共 %d 个输入文件" % len(self.files))
 
         options = MergeOptions(
@@ -237,6 +259,7 @@ class ReportTab(ttk.Frame):
             with_appendix=self.appendix_var.get(),
             use_formula=self.formula_var.get(),
             mode=self.mode_var.get(),
+            grade_profile=self.grade_names.get(self.grade_var.get()),
         )
         files = sorted(self.files, key=natural_key_compat)
 
@@ -257,6 +280,11 @@ class ReportTab(ttk.Frame):
             messagebox.showerror("汇总失败", payload)
             return
         t = payload["total"]
+        self.log_line("[分级] %s（%s）→ %s"
+                      % (payload["grade_profile_name"], payload["grade_profile_reason"],
+                         " / ".join(payload["grade_bands"])))
+        for message in payload.get("warnings") or ():
+            self.log_line("[警告] %s" % message)
         self.log_line("[输出] %s" % payload["output"])
         self.log_line("[汇总] 矿块 %d 个，品位档：%s"
                       % (payload["blocks"], " / ".join(payload["tiers"])))

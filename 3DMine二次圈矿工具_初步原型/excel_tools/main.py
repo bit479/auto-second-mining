@@ -10,6 +10,10 @@
      按矿块品位落档、档位从高到低排、同档内保持文件顺序、体号重新编号；
    * ``detail``（0915/0922/1008 的旧口径）—— 把每行明细拆开按品位档归组。
 
+   品位分级**按矿段**取（``--grades``，默认 ``auto`` 自动识别）：
+   金斗山 ``0.5-1 / 1-1.5 / 1.5-3 / ≥3``，中心矿段 ``0.5-0.8 / 0.8-1 / ≥1``，
+   配置在 ``config/grade_profiles.json``。
+
    .. code-block:: bat
 
       python main.py -i "工作表1.xls" "工作表2.xls" "工作表3.xls" "工作表4.xls"
@@ -40,6 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.blast_report.builder import MergeOptions, merge_reports  # noqa: E402
 from src.blast_report import naming  # noqa: E402
+from src.blast_report.profiles import ProfileError, load_registry  # noqa: E402
 from src.blast_report.schema import (DEFAULT_MINE_PREFIX, DEFAULT_MODE,  # noqa: E402
                                      MODE_LABELS, MODES)
 from src.excel_core.reader import find_input_files, natural_key_compat  # noqa: E402
@@ -47,6 +52,12 @@ from src.excel_core.reader import find_input_files, natural_key_compat  # noqa: 
 natural_key = natural_key_compat
 
 DEFAULT_PATTERN = "*.xls*"
+
+# 品位分级（矿段）选项直接来自配置，加矿段只改 config/grade_profiles.json
+_REGISTRY = load_registry()
+GRADE_CHOICES = ["auto"] + _REGISTRY.keys()
+GRADE_HELP = "；".join(["auto=按路径与源报告档位自动识别"]
+                      + ["%s=%s" % (p.key, p.name) for p in _REGISTRY.profiles.values()])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
     g1.add_argument("--mode", choices=list(MODES), default=DEFAULT_MODE,
                     help="汇总方式，默认 %(default)s —— "
                          "total=每个文件的「总计」行当一个矿块；detail=把明细行拆开按档汇总")
+    g1.add_argument("--grades", default="auto", choices=GRADE_CHOICES,
+                    metavar="矿段",
+                    help="品位分级（矿段），默认 auto —— %s" % GRADE_HELP)
+    g1.add_argument("--grade-config", dest="grade_config", default=None,
+                    help="自定义分级配置 JSON（默认 excel_tools/config/grade_profiles.json）")
     g1.add_argument("--mine-prefix", dest="mine_prefix", default=None,
                     help="标题里的矿名前缀，默认 %s" % DEFAULT_MINE_PREFIX)
     g1.add_argument("--no-appendix", action="store_true",
@@ -150,9 +166,18 @@ def run_merge(args: argparse.Namespace) -> int:
         use_formula=not args.values,
         mode=args.mode,
         mine_prefix=args.mine_prefix,
+        grade_profile=args.grades,
+        grade_config=args.grade_config,
     )
-    result = merge_reports(files, output, options)
+    try:
+        result = merge_reports(files, output, options)
+    except (ProfileError, ValueError) as exc:
+        print("[错误] %s" % exc)
+        return 2
 
+    for message in result["warnings"]:
+        print("[警告] %s" % message)
+    print("[矿段] %s（%s）" % (result["grade_profile_name"], result["grade_profile_reason"]))
     print("[汇总] 矿块 %d 个，品位档 %s" % (result["blocks"], " / ".join(result["tiers"])))
     t = result["total"]
     print("[合计] 体积 %.3f m3 | 重量 %.3f t | 平均品位 %.4f g/t | 金属量 %.3f 百克"

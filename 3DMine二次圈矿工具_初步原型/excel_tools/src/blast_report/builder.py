@@ -9,6 +9,11 @@
 ``detail``（旧口径，0915/0922/1008 那批报告）
     把每行明细拆出来，按品位档归组重排。
 
+**品位分级按矿段取**（金斗山 / 中心矿段各一套，配置见 ``config/grade_profiles.json``）：
+先由 :func:`profiles.resolve_profile` 定出这次汇总用哪个矿段（手动指定 > 路径关键字 >
+源报告档位 > 默认），再拿这套分界值落档。以前写死金斗山分级，中心矿段的
+0.6 / 0.9 会被并进 ``0.500-1.000``，档位与人工成果对不上。
+
 两者共用的部分：
 1. 每个档位列出全部明细行，随后一行"小计"；
 2. 末尾一行"合计"，等于各小计之和；
@@ -20,10 +25,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 
 from ..excel_core.writer import SheetPlan, StyleSpec, write_workbook
-from . import by_total, naming
+from . import by_total, naming, profiles
 from .parser import BlockRecord, SourceReport, truncate_at_total
 from .schema import (DEFAULT_MODE, METAL_SCALE, MODE_DETAIL, MODE_TOTAL, MODES,
                      OUTPUT_COLUMNS, grade_sort_key)
@@ -44,6 +49,8 @@ class MergeOptions:
     mine_prefix: str | None = None  # 标题里的矿名前缀（默认"北部山头"）
     title_suffix: str = "炮孔数据报告"
     sheet_name: str = "Sheet1"
+    grade_profile: str | None = None  # 品位分级（矿段 key）；None/"auto" = 按路径与报告档位自动识别
+    grade_config: str | None = None   # 自定义分级配置 JSON；None = excel_tools/config/grade_profiles.json
     column_widths: dict[str, float] = field(
         default_factory=lambda: {"A": 18.55, "B": 9.0, "C": 12.0, "D": 12.0, "E": 18.55, "F": 18.55}
     )
@@ -79,9 +86,20 @@ def group_records(records: Sequence[BlockRecord]) -> list[tuple[str, list[BlockR
     return [(k, list(v)) for k, v in ordered]
 
 
-def _records_from_details(reports: Sequence[SourceReport]) -> list[BlockRecord]:
-    """旧口径：把每个源文件的全部明细行摊平。"""
-    return [rec for rep in reports for rec in rep.records]
+def _records_from_details(reports: Sequence[SourceReport],
+                          profile: profiles.GradeProfile | None = None,
+                          warnings: list[str] | None = None) -> list[BlockRecord]:
+    """旧口径：把每个源文件的全部明细行摊平（档位沿用源报告写的，不改写）。"""
+    records = [rec for rep in reports for rec in rep.records]
+    if profile is not None and warnings is not None:
+        unknown = sorted({rec.grade_type for rec in records
+                          if rec.grade_type and not profile.owns_label(rec.grade_type)})
+        if unknown:
+            warnings.append(
+                "源报告里的档位 %s 不属于「%s」分级（%s），已按原样保留 —— "
+                "请确认矿段没选错（换矿段重跑，或改 config/grade_profiles.json）"
+                % ("、".join(unknown), profile.name, " / ".join(profile.labels)))
+    return records
 
 
 def _sum_expr(col: str, rows: Sequence[int]) -> str | None:
@@ -134,10 +152,19 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
     if not reports:
         raise ValueError("没有解析到任何有效数据，请检查输入文件")
 
-    build_records: Callable[[Sequence[SourceReport]], list[BlockRecord]] = (
-        by_total.records_from_totals if opt.mode == MODE_TOTAL else _records_from_details
-    )
-    records: list[BlockRecord] = build_records(reports)
+    # ---- 第一步：定出这次汇总用哪套品位分级（哪个矿段）----
+    registry = profiles.load_registry(opt.grade_config)
+    warnings: list[str] = list(registry.warnings)
+    grade_profile, profile_reason = profiles.resolve_profile(
+        opt.grade_profile, input_paths, reports, registry)
+    print("[分级] %s —— %s（%s）"
+          % (grade_profile.name, " / ".join(grade_profile.labels), profile_reason))
+
+    # ---- 第二步：按口径取矿块 ----
+    if opt.mode == MODE_TOTAL:
+        records = by_total.records_from_totals(reports, grade_profile, warnings)
+    else:
+        records = _records_from_details(reports, grade_profile, warnings)
     if not records:
         raise ValueError("没有解析到任何矿块数据（%s 方式），请检查输入文件里有没有「总计」行"
                          % opt.mode)
@@ -235,6 +262,13 @@ def merge_reports(inputs: Sequence[str] | Sequence[SourceReport],
         "tiers": [k for k, _ in groups],
         "total": _collect_total(groups),
         "total_row": total_row,
+        # 品位分级（矿段）：用哪套、怎么定出来的，都回给调用方，便于日志与排查
+        "grade_profile": grade_profile.key,
+        "grade_profile_name": grade_profile.name,
+        "grade_profile_reason": profile_reason,
+        "grade_profile_source": registry.source,
+        "grade_bands": list(grade_profile.labels),
+        "warnings": warnings,
     }
 
 

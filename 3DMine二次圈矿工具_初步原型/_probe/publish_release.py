@@ -18,6 +18,8 @@ for i, a in enumerate(sys.argv):
     if a == "--tag" and i + 1 < len(sys.argv):
         TAG = sys.argv[i + 1]
 ZIP = Path(r"D:\WK\N CRT\release_v1\second-mining-tool-%s.zip" % TAG)
+if not ZIP.exists():                      # 换盘符 / 换机器时跟着仓库走
+    ZIP = ROOT.parent / "release_v1" / ("second-mining-tool-%s.zip" % TAG)
 NOTES = Path(__file__).resolve().with_name("release_notes_%s.md" % TAG.replace(".", "_"))
 if not NOTES.exists():
     NOTES = Path(__file__).resolve().with_name("release_notes_v1.md")
@@ -83,7 +85,8 @@ def main() -> int:
              "v1.11": "v1.11 —— 矿块线条圆滑 + 综合图 4.5m 直接相接",
              "v1.11.1": "v1.11.1 —— 细长孔簇外推收尖刺，轮廓再顺一档",
              "v1.12": "v1.12 —— 生成炮孔数据库：孔深三列四舍五入取整",
-             "v1.12.1": "v1.12.1 —— 换矿段后坐标 TXT 拖进去不再被忽略"}.get(
+             "v1.12.1": "v1.12.1 —— 换矿段后坐标 TXT 拖进去不再被忽略",
+             "v1.13": "v1.13 —— 炮孔报告汇总按矿段换品位分级（金斗山 / 中心矿段）"}.get(
                  TAG, "%s —— 二次圈矿工具" % TAG)
     st, res = api("https://api.github.com/repos/%s/releases" % REPO, tok,
                   {"tag_name": TAG, "name": title,

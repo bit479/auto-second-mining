@@ -1,18 +1,36 @@
-"""炮孔数据报告的字段与品位档定义。"""
+"""炮孔数据报告的字段与品位档定义。
+
+品位档**按矿段**取（金斗山 / 中心矿段各一套），配置见 ``config/grade_profiles.json``，
+解析与识别逻辑在 :mod:`profiles`；本模块只做转出与兼容。
+"""
 
 from __future__ import annotations
 
-import math
-import re
 from typing import Any
+
+from .profiles import (BUILTIN_PROFILES, DEFAULT_PROFILE_KEY, GradeProfile,
+                       build_registry, get_profile, parse_range)
 
 __all__ = [
     "COL_TYPE", "COL_BODY", "COL_VOLUME", "COL_WEIGHT", "COL_GRADE", "COL_METAL",
     "OUTPUT_COLUMNS", "COLUMN_SYNONYMS", "NUMERIC_COLUMNS",
     "SUMMARY_TOKENS", "parse_grade_range", "grade_sort_key",
     "MODE_TOTAL", "MODE_DETAIL", "MODES", "MODE_LABELS",
-    "GRADE_BANDS", "TOTAL_TOKENS", "band_of_grade", "DEFAULT_MINE_PREFIX",
+    "GRADE_BANDS", "TOTAL_TOKENS", "band_of_grade", "grade_profile",
+    "grade_bands", "DEFAULT_MINE_PREFIX", "DEFAULT_PROFILE_KEY",
 ]
+
+# --------------------------------------------------------------------------
+# 品位档解析（实现在 profiles.py，这里转出以保持旧引用可用）
+# --------------------------------------------------------------------------
+parse_grade_range = parse_range
+
+
+def grade_sort_key(text: Any) -> tuple:
+    """品位档排序键：档次由高到低，同档按下限降序（``<0.500`` 这类兜底档排最后）。"""
+    low, high = parse_grade_range(text)
+    return (-low, -high)
+
 
 # 业务标准列名
 COL_TYPE = "类型"
@@ -82,39 +100,6 @@ SUMMARY_TOKENS = ("小计", "合计", "总计", "共计")
 # 金属量(百克) = 重量(t) × 品位(g/t) ÷ 100
 METAL_SCALE = 100.0
 
-_RANGE_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*[-~－—～至]\s*(-?\d+(?:\.\d+)?)")
-_SINGLE_RE = re.compile(r"^\s*[<>≥≤]?=?\s*(-?\d+(?:\.\d+)?)")
-
-
-def parse_grade_range(text: Any) -> tuple[float, float]:
-    """解析品位档字符串，返回 (下限, 上限)。
-
-    支持："0.500-1.000"、"1.5~3"、"≥3.000"、"3.000 以上"、"3 以上"。
-    无法解析时返回 ``(-inf, -inf)``，排序时排在最末。
-    """
-    s = str(text or "").strip()
-    s = s.translate({i: i - 0xFEE0 for i in range(0xFF01, 0xFF5F)})
-    s = s.replace("，", ",").replace(" ", "")
-
-    m = _RANGE_RE.search(s)
-    if m:
-        low, high = float(m.group(1)), float(m.group(2))
-        return (min(low, high), max(low, high))
-
-    m = _SINGLE_RE.search(s)
-    if m:
-        value = float(m.group(1))
-        if s.startswith(("<", "≤")):
-            return (-math.inf, value)
-        return (value, math.inf)
-    return (-math.inf, -math.inf)
-
-
-def grade_sort_key(text: Any) -> tuple:
-    """品位档排序键：档次由高到低，同档按下限降序。"""
-    low, high = parse_grade_range(text)
-    return (-low, -high)
-
 
 # --------------------------------------------------------------------------
 # 汇总方式
@@ -134,35 +119,46 @@ DEFAULT_MODE = MODE_TOTAL
 TOTAL_TOKENS = ("总计", "合计", "共计")
 
 # --------------------------------------------------------------------------
-# 品位档区间（3DMine 报告口径）
+# 品位档区间（按矿段，见 config/grade_profiles.json）
 # --------------------------------------------------------------------------
-# 判定规则：下限含、上限不含。即 0.500 归入 "0.500-1.000"。
-# 最后一个区间上限为 None（表示无上限）。
-GRADE_BANDS = (
-    (0.0, 0.5, "0.000-0.500"),
-    (0.5, 1.0, "0.500-1.000"),
-    (1.0, 1.5, "1.000-1.500"),
-    (1.5, 3.0, "1.500-3.000"),
-    (3.0, None, "3.000-999.000"),
-)
+# 判定规则：下限含、上限不含（0.500 归 0.500-0.800，0.800 归 0.800-1.000）；
+# 相邻档共用边界值，既不重复计数也不留缝。矿段不同 → 分界值不同：
+#
+#   金斗山    0.000 / 0.500 / 1.000 / 1.500 / 3.000 / 999   （含 0.000-0.500 废石档）
+#   中心矿段  0.500 / 0.800 / 1.000 / 999                   （0.5 以下为废石，不进档）
+#
+# GRADE_BANDS 只是**内置默认矿段**（金斗山）的档位快照，留着兼容旧引用；
+# 实际落档一律走 band_of_grade(值, 矿段分级)，别直接读它。
+_BUILTIN_REGISTRY = build_registry({"default": DEFAULT_PROFILE_KEY,
+                                    "profiles": list(BUILTIN_PROFILES)}, source="内置")
+GRADE_BANDS = tuple((b.low, b.high, b.label) for b in _BUILTIN_REGISTRY.default.bands)
 
 # 默认矿名前缀：路径里找不到形如「北部山头3940平台」的段时补上
 DEFAULT_MINE_PREFIX = "北部山头"
 
 
-def band_of_grade(grade: Any) -> str:
-    """把一个品位值落到标准档位字符串。落在区间外时贴到最近的一档。"""
+def grade_profile(key: str | None = None, config: str | None = None) -> GradeProfile:
+    """取某个矿段的分级（``None`` = 配置里的默认矿段）。"""
+    return get_profile(key, config)
+
+
+def grade_bands(profile: GradeProfile | None = None) -> tuple[tuple[float, float | None, str], ...]:
+    """某套分级的 ``(下限, 上限, 档位名)`` 列表；不传就用默认矿段。"""
+    target = profile or get_profile(None)
+    return tuple((b.low, b.high, b.label) for b in target.bands)
+
+
+def band_of_grade(grade: Any, profile: GradeProfile | None = None) -> str:
+    """把一个品位值落到**指定矿段**的档位。
+
+    * 不给 ``profile`` 时用配置里的默认矿段（内置默认是金斗山，与旧行为一致）；
+    * 低于该矿段工业品位下限（第一档下限）时，金斗山贴最低档（旧行为），
+      中心矿段这类下限 > 0 的矿段返回 ``<0.500`` 单列一档，避免把废石并进矿。
+    """
     from ..excel_core.model import to_number
 
     value = to_number(grade)
     if value is None:
         return ""
-    for low, high, name in GRADE_BANDS:
-        if high is None:
-            if value >= low:
-                return name
-            continue
-        if low <= value < high:
-            return name
-    return GRADE_BANDS[0][2]          # 小于 0.000 的一律贴到最低档
+    return (profile or get_profile(None)).band_of(value)
 

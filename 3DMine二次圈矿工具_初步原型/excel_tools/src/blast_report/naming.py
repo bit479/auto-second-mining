@@ -3,12 +3,14 @@
 命名约定（与人工成果一致）::
 
     <矿名><平台号>平台<日期>炮孔数据报告
-    例：北部山头3940平台1011炮孔数据报告
+    例：北部山头3940平台1011炮孔数据报告 / 中心矿段3570平台1023炮孔数据报告
 
 * 平台标签从输入/输出路径里形如 ``北部山头3940平台`` 或 ``3940平台`` 的目录段取；
 * 日期代号取输出目录名 / 输出文件名 / 输入目录名末尾的 3~4 位数字
   （如 ``...\\Desktop\\3940平台\\1011\\工作表1.xls`` → ``1011``）；
-* 路径里没有矿名时补上默认前缀（``北部山头``）。
+* 路径里没有矿名时补上默认前缀（``北部山头``）；**平台标签里已经带了矿段名**
+  （``中心矿段`` / ``金斗山`` / ``南部山头`` …，见 ``config/grade_profiles.json`` 的
+  ``keywords``）就不再补，免得出现"北部山头中心矿段3570平台"这种串味标题。
 """
 
 from __future__ import annotations
@@ -17,14 +19,27 @@ import os
 import re
 from typing import Iterable, Sequence
 
+from .profiles import load_registry
 from .schema import DEFAULT_MINE_PREFIX
 
-__all__ = ["guess_platform_label", "guess_day_code", "guess_title", "default_output_path"]
+__all__ = ["guess_platform_label", "guess_day_code", "guess_title",
+           "default_output_path", "known_mine_names"]
 
 # 平台标签：可选中文矿名前缀 + 3~4 位平台号 + "平台"
 _PLATFORM_RE = re.compile(r"[\u4e00-\u9fff]{0,8}\d{3,4}\s*平台")
 _TRAILING_DAY_RE = re.compile(r"[-_ ]*(\d{3,4})\s*$")
 _ANY_DAY_RE = re.compile(r"(?<!\d)(\d{3,4})(?!\d)")
+
+
+def known_mine_names() -> tuple[str, ...]:
+    """分级配置里认得的矿段名（中文关键字，长的在前），用于判断标题是否已有矿名。"""
+    names: list[str] = []
+    for profile in load_registry().profiles.values():
+        for keyword in profile.keywords:
+            if len(keyword) >= 2 and not keyword.isascii() and keyword not in names:
+                names.append(keyword)
+    return tuple(sorted(names, key=len, reverse=True))
+
 
 
 def _segments(paths: Iterable[str]) -> list[str]:
@@ -89,7 +104,9 @@ def guess_title(inputs: Sequence[str] | None = None,
         return ""
 
     prefix = mine_prefix or DEFAULT_MINE_PREFIX
-    head = "" if platform.startswith(prefix) else prefix
+    has_name = platform.startswith(prefix) or any(
+        platform.startswith(name) for name in known_mine_names())
+    head = "" if has_name else prefix
     day = guess_day_code([str(p) for p in (inputs or []) if p], output, platform)
     return "%s%s%s%s" % (head, platform, day, suffix)
 

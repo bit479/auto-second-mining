@@ -5,7 +5,9 @@
 
 * 体积 / 重量 / 平均品位 / 金属量 四个值原样搬用，不重新计算；
 * 档位由「总计的品位」落在哪个标准区间反推（源文件自己的档位不能直接用：
-  一份文件的总计可能跨了好几个源档位）；
+  一份文件的总计可能跨了好几个源档位）。**区间按矿段取** —— 金斗山
+  ``0.5-1 / 1-1.5 / 1.5-3 / ≥3``，中心矿段 ``0.5-0.8 / 0.8-1 / ≥1``，
+  具体用哪套由 :func:`profiles.resolve_profile` 按「当前矿段」决定；
 * 同档内保持源文件的先后顺序；体号在最终顺序上重新编号 1→N。
 """
 
@@ -15,8 +17,8 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .parser import BlockRecord, SourceReport
-from .schema import (COL_GRADE, COL_METAL, COL_VOLUME, COL_WEIGHT, METAL_SCALE,
-                     band_of_grade)
+from .profiles import GradeProfile, get_profile
+from .schema import COL_GRADE, COL_METAL, COL_VOLUME, COL_WEIGHT, METAL_SCALE
 
 __all__ = ["TotalBlock", "collect_total_blocks", "records_from_totals"]
 
@@ -38,8 +40,10 @@ def _num(value: Any) -> float | None:
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
-def collect_total_blocks(reports: Sequence[SourceReport]) -> tuple[list[TotalBlock], list[str]]:
-    """逐份取「总计」行，返回 ``(矿块列表, 告警列表)``。"""
+def collect_total_blocks(reports: Sequence[SourceReport],
+                         profile: GradeProfile | None = None) -> tuple[list[TotalBlock], list[str]]:
+    """逐份取「总计」行，按 ``profile``（当前矿段）落档，返回 ``(矿块列表, 告警列表)``。"""
+    bands = profile or get_profile(None)
     blocks: list[TotalBlock] = []
     warnings: list[str] = []
 
@@ -58,9 +62,16 @@ def collect_total_blocks(reports: Sequence[SourceReport]) -> tuple[list[TotalBlo
             grade = (metal or 0.0) * METAL_SCALE / weight
             warnings.append("%s：总计行没有品位值，已按 金属量×100÷重量 补算" % rep.name)
 
+        grade_type = bands.band_of(grade)
+        if grade_type.startswith("<") and grade is not None:
+            warnings.append(
+                "%s：总计品位 %.3f 低于「%s」的工业品位下限 %.3f，"
+                "已单列 %s 一档（不并进最低档，请核对是否混进了废石块）"
+                % (rep.name, grade, bands.name, bands.cutoff, grade_type))
+
         blocks.append(TotalBlock(
             source=rep.name,
-            grade_type=band_of_grade(grade),
+            grade_type=grade_type,
             volume=volume,
             weight=weight,
             grade=grade,
@@ -70,11 +81,19 @@ def collect_total_blocks(reports: Sequence[SourceReport]) -> tuple[list[TotalBlo
     return blocks, warnings
 
 
-def records_from_totals(reports: Sequence[SourceReport]) -> list[BlockRecord]:
-    """给 :func:`builder.merge_reports` 用的矿块构造器。"""
-    blocks, warnings = collect_total_blocks(reports)
-    for message in warnings:
+def records_from_totals(reports: Sequence[SourceReport],
+                        profile: GradeProfile | None = None,
+                        warnings: list[str] | None = None) -> list[BlockRecord]:
+    """给 :func:`builder.merge_reports` 用的矿块构造器。
+
+    ``profile`` = 当前矿段分级；``warnings`` 传进来时把告警一起带出去
+    （界面上要显示，不能只打印到控制台）。
+    """
+    blocks, collected = collect_total_blocks(reports, profile)
+    for message in collected:
         print("[警告] %s" % message)
+    if warnings is not None:
+        warnings.extend(collected)
     return [
         BlockRecord(
             grade_type=block.grade_type,

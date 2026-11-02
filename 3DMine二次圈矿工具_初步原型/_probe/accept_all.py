@@ -136,6 +136,7 @@ XL = ROOT / "excel_tools"
 if XL.exists():
     xl_ok = True
     for name, script in (("报告汇总(total口径)", "tests/test_by_total.py"),
+                         ("矿段品位分级", "tests/test_grade_profiles.py"),
                          ("报告汇总(detail口径)", "tests/test_merge.py"),
                          ("单日数据并入总表", "tests/test_daily_merge.py"),
                          ("xls/xlsx 格式自适应", "tests/test_formats.py"),
@@ -148,7 +149,7 @@ if XL.exists():
         emit("== ⑤ Excel 工具自检：%s" % name)
         emit(out.splitlines()[-1] if out else "(没有输出)")
         xl_ok = xl_ok and p.returncode == 0
-    results.append(("⑤ Excel 工具自检（5 项）", xl_ok, 0 if xl_ok else 1))
+    results.append(("⑤ Excel 工具自检（6 项）", xl_ok, 0 if xl_ok else 1))
 
 # ⑥ 数据库生成：TXT 坐标 + 粘贴品位表 -> xls/mdb
 mkdb = PROBE / "test_make_database.py"
