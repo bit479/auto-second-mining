@@ -9,9 +9,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("SM_HOME") or Path(__file__).resolve().parent.parent)
 PATH = ROOT / "圈矿参数.json"
 
 DEFAULTS = {

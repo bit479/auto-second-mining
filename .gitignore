@@ -44,3 +44,16 @@ release_v1/
 
 # AutoCAD / 3DMine 的临时文件
 *.tmp
+
+# PyInstaller 打包产物（体积大，走 Release 资产，不进版本库）
+**/dist/
+**/build/
+*.spec
+
+# 新版界面的本机状态（最近任务/成果、上次页面）
+.ui_state.json
+
+# 自检/临时产物（_out 下每次跑自检都会长出新文件）
+**/excel_tools/_out/
+**/.ui_state.json
+**/验收日志.txt

@@ -33,6 +33,10 @@ EXPECTED = [
 
 def main() -> int:
     files = find_input_files(directory=SRC_DIR, pattern="工作簿*.xlsx")
+    if not files:
+        print("[跳过] 没找到 %s 下的 工作簿*.xlsx（这个自检比对的是那批历史成果）" % SRC_DIR)
+        print("结论：跳过（不影响其它自检）")
+        return 0
     files.sort(key=natural_key_compat)
     print("输入：", [os.path.basename(f) for f in files])
 

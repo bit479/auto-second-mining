@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("SM_HOME") or Path(__file__).resolve().parent.parent)
 TEMPLATE_MDB = ROOT / "assets" / "3dmine_template.mdb"
 
 try:

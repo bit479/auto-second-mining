@@ -235,6 +235,12 @@ class GradeRegistry:
 
 def config_path() -> Path:
     """``excel_tools/config/grade_profiles.json`` 的绝对路径。"""
+    # 单文件 exe：配置要落在可写目录（SM_HOME）里，包内那份只当模板
+    home = os.environ.get("SM_HOME")
+    if home:
+        candidate = Path(home).joinpath(*CONFIG_RELATIVE_PATH)
+        if candidate.exists():
+            return candidate
     here = Path(__file__).resolve()
     base = here.parents[2] if len(here.parents) > 2 else here.parent
     return base.joinpath(*CONFIG_RELATIVE_PATH)

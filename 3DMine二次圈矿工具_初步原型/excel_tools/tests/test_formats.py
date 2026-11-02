@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -59,9 +60,19 @@ def check(ok: bool, message: str) -> None:
     print("  %s  %s" % ("OK  " if ok else "FAIL", message))
 
 
+def _fresh(path: str) -> str:
+    """清空沙箱目录；目录删不掉（比如被占用/权限受限）就换一个带时间戳的新目录。"""
+    if os.path.exists(path):
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            path = "%s_%s" % (path, time.strftime("%H%M%S"))
+    return path
+
+
 def build_sandbox() -> str:
-    if os.path.exists(SANDBOX):
-        shutil.rmtree(SANDBOX)
+    global SANDBOX
+    SANDBOX = _fresh(SANDBOX)
     base = os.path.join(SANDBOX, "平台")
     day = os.path.join(base, "7、单日数据", DAY_DIR)
     os.makedirs(day)

@@ -55,9 +55,18 @@ def check(ok: bool, message: str) -> None:
     print("  %s  %s" % ("OK  " if ok else "FAIL", message))
 
 
+def _fresh(path: str) -> str:
+    if os.path.exists(path):
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            path = "%s_%s" % (path, time.strftime("%H%M%S"))
+    return path
+
+
 def build_sandbox() -> str:
-    if os.path.exists(SANDBOX):
-        shutil.rmtree(SANDBOX)
+    global SANDBOX
+    SANDBOX = _fresh(SANDBOX)
     root = os.path.join(SANDBOX, "北部山头3940平台2026")
     day_dir = os.path.join(root, "7、单日数据", "北部山头3940平台-1008")
     os.makedirs(day_dir)
@@ -182,6 +191,11 @@ def test_map(day_dir: str) -> None:
 
 def main() -> int:
     print("=" * 78)
+    if not (os.path.isdir(REAL_MASTER) and os.path.isdir(REAL_DAY)):
+        print("[跳过] 本机没有真实数据目录，这个自检只在有生产数据的机器上跑：")
+        print("       %s" % REAL_MASTER)
+        print("结论：跳过（不影响其它自检）")
+        return 0
     print("沙箱：", SANDBOX)
     day_dir = build_sandbox()
 

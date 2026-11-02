@@ -25,11 +25,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("SM_HOME") or Path(__file__).resolve().parent.parent)
 CONFIG = ROOT / "excel_tools" / "config" / "grade_profiles.json"
 
 # 配置读不到时的兜底（与 config/grade_profiles.json 保持一致）
