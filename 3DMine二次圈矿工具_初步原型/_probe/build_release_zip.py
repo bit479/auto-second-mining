@@ -17,11 +17,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT.parent / "release_v1"
 
-EXCLUDE_DIRS = {".git", "__pycache__", "3dmine_scripts", "归档", "_out"}
+# build / dist / release_v1 是打包产物（几百 MB 的 exe 与中间文件），不进源码包；
+# exe 走单独的 Release 资产。
+EXCLUDE_DIRS = {".git", "__pycache__", "3dmine_scripts", "归档", "_out",
+                "build", "dist", "release_v1", "_buildenv", "_replaced"}
 EXCLUDE_FILE_GLOBS = ["*.bmp", "*.bak", "*.pyc", "*.dwl", "*.dwl2",
                       "pip_install_log.txt", "pip_scipy_log.txt", "tk_check.txt",
                       "tk_check2.txt", "win_state.txt", "holes_1008.txt",
-                      "bat_test.txt", "deps_check.txt", "运行记录.txt"]
+                      "bat_test.txt", "deps_check.txt", "运行记录.txt",
+                      ".ui_state.json", "*.spec"]
 EXCLUDE_PATH_PARTS = ("sample_data/output/对账_", "sample_data/output/GUI跑通_",
                       "sample_data/output/AUTOCAD自检")
 

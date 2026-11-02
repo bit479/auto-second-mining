@@ -58,8 +58,9 @@ def main() -> int:
     print("凭据已取到（账号 bit479；内容不显示）")
     body = NOTES.read_text(encoding="utf-8")
 
-    p = subprocess.run(["git", "tag", "-a", TAG, "-m",
-                        "v1.0 首个可用版（17 个炮区验收全绿）"],
+    tag_msg = {"v1.0": "v1.0 首个可用版（17 个炮区验收全绿）"}.get(
+        TAG, "%s 二次圈矿工具" % TAG)
+    p = subprocess.run(["git", "tag", "-a", TAG, "-m", tag_msg],
                        cwd=str(ROOT), capture_output=True, text=True)
     print("git tag ->", (p.stdout + p.stderr).strip() or "已创建")
     if not DRY:
@@ -101,13 +102,23 @@ def main() -> int:
         res = res2
     rel_id = res.get("id")
 
-    if rel_id and ZIP.exists() and not DRY:
-        data = ZIP.read_bytes()
-        url = ("https://uploads.github.com/repos/%s/releases/%d/assets?name=%s"
-               % (REPO, rel_id, urllib.parse.quote(ZIP.name)))
-        st3, res3 = api(url, tok, data, method="POST", ctype="application/zip")
-        print("上传资产 %s（%.2f MB）-> %s %s" % (ZIP.name, len(data) / 1048576, st3,
-              res3.get("browser_download_url") or str(res3.get("error", ""))[:200]))
+    # 资产：源码包 + （可选）免安装 exe 目录版
+    assets = [ZIP]
+    _extra = ROOT.parent / "release_v1" / ("second-mining-workbench-%s-win64.zip" % TAG)
+    if _extra.exists():
+        assets.append(_extra)
+    if rel_id and not DRY:
+        for _a in assets:
+            if not _a.exists():
+                print("没找到资产：%s" % _a)
+                continue
+            _data = _a.read_bytes()
+            url = ("https://uploads.github.com/repos/%s/releases/%d/assets?name=%s"
+                   % (REPO, rel_id, urllib.parse.quote(_a.name)))
+            st3, res3 = api(url, tok, _data, method="POST", ctype="application/zip")
+            print("上传资产 %s（%.2f MB）-> %s %s"
+                  % (_a.name, len(_data) / 1048576, st3,
+                     res3.get("browser_download_url") or str(res3.get("error", ""))[:200]))
     elif not ZIP.exists():
         print("没找到 zip 资产：%s（只发 Release、不附文件）" % ZIP)
     print("完成。")
