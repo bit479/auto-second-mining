@@ -19,6 +19,7 @@ from pathlib import Path
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import polylabel, unary_union
 
+import grades
 from composite import load_composite_blocks, merge_outline      # noqa: E402
 
 LEVEL_COLOR = {"L1": 4, "L2": 5, "L3": 1, "L4": 2}          # AutoCAD 色号（青/蓝/红/黄）
@@ -33,15 +34,8 @@ LABEL_H_M = 3.0          # 矿块号文字高度(m)：用户 2026-10-14 定"字�
 
 
 def level_id_of(grade: float):
-    if grade >= 3.0:
-        return "L4"
-    if grade >= 1.5:
-        return "L3"
-    if grade >= 1.0:
-        return "L2"
-    if grade >= 0.5:
-        return "L1"
-    return None
+    """品位 → 档位 id（按当前矿段的分级，见 core/grades.py）。"""
+    return grades.level_of(grade)[0]
 
 
 def grid_cells(poly: Polygon, size: float = 1.0, origin=None, rule: str = None):
@@ -82,15 +76,28 @@ def grid_cells(poly: Polygon, size: float = 1.0, origin=None, rule: str = None):
 
 
 # ---------------------------------------------------------------- 报告 xlsx
+def stat_columns(holes):
+    """孔数统计表的一行：``[(标签, 孔数), ...]``。
+
+    按**当前矿段**的档位生成（高档在前、废孔最后），金斗山是
+    ``≥3 / 1.5-3 / 1-1.5 / 0.5-1 / <0.5``，中心矿段是 ``≥1 / 0.8-1 / 0.5-0.8 / <0.5``。
+    """
+    counts = {b.id: 0 for b in grades.bands()}
+    waste = 0
+    for h in holes:
+        lid, _ = grades.level_of(h.grade)
+        if lid is None:
+            waste += 1
+        else:
+            counts[lid] += 1
+    out = [(b.short, counts[b.id]) for b in grades.bands_desc()]
+    out.append(("<%g" % grades.cutoff(), waste))
+    return out
+
+
 def grade_stats(holes):
-    """炮孔品位统计：>=3 / 1.5-3 / 1-1.5 / 0.5-1 / <0.5 孔数。"""
-    return {
-        ">=3": sum(1 for h in holes if h.grade >= 3.0),
-        "1.5-3": sum(1 for h in holes if 1.5 <= h.grade < 3.0),
-        "1-1.5": sum(1 for h in holes if 1.0 <= h.grade < 1.5),
-        "0.5-1": sum(1 for h in holes if 0.5 <= h.grade < 1.0),
-        "<0.5": sum(1 for h in holes if h.grade < 0.5),
-    }
+    """炮孔品位统计：``{档位短标签: 孔数}``（顺序即报告里的列顺序）。"""
+    return dict(stat_columns(holes))
 
 
 def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
@@ -119,7 +126,7 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
 
     r = 3
     totals = [0.0, 0.0, 0.0]
-    for lid in ("L4", "L3", "L2", "L1"):
+    for lid in grades.ids_desc():
         bs = [b for b in blocks if b.level_id == lid]
         if not bs:
             continue
@@ -160,21 +167,13 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
         r += 2
         ws.cell(row=r, column=1, value="炮孔品位统计（孔数）").font = Font(bold=True)
         r += 1
-        st = grade_stats(holes)
-        ws.cell(row=r, column=1, value="≥3")
-        ws.cell(row=r, column=2, value=st[">=3"])
-        ws.cell(row=r, column=3, value="1.5-3")
-        ws.cell(row=r, column=4, value=st["1.5-3"])
-        ws.cell(row=r, column=5, value="1-1.5")
-        ws.cell(row=r, column=6, value=st["1-1.5"])
-        r += 1
-        ws.cell(row=r, column=1, value="0.5-1")
-        ws.cell(row=r, column=2, value=st["0.5-1"])
-        ws.cell(row=r, column=3, value="<0.5")
-        ws.cell(row=r, column=4, value=st["<0.5"])
-        ws.cell(row=r, column=5, value="合计孔数")
-        ws.cell(row=r, column=6, value=len(holes))
-        last_row = r
+        # 一行 3 对（标签+孔数），档位多/少都按实际数量排；最后一格固定是"合计孔数"
+        cells = stat_columns(holes) + [("合计孔数", len(holes))]
+        for i, (label, count) in enumerate(cells):
+            row = r + i // 3
+            ws.cell(row=row, column=1 + (i % 3) * 2, value=label)
+            ws.cell(row=row, column=2 + (i % 3) * 2, value=count)
+        last_row = r + (len(cells) - 1) // 3
 
     for row in ws.iter_rows(min_row=2, max_row=last_row, min_col=1, max_col=6):
         for cell in row:
@@ -192,7 +191,7 @@ def write_report_xlsx(blocks, meta, path: Path, holes=None) -> None:
 def _report_rows(blocks):
     """报告主表的行（含小计/合计），xlsx / xls / 分表三种导出共用。"""
     rows = []
-    for lid in ("L4", "L3", "L2", "L1", "L0"):
+    for lid in grades.ids_desc() + [grades.WASTE_ID]:
         bs = [b for b in blocks if b.level_id == lid]
         if not bs:
             continue
@@ -296,7 +295,7 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
     plt.rcParams["axes.unicode_minus"] = False
 
     rows = [["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"]]
-    for lid in ("L4", "L3", "L2", "L1"):
+    for lid in grades.ids_desc():
         bs = [b for b in blocks if b.level_id == lid]
         if not bs:
             continue
@@ -313,19 +312,16 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
                  "%.3f" % (tm * 100.0 / tt if tt else 0), "%.3f" % tm])
 
     # 主表 + 下面一张小的"炮孔品位统计"表（主表保持与人工报告版式一致）
-    st = grade_stats(holes) if holes else {}
-    st_rows = [["炮孔品位统计", "≥3", "1.5-3", "1-1.5", "0.5-1", "<0.5", "合计"],
-               ["孔数", str(st.get(">=3", 0)), str(st.get("1.5-3", 0)),
-                str(st.get("1-1.5", 0)), str(st.get("0.5-1", 0)),
-                str(st.get("<0.5", 0)),
-                str(sum(st.values())) if st else "0"]]
+    cols = stat_columns(holes) if holes else []
+    st_rows = [["炮孔品位统计"] + [c[0] for c in cols] + ["合计"],
+               ["孔数"] + [str(c[1]) for c in cols] + [str(sum(c[1] for c in cols))]]
     h_main = 0.42 * len(rows) + 1.6
-    fig, ax = plt.subplots(figsize=(9, h_main + (0.8 if st else 0.0)))
+    fig, ax = plt.subplots(figsize=(9, h_main + (0.8 if st_rows else 0.0)))
     ax.axis("off")
     ax.set_title("%s平台 %s炮孔数据报告" % (meta["platform"], meta["date"]),
                  fontsize=13, pad=10)
     tbl = ax.table(cellText=rows, cellLoc="center",
-                   bbox=[0.0, 0.16 if st else 0.0, 1.0, 0.78 if st else 1.0])
+                   bbox=[0.0, 0.16 if st_rows else 0.0, 1.0, 0.78 if st_rows else 1.0])
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9)
     for (r0, c0), cell in tbl.get_celld().items():
@@ -334,7 +330,7 @@ def write_report_png(blocks, meta, holes, path: Path, dpi: int = 150) -> tuple:
             cell.set_text_props(weight="bold")
         elif rows[r0][0] in ("小计", "合计"):
             cell.set_facecolor("none")
-    if st:
+    if st_rows:
         t2 = ax.table(cellText=st_rows, cellLoc="center",
                       bbox=[0.14, 0.0, 0.72, 0.085])
         t2.auto_set_font_size(False)
@@ -397,7 +393,7 @@ TABLE_TITLE_H = 1.6
 def _table_data(blocks, holes):
     """成果图里那张报告表的行（全部是字符串，跟 PNG 报告版式一致）。"""
     rows = [["类型", "体号", "体积", "重量", "平均品位(Au)", "金属量（百克）"]]
-    for lid in ("L4", "L3", "L2", "L1"):
+    for lid in grades.ids_desc():
         bs = [b for b in blocks if b.level_id == lid]
         if not bs:
             continue
@@ -415,12 +411,9 @@ def _table_data(blocks, holes):
     rows.append(["合计", "", "%.3f" % sum(b.volume_m3 for b in blocks),
                  "%.3f" % tt, "%.3f" % (tm * 100.0 / tt if tt else 0),
                  "%.3f" % tm])
-    st = grade_stats(holes) if holes else {}
-    stat_rows = [["≥3", "1.5-3", "1-1.5", "0.5-1", "<0.5", "合计"],
-                 [str(st.get(">=3", 0)), str(st.get("1.5-3", 0)),
-                  str(st.get("1-1.5", 0)), str(st.get("0.5-1", 0)),
-                  str(st.get("<0.5", 0)),
-                  str(sum(st.values())) if st else "0"]]
+    cols = stat_columns(holes) if holes else []
+    stat_rows = [[c[0] for c in cols] + ["合计"],
+                 [str(c[1]) for c in cols] + [str(sum(c[1] for c in cols))]]
     return rows, stat_rows
 
 
@@ -512,9 +505,8 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
 
     doc = new("R2010")
     doc.header["$INSUNITS"] = 6
-    for lid, name in (("L1", "0.500-1.000"), ("L2", "1.000-1.500"),
-                      ("L3", "1.500-3.000"), ("L4", "3.000-999.000")):
-        doc.layers.add(name, color=LEVEL_COLOR[lid])
+    for band in grades.bands():
+        doc.layers.add(band.label, color=LEVEL_COLOR.get(band.id, 7))
     for n in ("爆区方格网", "钻孔", "点", BLANK_LAYER, COMPOSITE_LAYER):
         if n not in doc.layers:
             doc.layers.add(n, color=7)
@@ -522,8 +514,7 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
     cn.dxf.bigfont = ""
     msp = doc.modelspace()
 
-    layer_of = {"L1": "0.500-1.000", "L2": "1.000-1.500",
-                "L3": "1.500-3.000", "L4": "3.000-999.000"}
+    layer_of = {b.id: b.label for b in grades.bands()}
     # 0) 综合图历史矿块（细线参照）+ 当日矿块与综合图合并后的轮廓
     merged_outlines = []
     # 用户 2026-10-15：**最终成果图里不要画综合图的边界**（那 85 条灰线参照），
@@ -560,7 +551,7 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
         for p in polys:
             msp.add_lwpolyline([(x, y) for x, y in p.exterior.coords], close=True,
                                dxfattribs={"layer": layer_of[b.level_id],
-                                           "color": LEVEL_COLOR[b.level_id],
+                                           "color": LEVEL_COLOR.get(b.level_id, 7),
                                            "lineweight": 30})
 
     # 0b) 空白区（孤立有品位孔，缺工程待取样）
@@ -580,7 +571,7 @@ def write_dxf(blocks, holes_all, cells, meta, path: Path,
     for b in blocks:
         if b.polygon is None:
             continue
-        color = LEVEL_COLOR[b.level_id]
+        color = LEVEL_COLOR.get(b.level_id, 7)
         for cellp in grid_cells(b.polygon, 1.0, grid_origin):
             msp.add_lwpolyline([(x, y) for x, y in cellp.exterior.coords], close=True,
                                dxfattribs={"layer": "爆区方格网", "color": color})

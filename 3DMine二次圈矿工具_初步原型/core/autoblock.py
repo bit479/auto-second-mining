@@ -19,6 +19,7 @@ from shapely.geometry import MultiPoint, Point, Polygon, box
 from shapely.ops import unary_union
 from scipy.spatial import Voronoi
 
+import grades
 from oreblocks import Block, Cell, level_of
 
 # 外推距离(m)：人工圈矿按"1/2 工程距离"外推；各平台统一按 3.0 起，可按矿区标定。
@@ -52,10 +53,9 @@ def _bounded_voronoi(holes, margin: float = HULL_MARGIN):
 
 def _group_by_level(holes, cells):
     """同档且（单元相接 或 孔距很近）的孔并成候选矿块。"""
-    ore = [h for h in holes if h.grade >= 0.5]
+    ore = [h for h in holes if h.grade >= grades.cutoff()]
     out = []
-    for lid, _, _, _ in (("L4", 3.0, 9e9, ""), ("L3", 1.5, 3.0, ""),
-                         ("L2", 1.0, 1.5, ""), ("L1", 0.5, 1.0, "")):
+    for lid in grades.ids_desc():
         todo = [h for h in ore if level_of(h.grade)[0] == lid]
         used = [False] * len(todo)
         for i in range(len(todo)):

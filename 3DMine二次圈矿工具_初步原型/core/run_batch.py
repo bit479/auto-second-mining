@@ -27,13 +27,15 @@ matplotlib.rcParams["axes.unicode_minus"] = False
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import grades                                               # noqa: E402
 from oreblocks import load_holes_xls                        # noqa: E402
 from pipeline import run_blast                              # noqa: E402
 from run_strip import DENSITY                               # noqa: E402
 import params as _params                                    # noqa: E402
 
-COLORS = {"L4": "#f4b183", "L3": "#ffd966", "L2": "#b4a7d6", "L1": "#a9d6d0"}
-LV_TXT = {"L4": "≥3", "L3": "1.5-3", "L2": "1-1.5", "L1": "0.5-1"}
+# 颜色/图例按"当前矿段"的档位现取（见 core/grades.py），不再写死四档
+COLORS = {b.id: b.color for b in grades.bands()}
+LV_TXT = {b.id: b.short for b in grades.bands()}
 
 
 def parse_folder(name: str):
@@ -140,7 +142,7 @@ def write_summary_png(out: Path, results) -> None:
     fig, ax = plt.subplots(figsize=(1.6 * len(results) + 4, 6), dpi=110)
     x = list(range(len(results)))
     bottom = [0.0] * len(results)
-    for one in ("L4", "L3", "L2", "L1"):
+    for one in grades.ids_desc():
         vals = [sum(b.volume_m3 for b in r["blocks"] if b.level_id == one)
                 for r in results]
         ax.bar(x, vals, bottom=bottom, color=COLORS[one], label=LV_TXT[one])
@@ -183,7 +185,7 @@ def write_overview_png(out: Path, results) -> None:
                     ha="center", va="center", fontsize=6, zorder=9)
         for h in r["holes"]:
             ax.plot([h.x], [h.y], marker="+", ms=4, mew=1.0,
-                    color="#0b4f4f" if h.grade >= 0.5 else "#b0b0b0", zorder=7)
+                    color="#0b4f4f" if h.grade >= grades.cutoff() else "#b0b0b0", zorder=7)
         ax.set_title("%s  %d 块 / %.0f m³"
                      % (r["date"], len(r["blocks"]),
                         sum(b.volume_m3 for b in r["blocks"])), fontsize=10)
@@ -216,7 +218,16 @@ def main() -> None:
         print("综合图历史矿块 %d 个" % len(comp))
 
     results = []
+    section = None
+    if "--grades" in sys.argv:
+        i = sys.argv.index("--grades")
+        if i + 1 < len(sys.argv):
+            section = sys.argv[i + 1].strip()
     for f in sorted(d for d in parent.iterdir() if d.is_dir()):
+        # 每个单日目录各按自己的路径认一次矿段：同一批量目录一般是同一矿段，
+        # 但两个矿段混着放时也不会串档
+        prof, why = grades.use_for([f, parent], explicit=section)
+        print("[分级] %s —— %s（%s）" % (prof.name, " / ".join(prof.labels), why))
         r = run_day(f, comp)
         if r is None:
             continue
@@ -242,9 +253,12 @@ def main() -> None:
             day_out = r["folder"] / ("二次圈矿成果_%s_%s"
                                      % (r["platform"] or "?", r["date"]))
             print("== %s 出三件套 -> %s" % (r["date"], day_out))
-            subprocess.run([py, "-X", "utf8", str(core / "run_strip.py"),
-                            str(r["xls"]), r["platform"], r["date"], str(day_out),
-                            str(comp_dwg)], check=False)
+            cmd = [py, "-X", "utf8", str(core / "run_strip.py"),
+                   str(r["xls"]), r["platform"], r["date"], str(day_out),
+                   str(comp_dwg)]
+            if section:                      # 显式指定过矿段就一路传下去
+                cmd += ["--grades", section]
+            subprocess.run(cmd, check=False)
 
 
 if __name__ == "__main__":

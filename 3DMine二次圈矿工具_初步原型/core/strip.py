@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 
+import grades
 import numpy as np
 from shapely.geometry import Polygon
 from shapely.geometry import LineString, MultiPoint, Point
@@ -420,7 +421,7 @@ def class_clusters(ore, all_holes=None, min_fragment: float = 0.0,
     box = MultiPoint([(h.x, h.y) for h in ore]).convex_hull.buffer(60.0)
     cells = _cells_within(all_holes or ore, box)
     groups = []
-    for lid in ("L4", "L3", "L2", "L1"):
+    for lid in grades.ids_desc():
         sub = [h for h in ore if level_of(h.grade)[0] == lid and h.hid in cells]
         for grp in _components_of(cells, sub):
             groups.append(list(grp))
@@ -510,7 +511,7 @@ def block_of_cluster(grp, ring, all_holes, density_waste: float = 2.65,
     b.area_m2 = sum(c.area_m2 for c in cs)
     b.volume_m3 = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
     b.tonnage_t = sum(c.area_m2 * c.hole.grade_lenght *
-                      (density_waste if c.hole.grade < 0.5 else density_ore) for c in cs)
+                      (density_waste if c.hole.grade < grades.cutoff() else density_ore) for c in cs)
     b.grade = grade
     b.metal_hg = b.tonnage_t * grade / 100.0
     # 簇模式：一个簇 = 一块。出图轮廓用**各孔 Voronoi 单元并集**（与体积同口径），
@@ -745,7 +746,7 @@ def _alpha_ring(ore, all_holes, extrude: float, comp_blocks, merge_gap: float,
     poly = sh.buffer(extrude, join_style="mitre").buffer(0)
     c, u, v = _pca(xy)
     s_all = (xy - c) @ u
-    waste = [h for h in all_holes if h.grade < 0.5]
+    waste = [h for h in all_holes if h.grade < grades.cutoff()]
     span = float(s_all.max() - s_all.min())
     band = max(12.0, 0.35 * span)
 
@@ -822,7 +823,7 @@ def zone_outline(ore, all_holes, extrude: float = EXTRUDE_M,
             manual_right=chain_right or (),
             exclude=(None if chain_exclude is None else tuple(chain_exclude)))
     xy = np.array([(h.x, h.y) for h in ore], float)
-    waste = [h for h in all_holes if h.grade < 0.5]
+    waste = [h for h in all_holes if h.grade < grades.cutoff()]
     csm = float(chain_smooth_m or 0.0)
     west = _offset_chain(_smooth_chain([xy[j] for j in left], csm), c, extrude,
                          outward=-v)
@@ -1185,18 +1186,18 @@ def blocks_from_outline_files(paths, all_holes, density_waste: float = 2.65,
         if lid is None:
             # 平均品位 <0.5 的整块（人工圈进来的废石区）：列成 0.5-1 以下的一块，
             # 让报告里也能看到它，而不是悄悄丢掉。
-            lid, label = "L0", "<0.500"
+            lid, label = grades.WASTE_ID, grades.waste_label()
         b = Block(level_id=lid, label=label, holes=list(hs_in), cells=cs)
         b.area_m2 = sum(c.area_m2 for c in cs)
         b.volume_m3 = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
         b.tonnage_t = sum(c.area_m2 * c.hole.grade_lenght *
-                          (density_waste if c.hole.grade < 0.5 else density_ore)
+                          (density_waste if c.hole.grade < grades.cutoff() else density_ore)
                           for c in cs)
         b.grade = grade
         b.metal_hg = b.tonnage_t * grade / 100.0
         b.polygon = poly                        # 出图用人工画的那条线
         out_blocks.append(b)
-    order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3, "L0": 4}
+    order = grades.order_map(with_waste=True)
     out_blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(out_blocks, 1):
         b.no = i
@@ -1270,7 +1271,7 @@ def average_blocks(ore, outline, density: float,
     if not hs:
         return []
     groups = []
-    for lid in ("L4", "L3", "L2", "L1"):
+    for lid in grades.ids_desc():
         sub = [h for h in hs if level_of(h.grade)[0] == lid]
         for grp in _components_of(cells, sub):
             groups.append({"holes": list(grp)})
@@ -1390,7 +1391,7 @@ def average_blocks(ore, outline, density: float,
             # 含废孔：体积/重量/品位按"所有孔"重算
             vol = sum(c.area_m2 * c.hole.grade_lenght for c in cs)
             ton = sum(c.area_m2 * c.hole.grade_lenght *
-                      (density_waste if c.hole.grade < 0.5 else density_ore)
+                      (density_waste if c.hole.grade < grades.cutoff() else density_ore)
                       for c in cs)
             lsum = sum(h.grade_lenght for h in pts)
             grade = (sum(h.grade_lenght * h.grade_disp for h in pts) / lsum
@@ -1404,7 +1405,7 @@ def average_blocks(ore, outline, density: float,
         b.polygon = simplify_block_outline(b.polygon, pts, block_simplify)
         b.polygon = smooth_block_outline(b.polygon, pts, block_smooth, 0.5)
         out.append(b)
-    order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
+    order = grades.order_map()
     out.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(out, 1):
         b.no = i
@@ -1461,10 +1462,7 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "rules",
             best = min(ore, key=lambda h: (h.x - rp.x) ** 2 + (h.y - rp.y) ** 2)
             buckets.setdefault(level_of(best.grade)[0], []).append(p)
         blocks = []
-        for lid, lo, hi, label in (("L4", 3.0, 9e9, "3.000-999.000"),
-                                   ("L3", 1.5, 3.0, "1.500-3.000"),
-                                   ("L2", 1.0, 1.5, "1.000-1.500"),
-                                   ("L1", 0.5, 1.0, "0.500-1.000")):
+        for lid, lo, hi, label in grades.levels_desc():
             plist = buckets.get(lid, [])
             if not plist:
                 continue
@@ -1592,10 +1590,7 @@ def degree_blocks(ore, outline, density: float, split_mode: str = "rules",
 
     cells_all = _voronoi_cells(ore, outline)
     blocks = []
-    for lid, lo, hi, label in (("L4", 3.0, 9e9, "3.000-999.000"),
-                               ("L3", 1.5, 3.0, "1.500-3.000"),
-                               ("L2", 1.0, 1.5, "1.000-1.500"),
-                               ("L1", 0.5, 1.0, "0.500-1.000")):
+    for lid, lo, hi, label in grades.levels_desc():
         region = None
         if split_mode == "midline":
             for p in buckets.get(lid, []):

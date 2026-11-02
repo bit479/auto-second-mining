@@ -187,6 +187,18 @@ if comp_test.exists():
     emit(out.splitlines()[-1] if out else "(没有输出)")
     results.append(("⑧ 综合图参考（直接相接）", p.returncode == 0, p.returncode))
 
+# ⑨ 品位分级按矿段（金斗山 / 中心矿段）：档位、识别、真跑一圈
+grade_test = PROBE / "test_grades.py"
+if grade_test.exists():
+    p = subprocess.run([sys.executable, "-X", "utf8", str(grade_test)] + (["--quick"] if QUICK else []),
+                       capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    out = ((p.stdout or "") + (p.stderr or "")).rstrip()
+    emit("")
+    emit("== ⑨ 品位分级按矿段自检（金斗山 4 档 / 中心矿段 3 档）")
+    emit(out.splitlines()[-1] if out else "(没有输出)")
+    results.append(("⑨ 品位分级按矿段", p.returncode == 0, p.returncode))
+
 emit("")
 emit("=" * 78)
 emit("== 汇总")

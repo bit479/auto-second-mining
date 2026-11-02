@@ -43,12 +43,21 @@ PROBE = ROOT / "_probe"
 PARAMS_REPORT = PROBE / "params_report.py"
 ACCEPT_ALL = PROBE / "accept_all.py"
 ACCEPT_REPORT = ROOT / "验收报告.md"
-VERSION = "v1.13"           # 界面上会显示——以后一眼就能看出跑的是哪版代码
+VERSION = "v1.14"           # 界面上会显示——以后一眼就能看出跑的是哪版代码
 EXCEL_TOOLS = ROOT / "excel_tools"          # 整合进来的"炮孔数据工具"（报告汇总 + 单日并入总表）
 EXCEL_MAIN = EXCEL_TOOLS / "main.py"
 PY = sys.executable
 PYW = str(Path(PY).with_name("pythonw.exe")) if Path(PY).with_name("pythonw.exe").exists() else PY
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+# 品位分级（按矿段）：界面上的下拉选项来自同一份配置（core/grades.py）
+if str(CORE) not in sys.path:
+    sys.path.insert(0, str(CORE))
+try:
+    import grades                     # noqa: E402
+except Exception as _exc:             # 配置/依赖出问题时不影响主流程，只是没有下拉项
+    grades = None
+    print("[提示] 品位分级模块没加载起来：%s" % _exc)
 
 
 def parse_platform_date(fname: str):
@@ -142,10 +151,23 @@ class App:
 
         row3 = tk.Frame(frm)
         row3.pack(fill="x", pady=(6, 0))
-        tk.Label(row3, text="输出目录：", width=18, anchor="w").pack(side="left")
+        tk.Label(row3, text="矿段（品位分级）：", width=18, anchor="w").pack(side="left")
+        # auto = 按数据库/综合图/输出目录的路径认矿段（带"中心矿段"/"zx-" 就是中心矿段）
+        self.section_map = {"自动（按路径认）": "auto"}
+        for _key, _name in (grades.choices() if grades else []):
+            self.section_map[_name] = _key
+        self.var_section = tk.StringVar(value="自动（按路径认）")
+        tk.OptionMenu(row3, self.var_section, *self.section_map).pack(side="left")
+        tk.Label(row3, text="  金斗山 4 档 / 中心矿段 3 档（分界值见 "
+                            "excel_tools\\config\\grade_profiles.json）",
+                 fg="#666").pack(side="left")
+
+        row4 = tk.Frame(frm)
+        row4.pack(fill="x", pady=(6, 0))
+        tk.Label(row4, text="输出目录：", width=18, anchor="w").pack(side="left")
         self.var_out = tk.StringVar()
-        tk.Entry(row3, textvariable=self.var_out).pack(side="left", fill="x", expand=True)
-        tk.Button(row3, text="浏览...", command=self.browse_out).pack(side="left", padx=4)
+        tk.Entry(row4, textvariable=self.var_out).pack(side="left", fill="x", expand=True)
+        tk.Button(row4, text="浏览...", command=self.browse_out).pack(side="left", padx=4)
 
         # ---- 参数区（按平台可覆盖，存 圈矿参数.json）----
         pf = tk.LabelFrame(root, text="参数（留空=用默认；改完点“存为该平台默认”或“存为该炮区”）",
@@ -735,7 +757,8 @@ class App:
         def job():
             ok = True
             try:
-                p = subprocess.Popen([PY, "-X", "utf8", str(MERGE_COMP), comp, tds],
+                p = subprocess.Popen([PY, "-X", "utf8", str(MERGE_COMP), comp, tds]
+                                     + self._grades_args(),
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                      text=True, encoding="utf-8", errors="replace",
                                      creationflags=CREATE_NO_WINDOW)
@@ -781,7 +804,8 @@ class App:
             ok = True
             self.log_line("== 批量圈矿 ==")
             try:
-                p = subprocess.Popen([PY, "-X", "utf8", str(RUN_BATCH), parent, comp, out],
+                p = subprocess.Popen([PY, "-X", "utf8", str(RUN_BATCH), parent, comp, out]
+                                     + self._grades_args(),
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                      text=True, encoding="utf-8", errors="replace",
                                      creationflags=CREATE_NO_WINDOW)
@@ -804,6 +828,14 @@ class App:
             self.set_busy(False)
 
         threading.Thread(target=job, daemon=True).start()
+
+    def _grades_args(self):
+        """界面上选了矿段就传给子进程；选"自动"就不传，让子进程按路径认。"""
+        try:
+            key = self.section_map.get(self.var_section.get(), "auto")
+        except Exception:
+            key = "auto"
+        return ["--grades", key] if key and key != "auto" else []
 
     def start(self):
         if self.busy:
@@ -849,6 +881,7 @@ class App:
         self.log_line("炮孔数据库：%s" % xls)
         self.log_line("综合图    ：%s" % comp)
         self.log_line("平台=%s  日期=%s" % (platform, date))
+        self.log_line("矿段      ：%s" % self.var_section.get())
         self.log_line("输出目录  ：%s" % out)
         self.log_line("-" * 68)
         threading.Thread(target=self.run_pipeline,
@@ -860,6 +893,9 @@ class App:
         ok_all = True
         # 人工画线：② 人工圈矿 → --manual-blocks（每条线一块）；③ 精确模式 → --outline（整条当矿界）
         extra = []
+        _section = self.section_map.get(self.var_section.get(), "auto")
+        if _section and _section != "auto":
+            extra += ["--grades", _section]      # 显式指定矿段：一路传到 run_strip
         if outlines and mode in ("manual", "exact"):
             extra += (["--manual-blocks", ";".join(outlines)] if mode == "manual"
                       else ["--outline", ";".join(outlines)])
@@ -910,7 +946,8 @@ class App:
             if not _acad_running():
                 self.log_line("（AutoCAD 没在运行，正在拉起它——首次启动约 30~60 秒，请稍等）")
             if run("第 3 步 并入综合图副本（原件不动）",
-                   [PY, "-X", "utf8", str(MERGE_COMP), comp, str(tds), "--start"]):
+                   [PY, "-X", "utf8", str(MERGE_COMP), comp, str(tds), "--start"]
+                   + self._grades_args()):
                 for line in str(self.log.get("1.0", "end")).splitlines():
                     if "_并入" in line and ".dwg" in line:
                         merged = line.strip().split("->")[-1].strip()

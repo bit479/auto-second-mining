@@ -24,20 +24,17 @@ from pathlib import Path
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
+import grades
+
 # ---- 品位档（左闭右开）----
-LEVELS = [
-    ("L4", 3.0, float("inf"), "3.000-999.000"),
-    ("L3", 1.5, 3.0, "1.500-3.000"),
-    ("L2", 1.0, 1.5, "1.000-1.500"),
-    ("L1", 0.5, 1.0, "0.500-1.000"),
-]
+# 档位按矿段取（金斗山 0.5-1 / 1-1.5 / 1.5-3 / ≥3，中心矿段 0.5-0.8 / 0.8-1 / ≥1），
+# 配置在 excel_tools/config/grade_profiles.json，逻辑见 core/grades.py。
+# 原来那个 import 时就固定的 LEVELS 常量已取消 —— 换矿段它不会跟着变，正是出错的原因。
 
 
 def level_of(grade: float):
-    for lid, lo, hi, label in LEVELS:
-        if lo <= grade < hi:
-            return lid, label
-    return None, None            # <0.5 废孔
+    """品位 → ``(档位 id, 档位名)``；低于工业品位下限返回 ``(None, None)``（废孔）。"""
+    return grades.level_of(grade)
 
 
 @dataclass
@@ -258,14 +255,14 @@ def attach_cells(holes, faces):
 
 def build_blocks(cells, min_area_m2: float = 0.0):
     """同档且相接的单元并成矿块；体号按 高档在前 全局连续。"""
-    ore = [c for c in cells if c.hole.grade >= 0.5]
+    ore = [c for c in cells if c.hole.grade >= grades.cutoff()]
     by_level = {}
     for c in ore:
         lid, _ = level_of(c.hole.grade)
         by_level.setdefault(lid, []).append(c)
 
     blocks = []
-    for lid, _, _, _ in LEVELS:
+    for lid in grades.ids_desc():
         todo = list(by_level.get(lid, []))
         used = [False] * len(todo)
         for i in range(len(todo)):

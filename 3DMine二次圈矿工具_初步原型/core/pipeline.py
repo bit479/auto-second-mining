@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 
+import grades
 from oreblocks import load_holes_xls
 from strip import (LAST_RING, average_blocks, block_of_cluster,
                    blocks_from_outline_files, class_clusters, connect_ring_parts,
@@ -23,7 +24,7 @@ from strip import (LAST_RING, average_blocks, block_of_cluster,
 
 def pick_zone(holes, gap: float = 1.0, adjacent_max: float = 15.0):
     """返回 (主矿化带矿孔, 待定孤立孔组)。同孔位先去重，再按邻接距离分组。"""
-    ore = [h for h in holes.values() if h.grade >= 0.5]
+    ore = [h for h in holes.values() if h.grade >= grades.cutoff()]
     kept = []
     for h in ore:
         if any(abs(h.x - k.x) < gap and abs(h.y - k.y) < gap for k in kept):
@@ -118,7 +119,7 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                       block_smooth=P.get("block_smooth_m", 0.3))
                 if b1 is not None:
                     blocks.append(b1)
-        order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
+        order = grades.order_map()
         blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
         for i, b in enumerate(blocks, 1):
             b.no = i
@@ -160,7 +161,7 @@ def run_blast(holes, allh, P: dict, comp_blocks=None, blast: str = ""):
                                  density_ore=P.get("density_ore", 2.7),
                                  block_simplify=P.get("block_simplify_m", 0.3),
                                  block_smooth=P.get("block_smooth_m", 0.3))
-    order = {"L4": 0, "L3": 1, "L2": 2, "L1": 3}
+    order = grades.order_map()
     blocks.sort(key=lambda b: (order.get(b.level_id, 9), -b.volume_m3))
     for i, b in enumerate(blocks, 1):
         b.no = i

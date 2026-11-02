@@ -25,6 +25,7 @@ from deliver import (write_3ds, write_dxf, write_report_png,   # noqa: E402
 from bak_housekeeping import collect_bak_files                 # noqa: E402
 from oreblocks import load_holes_xls                           # noqa: E402
 from pipeline import pick_zone, run_blast                      # noqa: E402
+import grades                                                  # noqa: E402
 import params as _params                                       # noqa: E402
 
 DENSITY = 2.7
@@ -48,7 +49,8 @@ def main() -> None:
     t0 = time.time()
     if len(sys.argv) < 2:
         print("用法: python run_strip.py <炮孔数据库.xls> [平台] [日期] "
-              "[输出目录] [综合图.dwg] [--manual-blocks a.3ds;b.3ds] [--outline a.3ds]")
+              "[输出目录] [综合图.dwg] [--manual-blocks a.3ds;b.3ds] [--outline a.3ds] "
+              "[--grades auto|jindoushan|center]")
         sys.exit(2)
     xls = Path(sys.argv[1])
     if not xls.exists():
@@ -106,6 +108,15 @@ def main() -> None:
 
     meta = {"platform": plat or "?", "date": date or "?", "density": DENSITY}
     P = _params.for_blast(date, platform=plat)
+    # 品位分级（矿段）：命令行 --grades > 圈矿参数.json 的 mine_section > 按路径认矿段
+    _want = None
+    if "--grades" in sys.argv:
+        _i = sys.argv.index("--grades")
+        if _i + 1 < len(sys.argv):
+            _want = sys.argv[_i + 1].strip()
+    _prof, _why = grades.use_for([xls, comp_dwg, out_dir, xls.parent],
+                                 explicit=_want or str(P.get("mine_section") or "auto"))
+    note("[分级] %s —— %s（%s）" % (_prof.name, " / ".join(_prof.labels), _why))
     if manual_blocks:
         P["manual_blocks"] = list(manual_blocks)
     if outline:

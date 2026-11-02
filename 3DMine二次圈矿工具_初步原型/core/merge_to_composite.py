@@ -20,12 +20,14 @@ import time
 from pathlib import Path
 
 try:
+    import grades
     from bak_housekeeping import collect_bak_files
 except ImportError:                       # 作为 core 包导入时
+    from . import grades                  # noqa: F401
     from .bak_housekeeping import collect_bak_files
 
-LAYER_COLOR = {"0.500-1.000": 4, "1.000-1.500": 5,
-               "1.500-3.000": 1, "3.000-999.000": 2}
+# 层名 → 色号，按当前矿段的档位现取（见 core/grades.py）
+LAYER_COLOR = {b.label: b.aci for b in grades.bands()}
 
 
 def read_3ds_blocks(path: Path):
@@ -184,8 +186,7 @@ def preview(comp_dwg: Path, blocks, out_png: Path, cache_json: Path = None):
                 n_draw += 1
         except Exception:
             pass
-    colors = {"0.500-1.000": "#a9d6d0", "1.000-1.500": "#b4a7d6",
-              "1.500-3.000": "#ffd966", "3.000-999.000": "#f4b183"}
+    colors = {b.label: b.color for b in grades.bands()}
     for label, pts in blocks:
         ax.fill([p[0] for p in pts], [p[1] for p in pts],
                 color=colors.get(label, "#cccccc"), alpha=0.75, zorder=3)
@@ -206,6 +207,13 @@ def main() -> None:
     if len(sys.argv) < 3:
         print(__doc__)
         return
+    section = None
+    if "--grades" in sys.argv:
+        i = sys.argv.index("--grades")
+        if i + 1 < len(sys.argv):
+            section = sys.argv[i + 1].strip()
+    prof, why = grades.use_for([sys.argv[1], sys.argv[2]], explicit=section)
+    print("[分级] %s —— %s（%s）" % (prof.name, " / ".join(prof.labels), why))
     out = None
     for a in sys.argv[3:]:
         if not a.startswith("--"):

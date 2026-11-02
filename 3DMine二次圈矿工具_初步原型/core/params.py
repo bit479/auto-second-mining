@@ -15,6 +15,10 @@ ROOT = Path(__file__).resolve().parent.parent
 PATH = ROOT / "圈矿参数.json"
 
 DEFAULTS = {
+    # 品位分级（矿段）：auto = 按数据库/综合图/输出目录的路径认（带"中心矿段"或"zx-" 就是中心矿段）；
+    # 也可写死成 jindoushan / center，或按平台、炮区单独覆盖。分界值在
+    # excel_tools/config/grade_profiles.json，逻辑见 core/grades.py。
+    "mine_section": "auto",
     "extrude_m": 3.0,          # 外围矿界向外推的距离(m)
     "zone_link_m": 15.0,       # 孤立孔连接半径(m)：≤这个距离才算同一条矿化带
     "min_fragment_m2": 40.0,   # 最小块段(m²)：比它小的同档碎片并入邻块
