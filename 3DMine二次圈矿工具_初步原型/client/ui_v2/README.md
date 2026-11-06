@@ -8,16 +8,23 @@
 ```
 ui_v2/
 ├── app.py               入口：开界面；单文件 exe 里还负责 --run-script 派发
-├── main_window.py       主窗口：侧栏导航(10 页) + 顶栏状态 + QStackedWidget
-├── theme.py             配色与 QSS（浅色 + 深色侧栏；品位颜色不在这里定义）
-├── icons.py             内联 SVG 线性图标（QSvgRenderer 渲染，无外部图片依赖）
-├── components/widgets.py  卡片 Card / 状态徽章 Badge / 日志台 LogView / 文件行 FileRow /
-│                          统计块 StatTile / 参数格 ParamGrid / 提示条 Banner / 表格工厂
+├── main_window.py       主窗口：无边框沉浸式外壳 + 侧栏导航(10 页) + QStackedWidget
+│                        Win32 原生 hit-test（拖动/双击最大化/Win11 贴靠/边缘缩放/工作区最大化）
+├── theme.py             设计令牌 + 全局 QSS（深蓝外框 + 浅色工作面；品位颜色不在这里定义）
+├── icons.py             内联 SVG 线性图标（24×24 / 1.75 描边 / 多档 DPR 位图，无外部资源）
+├── components/
+│   ├── shell.py         标题栏 TitleBar / 窗口按钮 WindowButton / 导航 NavItem / 侧栏 Sidebar
+│   ├── drop_overlay.py  全局拖放提示层（拖入态 / 解析中 / 结果小卡片）
+│   └── widgets.py       卡片 Card / 表格卡 TableCard / 快捷卡 QuickCard / 空状态 EmptyState /
+│                        统计块 StatTile / 徽章 Badge / 自绘 Combo 与 CheckRow /
+│                        日志台 LogView / 文件行 FileRow / 参数格 ParamGrid / 提示条 Banner
 ├── services/
 │   ├── paths.py         路径与运行环境（源码 / 单文件 exe 双模式；SM_HOME 可写根）
 │   ├── runner.py        后台任务（QProcess）：实时日志、状态、取消、防重复
 │   ├── config.py        品位分级(profiles)/圈矿参数(三层+来源)/最近记录(StateStore)
 │   ├── files.py         平台日期识别、综合图匹配、.3ds 行数、批量目录扫描
+│   ├── txt_import.py    坐标 TXT 解析引擎（编码/分隔符/表头/元数据/异常统计/规范化副本）
+│   ├── drop_manager.py  全局 TXT 拖放（应用级事件过滤 + 后台线程解析 + 去重排队 + 取消）
 │   └── context.py       跨页面上下文（当前数据库/平台/日期/矿段/模式）
 └── pages/               10 个业务页面（见下）
 ```
@@ -39,6 +46,18 @@ ui_v2/
 
 **没有假按钮**：每个按钮要么改界面状态（模式、勾选、选择文件），要么起一个真实子进程/线程；
 逐条对应关系见项目根的 `UI功能接入清单.md`。
+
+## 全局 TXT 拖放导入（v1.17）
+
+* 坐标 TXT 拖到**任意页面**即可：主窗口 `acceptDrops` 注册 OLE 放置目标，
+  `GlobalFileDropManager` 作为 `QApplication` 事件过滤器接住 `DragEnter/Drop`；
+* 只拦截单个 `.txt/.dat`，其它类型放行给页面原有的 `FileRow`；
+* 解析在 `QThreadPool` 里跑，`Esc` 可取消；解析成功写入 `AppContext.txt_import` 并跳到
+  「炮孔数据库生成」页自动填参数、列炮孔、给出门禁；
+* 解析规则：编码 UTF-8(BOM)/GBK，分隔符 制表符/逗号/分号/空格，带表头或不带表头，
+  元数据优先级「文件内标注/炮孔编号 → 文件名 → 保留页面值」，绝不从 Z 推断平台、绝不填当天日期；
+* 核心脚本只认「UTF-8 + 逗号 + 5 列」，不兼容的文件会生成规范化副本到 `%TEMP%\sm_txt_import`，
+  原文件不动。详见 `docs/功能说明_TXT拖放导入_v1.17.md`。
 
 ## 后台任务与日志
 
@@ -72,16 +91,25 @@ ui_v2/
 底层是 `_probe/build_exe.py`：先做一份干净的数据树（排除 `__pycache__`/`_out`/`归档`/`bak`），
 再用 PyInstaller 收集 `core/`、`excel_tools/`、`_probe/`、`sample_data/`、`assets/`、`圈矿参数.json`。
 
-## 视觉规范对照
+## 视觉规范（v1.16）
+
+完整规范见 `docs/UI设计规范_v1.16.md`，令牌全部在 `theme.py`。
 
 | 项 | 取值 |
 |---|---|
-| 主背景 / 卡片 | `#F4F6F8` / `#FFFFFF` |
-| 侧栏 | `#14263D`（选中 `#25456A` + 左侧 3px `#2878A5`） |
-| 主按钮 / 强调 | `#2878A5` / `#B87945` |
-| 正文 / 辅助 | `#263445` / `#7B8794` |
-| 成功 / 警告 / 错误 | `#26966D` / `#D69A35` / `#D65353` |
-| 圆角 | 卡片 10px、控件 6~8px；边框 1px `#E3E8EE`，不用阴影堆叠 |
-| 字号 | 正文 13px，页标题 16px，卡片标题 14px，辅助 11~12px |
-| 图标 | 24×24 viewBox 线性 SVG，1.6 描边，按主题色渲染 |
-| 品位颜色 | 取自 `grade_profiles.json` 经 `core/grades.py` 给的色号（青/蓝/红/黄），与成果图一致 |
+| 外框（标题栏/侧栏） | `#0E1B2A`（hover `#16283C`，选中 `#1B3350`，分隔线 `#1E3349`） |
+| 工作面 / 卡片 | `#F1F4F8` / `#FFFFFF`（边框 `#E3E9F0`） |
+| 主按钮 / 强调 | `#2A6F97` / `#B0774A`（铜褐仅用于品位类强调） |
+| 正文 / 次级 / 说明 | `#1B2735` / `#455667` / `#6F7F90` |
+| 成功 / 警告 / 错误 | `#1F8A5F` / `#C08319` / `#C0453C` |
+| 尺寸 | 标题栏 56px、侧栏 236px、导航项 38px、控件 34px、表格行 34px、间距 14px |
+| 圆角 | 卡片 10px、控件 6px、胶囊 999px；只用 1px 边框，不用阴影 |
+| 字号 | 数值 24、页标题 18、区块 15、卡片标题 14、正文 13、说明 12、徽章 11 |
+| 图标 | 24×24 viewBox 线性 SVG，1.75 描边；导航 20px、按钮 16px、功能卡 22px |
+| 品位颜色 | 取自 `grade_profiles.json` 经 `core/grades.py` 给的色号，与成果图一致 |
+
+### 图标渲染的历史坑（v1.16 已修）
+
+旧 `icons._render()` 先 `setDevicePixelRatio(dpr)` 再按 `size*dpr` 绘制，等于把图放大 `dpr` 倍后
+塞进同一张画布，只画进左上角 1/dpr² 区域 —— 表现就是「图标只剩左上角一小段」。现在改为
+**先按设备像素铺满绘制，再设 DPR**，并为 1/1.25/1.5/1.75/2/2.5/3 六档各缓存一张位图供 QIcon 精确匹配。

@@ -7,8 +7,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QMessageBox,
-    QPushButton, QTabWidget, QVBoxLayout, QWidget,
+    QFileDialog, QHBoxLayout, QLabel, QListWidget, QMessageBox, QPushButton,
+    QTabWidget, QVBoxLayout, QWidget,
 )
 
 from ..components import widgets as W
@@ -61,10 +61,10 @@ class ReportTab(QWidget):
         self.listw = QListWidget()
         self.listw.setMinimumHeight(150)
         self.listw.setAlternatingRowColors(True)
-        self.listw.setStyleSheet(
-            "QListWidget{background:#FFFFFF;border:1px solid %s;border-radius:8px;}"
-            "QListWidget::item{padding:5px 8px;}" % "#E3E8EE")
         card.add(self.listw)
+        self.lb_empty = QLabel("还没有添加报告 · 用「添加文件 / 添加目录」导入 3DMine 报告后开始汇总")
+        self.lb_empty.setObjectName("muted")
+        card.add(self.lb_empty)
         bar = QHBoxLayout()
         bar.setSpacing(6)
         bar.addWidget(W.icon_button("plus", "添加文件", on_click=self.add_files))
@@ -83,14 +83,13 @@ class ReportTab(QWidget):
         grid = QHBoxLayout()
         grid.setSpacing(12)
         grid.addWidget(_lab("汇总方式"))
-        self.cb_mode = QComboBox()
-        self.cb_mode.addItem("按每个文件的「总计」行汇总（新口径）", "total")
-        self.cb_mode.addItem("按明细行汇总（旧口径）", "detail")
+        self.cb_mode = W.combo([("total", "按每个文件的「总计」行汇总（新口径）"),
+                                ("detail", "按明细行汇总（旧口径）")])
+        self.cb_mode.setMinimumWidth(280)
         grid.addWidget(self.cb_mode)
         grid.addWidget(_lab("品位分级"))
-        self.cb_grade = QComboBox()
-        for key, name in config.grade_choices():
-            self.cb_grade.addItem(name, key)
+        self.cb_grade = W.combo(config.grade_choices())
+        self.cb_grade.setMinimumWidth(200)
         grid.addWidget(self.cb_grade)
         grid.addStretch(1)
         opt.add(grid)
@@ -114,9 +113,7 @@ class ReportTab(QWidget):
 
         run = QHBoxLayout()
         run.setSpacing(8)
-        b = W.icon_button("play", "开始汇总", kind="primary", on_click=self.run)
-        b.setMinimumHeight(36)
-        run.addWidget(b)
+        run.addWidget(W.icon_button("play", "开始汇总", kind="primary", on_click=self.run))
         run.addStretch(1)
         self.lb_state = QLabel("")
         self.lb_state.setObjectName("muted")
@@ -129,6 +126,7 @@ class ReportTab(QWidget):
     def _refresh(self) -> None:
         n = self.listw.count()
         self.lb_count.setText("%d 个文件" % n)
+        self.lb_empty.setVisible(n == 0)
 
     def add_files(self) -> None:
         fs, _ = QFileDialog.getOpenFileNames(self, "选择 3DMine 报告", "",
@@ -220,10 +218,9 @@ class DailyTab(QWidget):
         run = QHBoxLayout()
         run.setSpacing(8)
         self.btn_dry = W.icon_button("play", "预演（不写盘）", on_click=lambda: self.run(True))
-        self.btn_dry.setMinimumHeight(36)
         run.addWidget(self.btn_dry)
-        self.btn_real = W.icon_button("upload", "正式并入", kind="primary", on_click=lambda: self.run(False))
-        self.btn_real.setMinimumHeight(36)
+        self.btn_real = W.icon_button("upload", "正式并入", kind="primary",
+                                      on_click=lambda: self.run(False))
         run.addWidget(self.btn_real)
         self.btn_restore = W.icon_button("refresh", "还原备份", kind="ghost", on_click=self.restore)
         run.addWidget(self.btn_restore)

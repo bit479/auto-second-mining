@@ -14,6 +14,7 @@ from .runner import runner
 class AppContext(QObject):
     changed = Signal()             # 当前选择变化（顶栏刷新）
     task_added = Signal()          # 有任务开始/结束（工作台刷新）
+    txt_import_changed = Signal()  # 拖入的 TXT 导入任务变化（跨页保留）
 
     def __init__(self) -> None:
         super().__init__()
@@ -27,6 +28,8 @@ class AppContext(QObject):
         self.outlines: list[str] = []
         self.dwg_convert: bool = True
         self.merge_composite: bool = True
+        # 全局 TXT 拖放导入任务（services/txt_import.TxtImportTask），换页面不丢
+        self.txt_import = None
         self.runner = runner()
         self.state = config.STATE
 

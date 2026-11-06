@@ -39,8 +39,9 @@ class ParameterManagerPage(Page):
         self.tree.setHeaderLabels(["层级 / 参数", "值"])
         self.tree.setColumnWidth(0, 210)
         self.tree.setAlternatingRowColors(True)
-        self.tree.setStyleSheet("QTreeWidget{background:#fff;border:1px solid %s;border-radius:8px;}"
-                                "QTreeWidget::item{padding:3px;}" % theme.BORDER)
+        self.tree.setFocusPolicy(Qt.NoFocus)
+        self.tree.setIndentation(14)
+        self.tree.setUniformRowHeights(True)
         self.tree.itemSelectionChanged.connect(self._on_select)
         tc.add(self.tree)
         tbar = QHBoxLayout()
@@ -64,7 +65,7 @@ class ParameterManagerPage(Page):
 
         sc = W.Card("覆盖关系", "每个参数最终由谁决定")
         self.tb = W.make_table(["参数", "全局默认", "平台", "炮区", "生效值", "来源"],
-                               [140, 90, 90, 90, 100, 120], 260)
+                               [186, 84, 74, 74, 92], 300)
         sc.add(self.tb)
         self.lb_plat = QLabel("")
         self.lb_plat.setObjectName("muted")

@@ -61,6 +61,8 @@ HIDDEN = [
     "ui_v2.pages.settings",
     "ui_v2.services", "ui_v2.services.paths", "ui_v2.services.runner",
     "ui_v2.services.config", "ui_v2.services.files", "ui_v2.services.context",
+    "ui_v2.services.txt_import", "ui_v2.services.drop_manager",
+    "ui_v2.components.drop_overlay", "ui_v2.components.shell",
 ]
 
 # PySide6 全家桶很大，只留用得上的
@@ -78,6 +80,47 @@ EXCLUDE_MODULES = [
     "PySide6.QtStateMachine", "PySide6.QtTextToSpeech",
     "PySide6.QtHttpServer", "PySide6.QtGraphs", "PySide6.QtSvgWidgets",
 ]
+
+
+def _project_version() -> tuple[str, str, str]:
+    """从 services/paths.py 读版本号与构建日期，避免两处手写。"""
+    import re
+
+    src = (ROOT / "client" / "ui_v2" / "services" / "paths.py").read_text(encoding="utf-8")
+    ver = re.search(r'APP_VERSION\s*=\s*"v?([0-9.]+)"', src)
+    build = re.search(r'BUILD_STAMP\s*=\s*"BUILD\s*([0-9-]+)"', src)
+    return (ver.group(1) if ver else "0.0", build.group(1) if build else "", src)
+
+
+def write_version_file(work: Path) -> Path | None:
+    """生成 Windows 文件属性里的版本信息（右键→属性→详细信息）。"""
+    tag, build_date, _src = _project_version()
+    parts = [int(x) for x in tag.split(".") if x.isdigit()][:4]
+    while len(parts) < 4:
+        parts.append(0)
+    v = tuple(parts)
+    path = work / "version_info.txt"
+    path.write_text(
+        "VSVersionInfo(\n"
+        "  ffi=FixedFileInfo(filevers=%r, prodvers=%r, mask=0x3f, flags=0x0,\n"
+        "                    OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),\n"
+        "  kids=[\n"
+        "    StringFileInfo([StringTable('080404B0', [\n"
+        "      StringStruct('CompanyName', 'bit479'),\n"
+        "      StringStruct('FileDescription', '二次圈矿智能工作台'),\n"
+        "      StringStruct('FileVersion', '%s'),\n"
+        "      StringStruct('InternalName', 'second-mining-workbench'),\n"
+        "      StringStruct('LegalCopyright', 'Copyright (C) 2026 bit479'),\n"
+        "      StringStruct('OriginalFilename', '二次圈矿智能工作台.exe'),\n"
+        "      StringStruct('ProductName', '二次圈矿智能工作台'),\n"
+        "      StringStruct('ProductVersion', '%s'),\n"
+        "      StringStruct('Comments', 'build %s'),\n"
+        "    ])]),\n"
+        "    VarFileInfo([VarStruct('Translation', [2052, 1200])])\n"
+        "  ]\n"
+        ")\n" % (v, v, tag, tag, build_date or "-"),
+        encoding="utf-8")
+    return path
 
 
 def main() -> int:
@@ -145,6 +188,10 @@ def main() -> int:
            ]
     if ICON.exists():
         cmd += ["--icon", str(ICON)]
+    ver_file = write_version_file(work)
+    if ver_file is not None:
+        cmd += ["--version-file", str(ver_file)]
+        print("  版本资源：%s v%s" % (ver_file.name, _project_version()[0]))
     for src, dst in DATAS:
         if (stage / dst).exists():
             cmd += ["--add-data", "%s%s%s" % ((stage / dst).as_posix(), sep, dst)]

@@ -57,3 +57,17 @@ release_v1/
 **/excel_tools/_out/
 **/.ui_state.json
 **/验收日志.txt
+
+# UI 验收矩阵原始截图（每轮几十张，体积大；正式归档图在 docs/screenshots/<版本>/）
+**/_probe/ui_shots*/
+**/_probe/dev/
+**/_probe/*.log
+
+# 打包中间目录 / TXT 导入的本地缓存
+3DMine二次圈矿工具_初步原型/_build/
+**/.import_cache/
+
+# 早期实验脚本（已被 client/ui_v2 取代，仅留本地）
+3DMine二次圈矿工具_初步原型/client/_page_work.py
+3DMine二次圈矿工具_初步原型/client/_view_new.py
+3DMine二次圈矿工具_初步原型/client/ui/

@@ -24,10 +24,18 @@ from pathlib import Path
 
 APP_NAME = "二次圈矿智能工作台"
 APP_NAME_EN = "GEOLOGICAL MINING WORKSPACE"
-APP_VERSION = "v1.15"
+APP_VERSION = "v1.17"
+BUILD_STAMP = "BUILD 2026-11-06"
+RELEASE_CHANNEL = "专业工作站版"
 
 # 让子进程知道"可写根目录"是谁；没设就让它们按源码树自己算
 ENV_HOME = "SM_HOME"
+
+
+def build_stamp() -> str:
+    """侧栏底部的构建信息：版本号下面那一行。"""
+    mode = "单文件 exe" if is_frozen() else "源码运行"
+    return "%s · %s" % (mode, BUILD_STAMP.replace("BUILD ", "").strip())
 
 
 def is_frozen() -> bool:

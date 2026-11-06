@@ -28,12 +28,9 @@ class DiagnosticsPage(Page):
         card.add(W.SectionTitle("1", "执行验收", "全量约 3 分钟；快检只挑代表炮区"))
         row = QHBoxLayout()
         row.setSpacing(8)
-        b1 = W.icon_button("shield", "一键全量验收", kind="primary", on_click=lambda: self.run(False))
-        b1.setMinimumHeight(36)
-        row.addWidget(b1)
-        b2 = W.icon_button("play", "快速验收", on_click=lambda: self.run(True))
-        b2.setMinimumHeight(36)
-        row.addWidget(b2)
+        row.addWidget(W.icon_button("shield", "一键全量验收", kind="primary",
+                                    on_click=lambda: self.run(False)))
+        row.addWidget(W.icon_button("play", "快速验收", on_click=lambda: self.run(True)))
         row.addWidget(W.icon_button("file", "打开验收报告", kind="ghost", on_click=self.open_report))
         row.addWidget(W.icon_button("folder", "打开 _probe 目录", kind="ghost",
                                     on_click=lambda: paths.open_path(paths.probe_dir())))
@@ -48,10 +45,14 @@ class DiagnosticsPage(Page):
         card.add(self.banner)
         self.add(card)
 
-        tcard = W.Card("验收项", "状态随日志实时更新")
-        self.tb = W.make_table(["验收项", "状态", "说明"], [320, 100, 400], 300)
+        tcard = W.TableCard(
+            "验收项", "状态随日志实时更新", ["验收项", "状态", "说明"], [340, 90], 320,
+            empty_icon="clipboard", empty_title="还没有验收记录",
+            empty_desc="点上方「一键全量验收」或「快速验收」，逐项结果会实时出现在这里。")
+        self.tb = tcard.table
+        self.tc_items = tcard
         self.rows = {}
-        tcard.add(self.tb)
+        self.tc_items.set_empty()
         self.add(tcard)
 
         lc = W.Card("日志", "")
@@ -76,6 +77,7 @@ class DiagnosticsPage(Page):
         self.log.clear()
         self.tb.setRowCount(0)
         self.rows = {}
+        self.tc_items.set_empty()
         args = ["--no-open"] + (["--quick"] if quick else [])
         self.lb_state.setText("正在跑%s验收…" % ("快速" if quick else "全量"))
         self._tid = self.runner.run("一键验收（%s）" % ("快检" if quick else "全量"),
@@ -104,6 +106,7 @@ class DiagnosticsPage(Page):
             self.rows[name] = idx
         self.tb.setItem(idx, 1, W.cell(status, fg, True))
         self.tb.setItem(idx, 2, W.cell(note, theme.TEXT_MUTED))
+        self.tc_items.set_empty()
 
     def _on_finished(self, tid: str, code: int) -> None:
         if tid != getattr(self, "_tid", None):

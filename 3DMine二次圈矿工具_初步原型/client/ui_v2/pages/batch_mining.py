@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget,
 )
 
 from .. import theme
@@ -43,7 +43,7 @@ class BatchMiningPage(Page):
         bar = QHBoxLayout()
         bar.setSpacing(8)
         bar.addWidget(W.icon_button("refresh", "扫描炮区", kind="primary", on_click=self.scan))
-        self.ck_all = QCheckBox("全选")
+        self.ck_all = W.CheckRow("全选")
         self.ck_all.setChecked(True)
         self.ck_all.stateChanged.connect(self._toggle_all)
         bar.addWidget(self.ck_all)
@@ -56,10 +56,12 @@ class BatchMiningPage(Page):
         card.add(bar)
         self.add(card)
 
-        run = QHBoxLayout()
+        toolbar = QFrame()
+        toolbar.setObjectName("card")
+        run = QHBoxLayout(toolbar)
+        run.setContentsMargins(14, 10, 14, 10)
         run.setSpacing(8)
         self.btn_run = W.icon_button("play", "开始批量圈矿", kind="primary", on_click=self.run_queue)
-        self.btn_run.setMinimumHeight(38)
         run.addWidget(self.btn_run)
         self.btn_orig = W.icon_button("layers", "跑原批量流程（含汇总表）", on_click=self.run_original)
         run.addWidget(self.btn_orig)
@@ -72,17 +74,20 @@ class BatchMiningPage(Page):
         self.lb_progress = QLabel("0 / 0")
         self.lb_progress.setObjectName("muted")
         run.addWidget(self.lb_progress)
-        self.add(run)
+        self.add(toolbar)
 
         split = QSplitter(Qt.Vertical)
         split.setChildrenCollapsible(False)
 
-        tcard = W.Card("任务列表", "勾选要跑的行；状态实时刷新")
-        self.table = W.make_table(
+        tcard = W.TableCard(
+            "任务列表", "勾选要跑的行；状态实时刷新",
             ["", "平台", "炮区", "数据库文件", "圈矿模式", "状态", "开始", "完成", "说明"],
-            [34, 70, 70, 260, 90, 80, 70, 70, 240], 260)
+            [40, 74, 74, 240, 96, 80, 78], 300,
+            empty_icon="layers", empty_title="还没有扫描到炮区",
+            empty_desc="选择「单日数据父目录」后点「扫描炮区」，勾选要跑的行再开始批量。")
+        self.table = tcard.table
         self.table.itemChanged.connect(self._on_item_changed)
-        tcard.add(self.table)
+        self.tc_tasks = tcard
         split.addWidget(tcard)
 
         lcard = W.Card("任务日志", "点一行看它的日志")
@@ -95,6 +100,7 @@ class BatchMiningPage(Page):
 
         self._logs: dict[int, list[str]] = {}
         self.runner.log.connect(self._collect_log)
+        self.tc_tasks.set_empty()
 
     # ------------------------------------------------------------ 扫描
 
@@ -134,6 +140,7 @@ class BatchMiningPage(Page):
             self.table.setItem(r, 8, W.cell(t.message, theme.TEXT_MUTED))
         self.table.blockSignals(False)
         self.lb_progress.setText("0 / %d" % len(self.tasks))
+        self.tc_tasks.set_empty()
 
     def _status_item(self, status: str):
         fg, _bg = theme.status_color(status)

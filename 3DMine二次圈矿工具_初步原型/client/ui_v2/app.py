@@ -68,6 +68,12 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["--run-script"]:
         return run_script(argv[1:])
 
+    # 截图/验收用：必须在 QApplication 之前设置缩放
+    if "--scale" in argv:
+        i = argv.index("--scale")
+        if i + 1 < len(argv):
+            os.environ["QT_SCALE_FACTOR"] = argv[i + 1]
+
     from PySide6.QtCore import Qt, QTimer
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtWidgets import QApplication, QMessageBox
@@ -97,7 +103,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     win.show()
 
-    # 开发/验收自检：截图后退出
+    # 开发/验收自检：--size 1366x768 指定窗口尺寸，--page 指定页面，--shot 存图后退出
+    if "--size" in argv:
+        i = argv.index("--size")
+        if i + 1 < len(argv):
+            try:
+                w, h = argv[i + 1].lower().split("x")
+                win.resize(int(w), int(h))
+            except Exception:
+                pass
+
     if "--shot" in argv:
         i = argv.index("--shot")
         target = Path(argv[i + 1]) if i + 1 < len(argv) else Path("ui_shot.png")
@@ -113,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
 
         QTimer.singleShot(700, _snap)
     return app.exec()
+
 
 
 def _save_and_quit(win, target: Path) -> None:

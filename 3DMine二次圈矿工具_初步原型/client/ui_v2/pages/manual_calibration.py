@@ -120,7 +120,7 @@ class ManualCalibrationPage(Page):
         right.addStretch(1)
 
         cc = W.Card("对比", "能算的才显示，缺数据留 —")
-        self.tb = W.make_table(["指标", "人工", "自动", "差异"], [150, 130, 130, 130], 210)
+        self.tb = W.make_table(["指标", "人工", "自动", "差异"], [170, 150, 160], 300)
         cc.add(self.tb)
         self.add(cc)
 

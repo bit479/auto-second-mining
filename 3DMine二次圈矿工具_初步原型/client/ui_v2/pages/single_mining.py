@@ -8,9 +8,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
-    QButtonGroup, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton, QSplitter,
-    QVBoxLayout, QWidget,
+    QButtonGroup, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QProgressBar, QPushButton, QRadioButton, QSplitter, QVBoxLayout,
+    QWidget,
 )
 
 from .. import theme
@@ -108,9 +108,8 @@ class SingleMiningPage(Page):
         gl.addWidget(self.ed_date, 0, 3)
 
         gl.addWidget(_lab("矿段"), 0, 4)
-        self.cb_section = QComboBox()
-        for key, name in config.grade_choices():
-            self.cb_section.addItem(name, key)
+        self.cb_section = W.combo(config.grade_choices())
+        self.cb_section.setFixedWidth(226)
         self.cb_section.currentIndexChanged.connect(self._on_section_changed)
         gl.addWidget(self.cb_section, 0, 5, 1, 2)
 
@@ -136,6 +135,7 @@ class SingleMiningPage(Page):
         row.setSpacing(10)
         self.mode_group = QButtonGroup(self)
         self.mode_buttons: dict[str, QRadioButton] = {}
+        self.mode_boxes: dict[str, QFrame] = {}
         specs = [
             ("auto", "① 自动圈矿", "按参数与算法自动分档、圈矿界、分块算量（日常默认）"),
             ("manual", "② 人工圈矿", "导入人工画的闭合矿块 .3ds：一条线 = 一块，只算量出图"),
@@ -143,7 +143,7 @@ class SingleMiningPage(Page):
         ]
         for key, title, desc in specs:
             box = QFrame()
-            box.setObjectName("cardTight")
+            box.setObjectName("modeCard")
             box.setCursor(Qt.PointingHandCursor)
             bl = QVBoxLayout(box)
             bl.setContentsMargins(12, 10, 12, 10)
@@ -159,6 +159,7 @@ class SingleMiningPage(Page):
             d.setWordWrap(True)
             bl.addWidget(d)
             row.addWidget(box, 1)
+            self.mode_boxes[key] = box
             box.mousePressEvent = lambda e, k=key: self.set_mode(k)   # 点卡片任意处都切换
         self.mode_buttons["auto"].setChecked(True)
         self.mode_group.buttonClicked.connect(lambda b: self.set_mode(b.property("modekey")))
@@ -243,8 +244,7 @@ class SingleMiningPage(Page):
         run_row.setSpacing(10)
         self.btn_run = W.icon_button("play", "一键出三件套", kind="primary",
                                      on_click=self.start_pipeline)
-        self.btn_run.setMinimumHeight(38)
-        self.btn_run.setMinimumWidth(180)
+        self.btn_run.setMinimumWidth(172)
         run_row.addWidget(self.btn_run)
         self.btn_cancel = QPushButton("取消")
         self.btn_cancel.setProperty("kind", "danger")
@@ -257,14 +257,12 @@ class SingleMiningPage(Page):
         run_row.addWidget(self.lb_state)
         card.add(run_row)
 
-        bar = QFrame()
-        bar.setFixedHeight(6)
-        bar.setStyleSheet("QFrame{background:%s;border-radius:3px;}" % theme.NEUTRAL_BG)
-        self.pbar = bar
-        self._pbar_inner = QFrame(bar)
-        self._pbar_inner.setStyleSheet("QFrame{background:%s;border-radius:3px;}" % theme.PRIMARY)
-        self._pbar_inner.setGeometry(0, 0, 0, 6)
-        card.add(bar)
+        self.pbar = QProgressBar()
+        self.pbar.setRange(0, 1000)
+        self.pbar.setValue(0)
+        self.pbar.setTextVisible(False)
+        self.pbar.setFixedHeight(8)
+        card.add(self.pbar)
         self._set_progress(0.0)
 
     def _build_right(self, box: QVBoxLayout) -> None:
@@ -272,9 +270,10 @@ class SingleMiningPage(Page):
         self.res_list = QVBoxLayout()
         self.res_list.setSpacing(4)
         res.add(self.res_list)
-        self.lb_res_empty = QLabel("还没有生成成果。")
-        self.lb_res_empty.setObjectName("muted")
-        self.res_list.addWidget(self.lb_res_empty)
+        self.res_list.addWidget(W.EmptyState(
+            "file-text", "还没有生成成果",
+            "跑完一次圈矿后，报告 xlsx / 图片 / DWG / DXF / .3ds 会出现在这里。",
+            compact=True))
         box.addWidget(res)
 
         logc = W.Card("运行日志", "")
@@ -402,6 +401,10 @@ class SingleMiningPage(Page):
         if rb is None:
             return
         rb.setChecked(True)
+        for k, box in self.mode_boxes.items():
+            box.setProperty("selected", "true" if k == key else "false")
+            box.style().unpolish(box)
+            box.style().polish(box)
         need = key in ("manual", "exact")
         self.row_outline.setVisible(need)
         self.btn_pick_outline.setVisible(need)
@@ -586,9 +589,8 @@ class SingleMiningPage(Page):
         names = {"xlsx": "报告 xlsx", "png": "报告图片", "dwg": "成果图 DWG",
                  "dxf": "成果图 DXF", "tds": "矿块边界线 .3ds"}
         if not items:
-            lb = QLabel("没有找到成果文件，请看右侧日志。")
-            lb.setObjectName("muted")
-            self.res_list.addWidget(lb)
+            self.res_list.addWidget(W.EmptyState(
+                "alert", "没有找到成果文件", "请看下方运行日志确认失败原因。", compact=True))
             return
         for key, f in items:
             row = QWidget()
@@ -621,10 +623,12 @@ class SingleMiningPage(Page):
             self.lb_steps.setText("")
 
     def _set_progress(self, ratio: float, error: bool = False) -> None:
-        w = self.pbar.width()
-        self._pbar_inner.setGeometry(0, 0, int(w * max(0.0, min(1.0, ratio))), 6)
-        self._pbar_inner.setStyleSheet(
-            "QFrame{background:%s;border-radius:3px;}" % (theme.DANGER if error else theme.PRIMARY))
+        value = int(max(0.0, min(1.0, ratio)) * 1000)
+        self.pbar.setValue(value)
+        self.pbar.setStyleSheet(
+            "QProgressBar{background:%s;border:none;border-radius:4px;}"
+            "QProgressBar::chunk{background:%s;border-radius:4px;}"
+            % (theme.NEUTRAL_BG, theme.DANGER if error else theme.PRIMARY))
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
